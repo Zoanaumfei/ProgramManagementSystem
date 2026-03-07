@@ -1,0 +1,22 @@
+spring:
+  application:
+    name: ProgramManagementSystem
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://cognito-idp.sa-east-1.amazonaws.com/sa-east-1_aA4I3tEmF
+
+app:
+  security:
+    cognito:
+      issuer-uri: https://cognito-idp.sa-east-1.amazonaws.com/sa-east-1_aA4I3tEmF
+      jwk-set-uri: https://cognito-idp.sa-east-1.amazonaws.com/sa-east-1_aA4I3tEmF/.well-known/jwks.json
+      app-client-id: rv7hk9nkugspb3i4p269sv828
+      allowed-origins:
+        - http://localhost:3000
+        - https://oryzem.com
+
+logging:
+  level:
+    com.oryzem.programmanagementsystem.security: INFO
