@@ -1,0 +1,22 @@
+{
+  "cluster": "program-management-system-cluster",
+  "serviceName": "program-management-system-service",
+  "taskDefinition": "__TASK_DEFINITION_ARN__",
+  "desiredCount": 1,
+  "launchType": "FARGATE",
+  "platformVersion": "LATEST",
+  "enableExecuteCommand": false,
+  "networkConfiguration": {
+    "awsvpcConfiguration": {
+      "subnets": [
+        "subnet-0200b652bed2d069a",
+        "subnet-0be1f1a93618c659c",
+        "subnet-01601f5f0d452d7da"
+      ],
+      "securityGroups": [
+        "sg-0af8c0fc744a9ef99"
+      ],
+      "assignPublicIp": "ENABLED"
+    }
+  }
+}

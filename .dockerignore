@@ -1,0 +1,7 @@
+.git
+.gitattributes
+.idea
+target
+PROJECT_CONTEXT.md
+run-rds.log
+*.iml

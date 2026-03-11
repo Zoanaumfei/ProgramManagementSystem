@@ -29,6 +29,13 @@ class PingControllerSecurityTest {
     }
 
     @Test
+    void actuatorHealthShouldBeAccessibleWithoutToken() throws Exception {
+        mockMvc.perform(get("/actuator/health"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("UP"));
+    }
+
+    @Test
     void apiEndpointShouldReturnUnauthorizedWithoutToken() throws Exception {
         mockMvc.perform(get("/api/ping"))
                 .andExpect(status().isUnauthorized())

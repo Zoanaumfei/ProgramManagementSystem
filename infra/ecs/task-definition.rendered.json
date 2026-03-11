@@ -1,0 +1,67 @@
+{
+  "family": "program-management-system",
+  "taskRoleArn": "arn:aws:iam::439533253319:role/program-management-system-ecs-task-role",
+  "executionRoleArn": "arn:aws:iam::439533253319:role/program-management-system-ecs-execution-role",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "cpu": "1024",
+  "memory": "2048",
+  "runtimePlatform": {
+    "cpuArchitecture": "X86_64",
+    "operatingSystemFamily": "LINUX"
+  },
+  "containerDefinitions": [
+    {
+      "name": "program-management-system",
+      "image": "439533253319.dkr.ecr.sa-east-1.amazonaws.com/oryzem-backend-dev:latest",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 8080,
+          "hostPort": 8080,
+          "protocol": "tcp",
+          "name": "http-8080"
+        }
+      ],
+      "environment": [
+        {
+          "name": "SPRING_PROFILES_ACTIVE",
+          "value": "rds"
+        },
+        {
+          "name": "DB_SECRET_ID",
+          "value": "program-management-system/rds/master"
+        },
+        {
+          "name": "AWS_REGION",
+          "value": "sa-east-1"
+        },
+        {
+          "name": "DB_SSL_MODE",
+          "value": "require"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/program-management-system",
+          "awslogs-region": "sa-east-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "healthCheck": {
+        "command": [
+          "CMD-SHELL",
+          "curl -fsS http://localhost:8080/actuator/health/liveness || exit 1"
+        ],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 90
+      }
+    }
+  ]
+}
+

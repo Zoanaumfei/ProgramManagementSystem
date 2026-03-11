@@ -1,5 +1,6 @@
 package com.oryzem.programmanagementsystem.config;
 
+import com.oryzem.programmanagementsystem.audit.RequestCorrelationFilter;
 import com.oryzem.programmanagementsystem.security.AuthenticationLoggingFilter;
 import com.oryzem.programmanagementsystem.security.CognitoAudienceValidator;
 import com.oryzem.programmanagementsystem.security.CognitoJwtAuthenticationConverter;
@@ -37,6 +38,7 @@ public class SecurityConfig {
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             JwtDecoder jwtDecoder,
+            RequestCorrelationFilter requestCorrelationFilter,
             ObjectMapper objectMapper) throws Exception {
 
         http
@@ -46,6 +48,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/public/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().denyAll())
@@ -54,6 +57,7 @@ public class SecurityConfig {
                                 .decoder(jwtDecoder)
                                 .jwtAuthenticationConverter(new CognitoJwtAuthenticationConverter())))
                 .exceptionHandling(exceptionHandling(objectMapper))
+                .addFilterBefore(requestCorrelationFilter, BearerTokenAuthenticationFilter.class)
                 .addFilterAfter(new AuthenticationLoggingFilter(), BearerTokenAuthenticationFilter.class);
 
         return http.build();
