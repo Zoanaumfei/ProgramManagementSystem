@@ -90,9 +90,10 @@ Estado atual confirmado:
 - o portfolio V1 ja persiste `Organizacao`, `Programa`, `ParticipacaoNoPrograma`, `Projeto`, `Produto`, `Item`, `Entregavel`, `MilestoneTemplate`, `MilestoneTemplateItem`, `ProjetoMilestone`, `OpenIssue` e `DeliverableDocument`
 - o fluxo inicial de documentos de entregavel ja suporta preparar upload, confirmar upload, listar, gerar download por URL assinada e exclusao logica
 - o provider de documentos padrao em local/testes e `stub`; no perfil `rds` a prioridade e `s3`
+- no runtime atual do ECS/Fargate, o provider de documentos foi sobrescrito temporariamente para `stub` ate existir bucket S3 definido para producao
 - o upload de documentos esta restrito, por enquanto, a `Entregavel` do tipo `DOCUMENT`
 - o comportamento do modulo de portfolio e do fluxo de documentos foi validado por teste automatizado
-- a ultima execucao conhecida de `./mvnw.cmd test` terminou com `49` testes passando
+- a ultima execucao conhecida de `./mvnw.cmd test` terminou com `48` testes passando
 - ainda nao houve validacao operacional do fluxo de documentos contra um bucket S3 real no runtime AWS
 - a primeira UI basica do portfolio ja foi implementada no frontend local consumindo o contrato real de `/api/portfolio`
 - o frontend agora consegue listar e criar `Organizacao`, criar `MilestoneTemplate`, criar `Programa` com `Projeto` inicial, navegar no detalhe do programa e seguir o fluxo estrutural ate documento em modo `stub`
@@ -141,15 +142,15 @@ Secrets Manager:
 ECS/Fargate:
 - cluster: `program-management-system-cluster`
 - service: `program-management-system-service`
-- task definition atual: `program-management-system:5`
+- task definition atual: `program-management-system:7`
 - task role: `program-management-system-ecs-task-role`
 - execution role: `program-management-system-ecs-execution-role`
 - execution role ARN: `arn:aws:iam::439533253319:role/program-management-system-ecs-execution-role`
 - task security group: `sg-0af8c0fc744a9ef99` (`program-management-system-ecs-tasks-sg`)
-- task atual validada: `a2897ccffde54d35a2fbc9f1a5096f8f`
-- ENI da task: `eni-04d37855bfd82fd0e`
-- IP privado observado: `172.31.9.59`
-- IP publico observado: `56.124.56.159`
+- task atual validada: `afbc2008a7dd4d7493e24d4c7f4c57d5`
+- ENI da task: `eni-05101ed5fcbdd779d`
+- IP privado observado: `172.31.13.90`
+- IP publico observado: `18.229.126.207`
 
 ECR:
 - repositorio: `oryzem-backend-dev`
@@ -255,10 +256,12 @@ Status do backend:
 - service ECS em steady state
 - health da task validada como `HEALTHY`
 - sem elevacao para a role administrativa, a observabilidade operacional segue parcial por falta de permissoes de leitura em logs e target health
-- task definition `:5` implantada com health check de container em producao
+- task definition `:7` implantada com health check de container em producao
 - modelo IAM em 2 camadas estabelecido com elevacao temporaria via role assumivel
 - com a role assumida, a observabilidade operacional basica foi validada para Logs e Target Health
 - provider de documentos configuravel por ambiente: `stub` local/testes e `s3` no perfil `rds`
+- rollout de `program-management-system:6` falhou no ECS por falta de `APP_PORTFOLIO_DOCUMENTS_BUCKET_NAME` ao subir com provider `s3`
+- task definition `:7` corrigiu o deploy com override temporario `APP_PORTFOLIO_DOCUMENTS_PROVIDER=stub` no runtime AWS
 
 Status do frontend:
 - a stack base do frontend esta definida com `React + JavaScript + Vite`
@@ -304,11 +307,11 @@ O que esta pronto:
 - probes `liveness` e `readiness` acessiveis via ALB
 - logs do container configurados para CloudWatch Logs no task definition
 - imagem Docker publicada com `curl` para suportar health check de container no ECS
-- task definition atual `program-management-system:5` implantada com health check em `/actuator/health/liveness`
+- task definition atual `program-management-system:7` implantada com health check em `/actuator/health/liveness`
 - task ECS atual rodando com health check de container e status `HEALTHY`
 - politica versionada de leitura operacional preparada localmente para IAM
 - deploy mais recente executado com sucesso no ECS/Fargate
-- service atualizado para `program-management-system:5` e revalidado com task saudavel
+- service atualizado para `program-management-system:7` e revalidado com task saudavel
 - mapa conceitual V1 do dominio principal definido com raiz em `Programa`
 - regra de negocio consolidada de que `tenant` representa uma empresa (`Organizacao`)
 - colaboracao multiempresa definida via participacao de organizacoes em programas
@@ -448,6 +451,8 @@ Configuracao do backend:
   - `APP_PORTFOLIO_DOCUMENTS_KEY_PREFIX`
   - `APP_PORTFOLIO_DOCUMENTS_PRESIGN_DURATION_MINUTES`
   - `APP_PORTFOLIO_DOCUMENTS_REGION`
+- override atual no ECS:
+  - `APP_PORTFOLIO_DOCUMENTS_PROVIDER=stub`
 
 Perfis e comportamento:
 - default/local: `app.portfolio.documents.provider=stub`
@@ -586,7 +591,7 @@ Qualidade:
 - suite `./mvnw.cmd test` validada repetidamente durante a implantacao
 - testes cobrindo autenticacao, autorizacao, CORS, `users`, `operations` e `reports`
 - teste do modulo de portfolio cobre autenticacao obrigatoria, criacao da hierarquia principal, aplicacao de milestone template, upload stub, confirmacao de upload, download, listagem de documentos e criacao de `OpenIssue`
-- ultima execucao conhecida: `49` testes passando
+- ultima execucao conhecida: `48` testes passando
 
 ## Mapa oficial do dominio V1
 
@@ -1026,6 +1031,14 @@ Proxima fila apos a sprint:
 - o detalhe de `Programa` passou a renderizar participantes, milestones, produtos, itens, entregaveis, documentos e `OpenIssue`
 - a UI passou a permitir criar `Produto`, `Item`, `Entregavel`, `OpenIssue` e registrar documento via provider `stub`
 - `npm run lint`, `npm run test` e `npm run build` foram executados com sucesso apos a implementacao
+
+### 2026-03-14 - Recuperacao do deploy ECS apos falha de configuracao de documentos
+- o build local com `./mvnw.cmd clean test` voltou a passar com `48` testes
+- o primeiro rollout de `program-management-system:6` falhou no ECS porque o profile `rds` subiu com provider `s3` sem `APP_PORTFOLIO_DOCUMENTS_BUCKET_NAME`
+- os logs do CloudWatch confirmaram erro de bootstrap em `PortfolioDocumentStorageConfig` exigindo `app.portfolio.documents.bucket-name`
+- o template `infra/ecs/task-definition.template.json` foi ajustado para sobrescrever temporariamente `APP_PORTFOLIO_DOCUMENTS_PROVIDER=stub` no runtime AWS
+- um novo deploy registrou `program-management-system:7`, promoveu a task `afbc2008a7dd4d7493e24d4c7f4c57d5` e recolocou o service em steady state
+- `GET /public/ping` e `GET /actuator/health/liveness` responderam `200` via ALB apos a recuperacao
 
 ## Regra de atualizacao
 
