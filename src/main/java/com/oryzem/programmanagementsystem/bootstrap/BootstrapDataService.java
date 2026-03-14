@@ -6,6 +6,7 @@ import com.oryzem.programmanagementsystem.authorization.TenantType;
 import com.oryzem.programmanagementsystem.operations.OperationRecord;
 import com.oryzem.programmanagementsystem.operations.OperationRepository;
 import com.oryzem.programmanagementsystem.operations.OperationStatus;
+import com.oryzem.programmanagementsystem.portfolio.PortfolioResetService;
 import com.oryzem.programmanagementsystem.users.ManagedUser;
 import com.oryzem.programmanagementsystem.users.UserRepository;
 import com.oryzem.programmanagementsystem.users.UserStatus;
@@ -21,16 +22,19 @@ public class BootstrapDataService {
     private final UserRepository userRepository;
     private final OperationRepository operationRepository;
     private final AuditTrailService auditTrailService;
+    private final PortfolioResetService portfolioResetService;
     private final boolean seedData;
 
     public BootstrapDataService(
             UserRepository userRepository,
             OperationRepository operationRepository,
             AuditTrailService auditTrailService,
+            PortfolioResetService portfolioResetService,
             @Value("${app.bootstrap.seed-data:true}") boolean seedData) {
         this.userRepository = userRepository;
         this.operationRepository = operationRepository;
         this.auditTrailService = auditTrailService;
+        this.portfolioResetService = portfolioResetService;
         this.seedData = seedData;
     }
 
@@ -54,6 +58,7 @@ public class BootstrapDataService {
         auditTrailService.clear();
         operationRepository.deleteAll();
         userRepository.deleteAll();
+        portfolioResetService.clearAll();
         if (seedData) {
             seedUsers();
             seedOperations();

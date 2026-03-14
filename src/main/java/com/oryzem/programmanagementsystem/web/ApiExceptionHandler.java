@@ -1,6 +1,7 @@
 package com.oryzem.programmanagementsystem.web;
 
 import com.oryzem.programmanagementsystem.operations.OperationNotFoundException;
+import com.oryzem.programmanagementsystem.portfolio.PortfolioNotFoundException;
 import com.oryzem.programmanagementsystem.users.UserNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
@@ -37,6 +38,14 @@ public class ApiExceptionHandler {
     @ExceptionHandler(OperationNotFoundException.class)
     public ResponseEntity<Map<String, Object>> handleOperationNotFound(
             OperationNotFoundException exception,
+            HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(errorBody(request, HttpStatus.NOT_FOUND, "Not Found", exception.getMessage(), null));
+    }
+
+    @ExceptionHandler(PortfolioNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handlePortfolioNotFound(
+            PortfolioNotFoundException exception,
             HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(errorBody(request, HttpStatus.NOT_FOUND, "Not Found", exception.getMessage(), null));

@@ -31,6 +31,13 @@ spring:
 app:
   bootstrap:
     seed-data: ${APP_BOOTSTRAP_SEED_DATA:true}
+  portfolio:
+    documents:
+      provider: ${APP_PORTFOLIO_DOCUMENTS_PROVIDER:stub}
+      bucket-name: ${APP_PORTFOLIO_DOCUMENTS_BUCKET_NAME:}
+      key-prefix: ${APP_PORTFOLIO_DOCUMENTS_KEY_PREFIX:portfolio}
+      presign-duration-minutes: ${APP_PORTFOLIO_DOCUMENTS_PRESIGN_DURATION_MINUTES:15}
+      region: ${APP_PORTFOLIO_DOCUMENTS_REGION:${AWS_REGION:sa-east-1}}
   security:
     cognito:
       issuer-uri: ${COGNITO_ISSUER_URI:https://cognito-idp.sa-east-1.amazonaws.com/sa-east-1_aA4I3tEmF}

@@ -17,6 +17,13 @@ spring:
 app:
   bootstrap:
     seed-data: ${APP_BOOTSTRAP_SEED_DATA:false}
+  portfolio:
+    documents:
+      provider: ${APP_PORTFOLIO_DOCUMENTS_PROVIDER:s3}
+      bucket-name: ${APP_PORTFOLIO_DOCUMENTS_BUCKET_NAME:}
+      key-prefix: ${APP_PORTFOLIO_DOCUMENTS_KEY_PREFIX:portfolio}
+      presign-duration-minutes: ${APP_PORTFOLIO_DOCUMENTS_PRESIGN_DURATION_MINUTES:15}
+      region: ${APP_PORTFOLIO_DOCUMENTS_REGION:${AWS_REGION:sa-east-1}}
   rds:
     secret:
       enabled: ${DB_SECRET_ENABLED:true}
