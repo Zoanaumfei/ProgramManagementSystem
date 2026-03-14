@@ -274,6 +274,7 @@ Status do frontend:
 - a autorizacao real para usuario no grupo `ADMIN` foi validada em `GET /api/admin/ping` e `GET /api/authz/check`
 - o frontend agora possui um workspace de portfolio consumindo `organizations`, `milestone-templates`, `programs`, detalhe de programa, `products`, `items`, `deliverables`, `documents` e `open-issues`
 - o diagnostico de sessao, claims e validador de endpoints protegidos foi preservado em `/workspace/session`
+- a inicializacao do `PortfolioWorkspace` foi estabilizada apos correcao de ordem de inicializacao de estado no calculo de `ownerOrganizationId`
 - os gaps atuais mais relevantes para integracao sao logout real, enriquecimento da identidade retornada, investigacao de `principal=null` nos endpoints de ping e refinamento de UX/mensagens do novo fluxo de portfolio
 
 Leitura estrategica do momento:
@@ -579,6 +580,7 @@ Frontend:
 - detalhe de programa renderiza participantes, milestones, produtos, itens, entregaveis, documentos e `OpenIssue`
 - a UI permite criar `Produto`, `Item`, `Entregavel`, `OpenIssue` e registrar documento via provider `stub`
 - o workspace tecnico anterior foi preservado em `/workspace/session`
+- a inicializacao do workspace de portfolio foi corrigida apos um `ReferenceError` causado por acesso antecipado a estado do formulario de programa
 
 AWS runtime:
 - RDS privado provisionado e validado
@@ -1031,6 +1033,11 @@ Proxima fila apos a sprint:
 - o detalhe de `Programa` passou a renderizar participantes, milestones, produtos, itens, entregaveis, documentos e `OpenIssue`
 - a UI passou a permitir criar `Produto`, `Item`, `Entregavel`, `OpenIssue` e registrar documento via provider `stub`
 - `npm run lint`, `npm run test` e `npm run build` foram executados com sucesso apos a implementacao
+
+### 2026-03-14 - Correcao de inicializacao do PortfolioWorkspace
+- o frontend apresentava `ReferenceError` ao abrir o workspace por calcular `effectiveOwnerOrganizationId` antes da inicializacao de `programForm`
+- o calculo foi movido para depois do `useState` correspondente, estabilizando a montagem inicial da tela
+- `npm run lint`, `npm run test` e `npm run build` foram reexecutados com sucesso apos a correcao
 
 ### 2026-03-14 - Recuperacao do deploy ECS apos falha de configuracao de documentos
 - o build local com `./mvnw.cmd clean test` voltou a passar com `48` testes
