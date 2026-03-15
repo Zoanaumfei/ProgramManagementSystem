@@ -56,8 +56,10 @@ class UserManagementControllerSecurityTest {
                                 .authorities(new SimpleGrantedAuthority("ROLE_MANAGER"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2))
-                .andExpect(jsonPath("$[0].tenantId").value("tenant-a"))
-                .andExpect(jsonPath("$[1].tenantId").value("tenant-a"));
+                .andExpect(jsonPath("$[0].organizationId").value("tenant-a"))
+                .andExpect(jsonPath("$[0].organizationName").value("Tenant A"))
+                .andExpect(jsonPath("$[1].organizationId").value("tenant-a"))
+                .andExpect(jsonPath("$[1].organizationName").value("Tenant A"));
     }
 
     @Test
@@ -82,8 +84,7 @@ class UserManagementControllerSecurityTest {
                                   "displayName": "New Member",
                                   "email": "new.member@tenant.com",
                                   "role": "MEMBER",
-                                  "tenantId": "tenant-a",
-                                  "tenantType": "EXTERNAL"
+                                  "organizationId": "tenant-a"
                                 }
                                 """)
                         .with(jwt().jwt(jwt -> jwt
@@ -95,7 +96,8 @@ class UserManagementControllerSecurityTest {
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", org.hamcrest.Matchers.containsString("/api/users/")))
                 .andExpect(jsonPath("$.role").value("MEMBER"))
-                .andExpect(jsonPath("$.tenantId").value("tenant-a"))
+                .andExpect(jsonPath("$.organizationId").value("tenant-a"))
+                .andExpect(jsonPath("$.organizationName").value("Tenant A"))
                 .andExpect(jsonPath("$.status").value("INVITED"));
     }
 
@@ -108,8 +110,7 @@ class UserManagementControllerSecurityTest {
                                   "displayName": "Escalated Admin",
                                   "email": "admin2@tenant.com",
                                   "role": "ADMIN",
-                                  "tenantId": "tenant-a",
-                                  "tenantType": "EXTERNAL"
+                                  "organizationId": "tenant-a"
                                 }
                                 """)
                         .with(jwt().jwt(jwt -> jwt
@@ -120,6 +121,28 @@ class UserManagementControllerSecurityTest {
                                 .authorities(new SimpleGrantedAuthority("ROLE_MANAGER"))))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Target role")));
+    }
+
+    @Test
+    void createUserShouldRejectUnknownOrganization() throws Exception {
+        mockMvc.perform(post("/api/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "displayName": "Ghost Member",
+                                  "email": "ghost.member@tenant.com",
+                                  "role": "MEMBER",
+                                  "organizationId": "tenant-z"
+                                }
+                                """)
+                        .with(jwt().jwt(jwt -> jwt
+                                        .claim("sub", "manager-123")
+                                        .claim("cognito:username", "manager")
+                                        .claim("tenant_id", "tenant-a")
+                                        .claim("tenant_type", "EXTERNAL"))
+                                .authorities(new SimpleGrantedAuthority("ROLE_MANAGER"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Organization not found: tenant-z"));
     }
 
     @Test

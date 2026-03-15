@@ -6,6 +6,7 @@ import com.oryzem.programmanagementsystem.authorization.TenantType;
 import com.oryzem.programmanagementsystem.operations.OperationRecord;
 import com.oryzem.programmanagementsystem.operations.OperationRepository;
 import com.oryzem.programmanagementsystem.operations.OperationStatus;
+import com.oryzem.programmanagementsystem.portfolio.OrganizationDirectoryService;
 import com.oryzem.programmanagementsystem.portfolio.PortfolioResetService;
 import com.oryzem.programmanagementsystem.users.ManagedUser;
 import com.oryzem.programmanagementsystem.users.UserRepository;
@@ -23,6 +24,7 @@ public class BootstrapDataService {
     private final OperationRepository operationRepository;
     private final AuditTrailService auditTrailService;
     private final PortfolioResetService portfolioResetService;
+    private final OrganizationDirectoryService organizationDirectoryService;
     private final boolean seedData;
 
     public BootstrapDataService(
@@ -30,11 +32,13 @@ public class BootstrapDataService {
             OperationRepository operationRepository,
             AuditTrailService auditTrailService,
             PortfolioResetService portfolioResetService,
+            OrganizationDirectoryService organizationDirectoryService,
             @Value("${app.bootstrap.seed-data:true}") boolean seedData) {
         this.userRepository = userRepository;
         this.operationRepository = operationRepository;
         this.auditTrailService = auditTrailService;
         this.portfolioResetService = portfolioResetService;
+        this.organizationDirectoryService = organizationDirectoryService;
         this.seedData = seedData;
     }
 
@@ -67,6 +71,7 @@ public class BootstrapDataService {
 
     private void seedUsers() {
         Instant baseTime = Instant.parse("2026-03-07T12:00:00Z");
+        seedOrganizations();
         userRepository.save(user("USR-ADMIN-001", "Platform Admin", "admin@oryzem.com", Role.ADMIN, "internal-core", TenantType.INTERNAL, UserStatus.ACTIVE, baseTime));
         userRepository.save(user("USR-ADMIN-002", "Security Admin", "security.admin@oryzem.com", Role.ADMIN, "internal-core", TenantType.INTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(60)));
         userRepository.save(user("USR-INT-SUP-001", "Support Analyst", "support@oryzem.com", Role.SUPPORT, "internal-core", TenantType.INTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(120)));
@@ -84,6 +89,27 @@ public class BootstrapDataService {
         operationRepository.save(operation("OP-TA-003", "Run @ Rate", "Capacity validation for tenant A", "tenant-a", TenantType.EXTERNAL, "member-123", OperationStatus.DRAFT, baseTime.plusSeconds(180)));
         operationRepository.save(operation("OP-TB-001", "Line Trial", "Production line trial for tenant B", "tenant-b", TenantType.EXTERNAL, "manager-b", OperationStatus.APPROVED, baseTime.plusSeconds(240)));
         operationRepository.save(operation("OP-TB-002", "Corrective Action", "Corrective action follow-up", "tenant-b", TenantType.EXTERNAL, "member-b", OperationStatus.REJECTED, baseTime.plusSeconds(360)));
+    }
+
+    private void seedOrganizations() {
+        organizationDirectoryService.ensureSeeded(
+                "internal-core",
+                "bootstrap",
+                "Oryzem Internal Core",
+                "CORE-INT",
+                true);
+        organizationDirectoryService.ensureSeeded(
+                "tenant-a",
+                "bootstrap",
+                "Tenant A",
+                "TENANT-A",
+                true);
+        organizationDirectoryService.ensureSeeded(
+                "tenant-b",
+                "bootstrap",
+                "Tenant B",
+                "TENANT-B",
+                true);
     }
 
     private ManagedUser user(

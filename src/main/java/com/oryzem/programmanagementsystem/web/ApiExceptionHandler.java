@@ -1,5 +1,6 @@
 package com.oryzem.programmanagementsystem.web;
 
+import com.oryzem.programmanagementsystem.audit.RequestCorrelationContext;
 import com.oryzem.programmanagementsystem.operations.OperationNotFoundException;
 import com.oryzem.programmanagementsystem.portfolio.PortfolioNotFoundException;
 import com.oryzem.programmanagementsystem.users.UserNotFoundException;
@@ -8,6 +9,8 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -18,6 +21,14 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
+
+    private final RequestCorrelationContext requestCorrelationContext;
+
+    public ApiExceptionHandler(RequestCorrelationContext requestCorrelationContext) {
+        this.requestCorrelationContext = requestCorrelationContext;
+    }
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<Map<String, Object>> handleAccessDenied(
@@ -70,6 +81,26 @@ public class ApiExceptionHandler {
                 .body(errorBody(request, HttpStatus.BAD_REQUEST, "Bad Request", exception.getMessage(), null));
     }
 
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<Map<String, Object>> handleUnexpectedException(
+            Exception exception,
+            HttpServletRequest request) {
+        String correlationId = requestCorrelationContext.getOrCreate();
+        log.error(
+                "Unhandled exception for [{} {}] correlationId={}",
+                request.getMethod(),
+                request.getRequestURI(),
+                correlationId,
+                exception);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(errorBody(
+                        request,
+                        HttpStatus.INTERNAL_SERVER_ERROR,
+                        "Internal Server Error",
+                        "Unexpected server error.",
+                        null));
+    }
+
     private Map<String, Object> errorBody(
             HttpServletRequest request,
             HttpStatus status,
@@ -82,6 +113,10 @@ public class ApiExceptionHandler {
         body.put("error", error);
         body.put("message", message);
         body.put("path", request.getRequestURI());
+        String correlationId = requestCorrelationContext.get();
+        if (correlationId != null && !correlationId.isBlank()) {
+            body.put("correlationId", correlationId);
+        }
         if (extras != null) {
             body.putAll(extras);
         }

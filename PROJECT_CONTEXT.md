@@ -93,10 +93,13 @@ Estado atual confirmado:
 - no runtime atual do ECS/Fargate, o provider de documentos foi sobrescrito temporariamente para `stub` ate existir bucket S3 definido para producao
 - o upload de documentos esta restrito, por enquanto, a `Entregavel` do tipo `DOCUMENT`
 - o comportamento do modulo de portfolio e do fluxo de documentos foi validado por teste automatizado
-- a ultima execucao conhecida de `./mvnw.cmd test` terminou com `48` testes passando
+- o modulo de `users` agora expoe contrato orientado a `organizationId`, valida a existencia da `Organizacao` no backend e devolve `organizationName` na resposta
+- a ultima execucao conhecida de `./mvnw.cmd test` terminou com `50` testes passando
 - ainda nao houve validacao operacional do fluxo de documentos contra um bucket S3 real no runtime AWS
 - a primeira UI basica do portfolio ja foi implementada no frontend local consumindo o contrato real de `/api/portfolio`
 - o frontend agora consegue listar e criar `Organizacao`, criar `MilestoneTemplate`, criar `Programa` com `Projeto` inicial, navegar no detalhe do programa e seguir o fluxo estrutural ate documento em modo `stub`
+- o frontend passou a aplicar fallback controlado para `id_token` quando chamadas protegidas retornam `403` com o `access_token`, reduzindo bloqueios de integracao enquanto o comportamento real do Cognito/backend e refinado
+- o backend agora deixa de mascarar excecoes nao tratadas como `403` em `/error` e passa a responder `500` JSON com `correlationId`, facilitando diagnostico de falhas reais no portfolio
 
 Ponto de retomada oficial:
 - validar em uso real a UI basica sobre `/api/portfolio` para usar o backend ja implementado como contrato real de produto
@@ -262,6 +265,8 @@ Status do backend:
 - provider de documentos configuravel por ambiente: `stub` local/testes e `s3` no perfil `rds`
 - rollout de `program-management-system:6` falhou no ECS por falta de `APP_PORTFOLIO_DOCUMENTS_BUCKET_NAME` ao subir com provider `s3`
 - task definition `:7` corrigiu o deploy com override temporario `APP_PORTFOLIO_DOCUMENTS_PROVIDER=stub` no runtime AWS
+- excecoes nao tratadas agora retornam `500` JSON com `correlationId` em vez de cair em `403` mascarado por `/error`
+- o backend de `users` agora aceita `organizationId` como referencia canonica no contrato HTTP e resolve `tenant_id`/`tenant_type` apenas internamente por compatibilidade
 
 Status do frontend:
 - a stack base do frontend esta definida com `React + JavaScript + Vite`
@@ -275,7 +280,8 @@ Status do frontend:
 - o frontend agora possui um workspace de portfolio consumindo `organizations`, `milestone-templates`, `programs`, detalhe de programa, `products`, `items`, `deliverables`, `documents` e `open-issues`
 - o diagnostico de sessao, claims e validador de endpoints protegidos foi preservado em `/workspace/session`
 - a inicializacao do `PortfolioWorkspace` foi estabilizada apos correcao de ordem de inicializacao de estado no calculo de `ownerOrganizationId`
-- os gaps atuais mais relevantes para integracao sao logout real, enriquecimento da identidade retornada, investigacao de `principal=null` nos endpoints de ping e refinamento de UX/mensagens do novo fluxo de portfolio
+- o workspace e o diagnostico autenticado agora reaproveitam `id_token` como fallback controlado quando o backend responde `403` ao `access_token`, com mensagem de erro orientando validacao em `/workspace/session`
+- os gaps atuais mais relevantes para integracao sao logout real, enriquecimento da identidade retornada, investigacao de `principal=null` nos endpoints de ping, alinhamento definitivo entre claims do Cognito e autorizacao esperada no backend e refinamento de UX/mensagens do novo fluxo de portfolio
 
 Leitura estrategica do momento:
 - o projeto saiu da fase de fundacao tecnica e entrou na fase de produto utilizavel
@@ -333,6 +339,8 @@ O que esta pronto:
 - workspace de portfolio implementado no frontend para `Organizacao`, `MilestoneTemplate`, `Programa` e detalhe agregado de `Programa`
 - fluxo de criacao ponta a ponta implementado na UI para `Produto`, `Item`, `Entregavel`, `OpenIssue` e documento em modo `stub`
 - rota tecnica `/workspace/session` preserva o diagnostico de sessao, claims e endpoints protegidos
+- cliente HTTP do frontend com fallback controlado para `id_token` em respostas `403` nas chamadas protegidas, com cobertura automatizada
+- backend de `users` adaptado para contrato orientado a `organizationId`, com enriquecimento de `organizationName` e validacao de organizacao existente
 - `lint`, `test` e `build` do frontend validados com sucesso
 
 O que ainda falta:
@@ -343,6 +351,7 @@ O que ainda falta:
 - definir e provisionar o bucket S3 definitivo para documentos do portfolio
 - validar o fluxo de documentos com provider `s3` em ambiente AWS real
 - validar em uso real a UI basica para navegar, criar e ler o portfolio sem ajustes manuais fora da interface
+- confirmar por que algumas chamadas protegidas podem receber `403` com `access_token` e se o fallback para `id_token` deve permanecer ou ser removido apos alinhamento de claims/autorizacao
 - refinar mensagens de erro, estados vazios, feedback de sucesso e ergonomia da navegacao no workspace do portfolio
 - evoluir o modulo de portfolio com operacoes de edicao, update de status e regras de transicao
 - estruturar os entregaveis do tipo `FORM`
@@ -362,6 +371,7 @@ Status atual:
 - a fundacao tecnica da aplicacao ja foi validada com autenticacao real em localhost
 - a primeira UI real do portfolio foi implementada consumindo o backend em AWS com token Cognito real
 - o workspace agora foi dividido entre fluxo de produto e diagnostico tecnico para preservar troubleshooting sem bloquear a evolucao da UI
+- o cliente HTTP autenticado do frontend agora aceita fallback para `id_token` quando o backend negar a mesma operacao com `access_token`
 
 Stack atual:
 - framework base: `React`
@@ -398,11 +408,13 @@ Estado atual da integracao:
 - `GET /api/portfolio/programs/{programId}` consumido no frontend
 - `POST /api/portfolio/projects/{projectId}/products`, `POST /api/portfolio/products/{productId}/items`, `POST /api/portfolio/items/{itemId}/deliverables` e `POST /api/portfolio/programs/{programId}/open-issues` consumidos no frontend
 - fluxo de documento via `upload-url`, `complete` e `download-url` exercitado na UI em modo `stub`
+- chamadas protegidas agora tentam primeiro `access_token` e, em caso de `403`, repetem uma unica vez com `id_token`
 
 Gaps atuais e pontos de atencao:
 - validar logout real com Hosted UI
 - entender por que `principal` vem `null` em respostas atuais de ping
 - decidir se `/api/auth/me` deve enriquecer `username`, email, roles, groups e contexto de tenant para a UI
+- confirmar se o fallback temporario para `id_token` continuara necessario depois do alinhamento de claims/permissoes no backend
 - definir tratamento refinado de `401` e `403`
 - refinar a UX do workspace do portfolio com feedback mais claro de erros e sucesso
 - decidir a melhor representacao visual para owner organization, participantes e breadcrumbs do portfolio
@@ -488,6 +500,7 @@ Seguranca:
 - mapeamento de `cognito:groups` para roles Spring
 - respostas padrao para `401` e `403`
 - correlacao por `X-Correlation-Id`
+- excecoes nao tratadas respondem `500` JSON com `correlationId` e sem mascaramento por `/error`
 
 Autorizacao centralizada:
 - enums `Role`, `AppModule`, `Action` e `TenantType`
@@ -544,6 +557,14 @@ API inicial do portfolio:
 - `DELETE /api/portfolio/deliverables/{deliverableId}/documents/{documentId}`
 - `POST /api/portfolio/programs/{programId}/open-issues`
 
+API atual de users:
+- `GET /api/users`
+- `GET /api/users?organizationId={organizationId}`
+- `POST /api/users` com `displayName`, `email`, `role` e `organizationId`
+- `DELETE /api/users/{userId}`
+- `POST /api/users/{userId}/resend-invite`
+- `POST /api/users/{userId}/reset-access`
+
 Regras implementadas no portfolio:
 - criacao de `Programa` exige `initialProject`
 - criacao de `Programa` exige `ownerOrganizationId`
@@ -555,6 +576,9 @@ Regras implementadas no portfolio:
 - documentos so podem ser anexados em `Entregavel` do tipo `DOCUMENT`
 - o fluxo de `complete` verifica a existencia do objeto no storage gateway antes de marcar o documento como `AVAILABLE`
 - a exclusao atual de documentos e logica, via status `DELETED`
+- todo `Usuario` criado via API precisa referenciar uma `Organizacao` existente
+- a resposta de `users` agora expoe `organizationId` e `organizationName` em vez de expor `tenantId` e `tenantType` no contrato principal
+- o backend preserva `tenant_id` e `tenant_type` como compatibilidade interna de autorizacao ate a evolucao completa do modulo de identidade
 
 Persistencia:
 - Flyway com PostgreSQL `17.6`
@@ -581,6 +605,8 @@ Frontend:
 - a UI permite criar `Produto`, `Item`, `Entregavel`, `OpenIssue` e registrar documento via provider `stub`
 - o workspace tecnico anterior foi preservado em `/workspace/session`
 - a inicializacao do workspace de portfolio foi corrigida apos um `ReferenceError` causado por acesso antecipado a estado do formulario de programa
+- o wrapper HTTP do frontend passou a repetir uma vez chamadas autenticadas com `id_token` quando o backend responder `403` ao `access_token`
+- as mensagens de erro de `403` no portfolio agora orientam relogin e validacao da sessao em `/workspace/session`
 
 AWS runtime:
 - RDS privado provisionado e validado
@@ -693,6 +719,11 @@ Portfolio e documentos:
 41. O upload de documentos fica restrito, por enquanto, a `Entregavel` do tipo `DOCUMENT`.
 42. A melhor forma de maturar o dominio daqui para frente sera combinar evolucao incremental do backend com uma UI basica de validacao.
 43. O frontend passa a usar `/workspace` como entrada principal da UI do portfolio e preserva o diagnostico tecnico em `/workspace/session`.
+44. Todo `Usuario` deve pertencer obrigatoriamente a uma `Organizacao`.
+45. No modelo de produto, o vinculo canonico de `Usuario` passa a ser `organizationId`; `tenant_id` e `tenant_type` permanecem apenas como compatibilidade temporaria enquanto o backend legado de `users` e adaptado.
+46. O cadastro de `Usuario` na UI nao deve expor `tenantId` nem `tenantType`; deve sempre selecionar uma `Organizacao` existente.
+47. O fluxo de `Organizacao` e `Usuario` deve ser tratado como jornada integrada, com opcao explicita para criar o primeiro administrador logo apos o cadastro da organizacao.
+48. `ParticipacaoNoPrograma` continua representando o papel da organizacao dentro do programa e nao substitui o vinculo obrigatorio entre `Usuario` e `Organizacao`.
 
 ## Decisoes em aberto
 
@@ -715,6 +746,10 @@ Portfolio e documentos:
 17. Como o isolamento por tenant sera reforcado no modulo de portfolio em consultas, listagens e operacoes de alteracao.
 18. Se a aprovacao futura de entregavel ocorrera no nivel do `Entregavel`, do `DeliverableDocument` ou em ambos.
 19. Como serao paginacao, filtros e busca das listagens de portfolio quando o volume crescer.
+20. Qual sera a regra exata para permitir ou bloquear inativacao/exclusao de `Organizacao` com usuarios vinculados.
+21. Se o primeiro usuario criado para uma `Organizacao` sera obrigatoriamente `ADMIN` e se essa exigencia sera validada apenas na UI ou tambem no backend.
+22. Como sera a integracao futura entre `Usuario` local e provisioning real no Cognito para convite, reenvio e sincronizacao de status.
+23. Como `SUPPORT` e `AUDITOR` serao apresentados operacionalmente na UI mantendo a regra de pertencimento obrigatorio a uma `Organizacao`.
 
 ## Proxima sessao
 
@@ -723,6 +758,9 @@ Checklist recomendado:
 - revisar mensagens de erro, estados vazios e feedbacks de sucesso do workspace do portfolio
 - validar no fluxo da UI a criacao ponta a ponta `Programa -> Projeto -> Produto -> Item -> Entregavel`
 - testar na UI o fluxo de documento com provider `stub` em mais de um cenario de uso
+- publicar no runtime AWS a correcao de tratamento de erro do backend e repetir o cadastro de `Organizacao` para confirmar a causa real caso ainda haja falha
+- evoluir o cadastro de `Organizacao` para preparar a jornada de criacao do primeiro administrador
+- adaptar a UI de `Usuario` ao contrato ja implementado com `organizationId` e `organizationName`
 - decidir o primeiro recorte de edicao e mudanca de status no backend do portfolio
 - definir o desenho inicial do `FORM` antes de implementar respostas mais ricas
 - comecar a matriz de permissao por papel dentro de `ParticipacaoNoPrograma`
@@ -732,12 +770,17 @@ Checklist recomendado:
 
 Se o foco for UI basica:
 - validar e refinar `GET/POST /api/portfolio/organizations`
+- desenhar a UX de `Organizacao -> Criar primeiro administrador`
+- preparar listagem de usuarios por organizacao no detalhe ou workspace administrativo
 - validar e refinar `GET/POST /api/portfolio/milestone-templates`
 - validar e refinar `GET/POST /api/portfolio/programs`
 - validar e refinar `GET /api/portfolio/programs/{programId}`
 - amadurecer o fluxo de documentos por URL assinada do entregavel `DOCUMENT`
 
 Se o foco for backend de negocio:
+- evoluir `POST /api/users` para contrato orientado a `organizationId`
+- validar que o `organizationId` informado existe e representar `tenant_id` como compatibilidade interna
+- enriquecer respostas de `users` com dados basicos da `Organizacao`
 - implementar update e mudanca de status para `Programa`, `Projeto`, `Entregavel` e `OpenIssue`
 - definir ownership por organizacao/usuario nas entidades criticas
 - desenhar a estrutura de perguntas e respostas do `FORM`
@@ -1046,6 +1089,34 @@ Proxima fila apos a sprint:
 - o template `infra/ecs/task-definition.template.json` foi ajustado para sobrescrever temporariamente `APP_PORTFOLIO_DOCUMENTS_PROVIDER=stub` no runtime AWS
 - um novo deploy registrou `program-management-system:7`, promoveu a task `afbc2008a7dd4d7493e24d4c7f4c57d5` e recolocou o service em steady state
 - `GET /public/ping` e `GET /actuator/health/liveness` responderam `200` via ALB apos a recuperacao
+
+### 2026-03-14 - Compatibilidade de token no frontend para `403` do portfolio
+- o frontend passou a repetir uma unica vez chamadas autenticadas com `id_token` quando o backend responder `403` ao `access_token`
+- o ajuste cobre o workspace do portfolio, o detalhe de programa e o diagnostico autenticado em `/workspace/session`
+- as mensagens de erro de `403` no portfolio passaram a orientar relogin e validacao da sessao em `/workspace/session`
+- `npm run test`, `npm run lint` e `npm run build` foram reexecutados com sucesso apos a correcao
+
+### 2026-03-15 - Tratamento de erro do backend para falso `403` no portfolio
+- foi identificado que algumas falhas de runtime estavam sendo encaminhadas para `/error` e apareciam na UI como `403 Forbidden`, apesar da operacao principal ja ter sido concluida
+- `SecurityConfig` passou a liberar `/error` para impedir que esse encaminhamento interno esconda a falha real atras da camada de seguranca
+- `ApiExceptionHandler` passou a capturar excecoes nao tratadas, responder `500` JSON consistente e incluir `correlationId` no corpo para facilitar troubleshooting
+- foi adicionado teste automatizado cobrindo o fluxo de excecao nao tratada sem mascaramento por `403`
+- a validacao local executou `./mvnw.cmd test "-Dtest=ApiExceptionHandlerTest,PortfolioManagementControllerSecurityTest"` com sucesso
+
+### 2026-03-15 - Contrato de `users` orientado a `organizationId`
+- `CreateUserRequest` deixou de expor `tenantType` e passou a usar `organizationId` como referencia canonica da organizacao do usuario
+- `GET /api/users` e `POST /api/users` passaram a responder `organizationId` e `organizationName` no contrato principal
+- o backend passou a validar que a `Organizacao` informada existe e esta ativa antes de criar o usuario
+- foi criado um diretório publico de organizacoes para permitir lookup e enriquecimento de resposta sem vazar detalhes internos das entidades de portfolio
+- o seed local agora cria organizacoes basicas para `internal-core`, `tenant-a` e `tenant-b`, mantendo coerencia entre usuarios seeded e portfolio
+- a suite completa `./mvnw.cmd test` foi reexecutada com sucesso, totalizando `50` testes passando
+
+### 2026-03-15 - Planejamento integrado de cadastro de `Organizacao` e `Usuario`
+- foi fechado que todo `Usuario` pertence obrigatoriamente a uma `Organizacao`, eliminando a exposicao conceitual de tenant abstrato na UX
+- a direcao de produto passou a tratar `organizationId` como referencia canonica do cadastro de usuario, mantendo `tenant_id` e `tenant_type` apenas como compatibilidade tecnica temporaria
+- foi definido que a jornada ideal de UX e `Criar organizacao -> opcionalmente criar primeiro administrador -> listar e convidar demais usuarios`
+- `ParticipacaoNoPrograma` foi reafirmada como vinculo entre `Organizacao` e `Programa`, sem substituir o pertencimento base do usuario a sua organizacao
+- o backlog das proximas sessoes passou a incluir a adaptacao do contrato de `users`, a UX do primeiro administrador e a exibicao de usuarios por organizacao
 
 ## Regra de atualizacao
 

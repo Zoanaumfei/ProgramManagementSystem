@@ -10,6 +10,8 @@ import com.oryzem.programmanagementsystem.authorization.AuthorizationDecision;
 import com.oryzem.programmanagementsystem.authorization.AuthorizationService;
 import com.oryzem.programmanagementsystem.authorization.Role;
 import com.oryzem.programmanagementsystem.authorization.TenantType;
+import com.oryzem.programmanagementsystem.portfolio.OrganizationDirectoryService;
+import com.oryzem.programmanagementsystem.portfolio.OrganizationDirectoryService.OrganizationDirectoryEntry;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
@@ -23,23 +25,26 @@ public class UserManagementService {
     private final UserRepository userRepository;
     private final AuthorizationService authorizationService;
     private final AuditTrailService auditTrailService;
+    private final OrganizationDirectoryService organizationDirectoryService;
 
     public UserManagementService(
             UserRepository userRepository,
             AuthorizationService authorizationService,
-            AuditTrailService auditTrailService) {
+            AuditTrailService auditTrailService,
+            OrganizationDirectoryService organizationDirectoryService) {
         this.userRepository = userRepository;
         this.authorizationService = authorizationService;
         this.auditTrailService = auditTrailService;
+        this.organizationDirectoryService = organizationDirectoryService;
     }
 
     public List<UserSummaryResponse> listUsers(
             AuthenticatedUser actor,
-            String tenantId,
+            String organizationId,
             boolean supportOverride,
             String justification) {
 
-        String effectiveTenantId = resolveListTenantId(actor, tenantId);
+        String effectiveTenantId = resolveListTenantId(actor, organizationId);
         AuthorizationContext context = AuthorizationContext.builder(AppModule.USERS, Action.VIEW)
                 .resourceTenantId(effectiveTenantId)
                 .resourceTenantType(resolveListTenantType(actor, effectiveTenantId))
@@ -56,7 +61,9 @@ public class UserManagementService {
         }
 
         List<ManagedUser> users = effectiveTenantId == null ? userRepository.findAll() : userRepository.findByTenantId(effectiveTenantId);
-        return users.stream().map(UserSummaryResponse::from).toList();
+        return users.stream()
+                .map(user -> UserSummaryResponse.from(user, resolveOrganizationName(user.tenantId())))
+                .toList();
     }
 
     public UserSummaryResponse createUser(AuthenticatedUser actor, CreateUserRequest request) {
@@ -64,29 +71,35 @@ public class UserManagementService {
             throw new IllegalArgumentException("A user with this email already exists.");
         }
 
+        OrganizationDirectoryEntry organization = organizationDirectoryService.getRequired(request.organizationId().trim());
+        if (!organization.active()) {
+            throw new IllegalArgumentException("Inactive organization cannot receive new users.");
+        }
+        TenantType targetTenantType = resolveTenantTypeForOrganization(actor, organization.id());
+
         AuthorizationContext context = AuthorizationContext.builder(AppModule.USERS, Action.CREATE)
-                .resourceTenantId(request.tenantId())
-                .resourceTenantType(request.tenantType())
+                .resourceTenantId(organization.id())
+                .resourceTenantType(targetTenantType)
                 .targetRole(request.role())
                 .build();
 
         AuthorizationDecision decision = authorizationService.decide(actor, context);
         assertAllowed(decision);
-        enforceTenantScope(actor, request.tenantId(), request.tenantType());
+        enforceTenantScope(actor, organization.id(), targetTenantType);
 
         ManagedUser created = new ManagedUser(
                 "USR-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase(),
                 request.displayName().trim(),
                 request.email().trim().toLowerCase(),
                 request.role(),
-                request.tenantId().trim(),
-                request.tenantType(),
+                organization.id(),
+                targetTenantType,
                 UserStatus.INVITED,
                 Instant.now(),
                 null,
                 null);
 
-        return UserSummaryResponse.from(userRepository.save(created));
+        return UserSummaryResponse.from(userRepository.save(created), organization.name());
     }
 
     public void deleteUser(AuthenticatedUser actor, String userId) {
@@ -205,6 +218,16 @@ public class UserManagementService {
                 .orElse(actor.tenantType());
     }
 
+    private TenantType resolveTenantTypeForOrganization(AuthenticatedUser actor, String organizationId) {
+        return userRepository.findByTenantId(organizationId).stream()
+                .map(ManagedUser::tenantType)
+                .findFirst()
+                .or(() -> actor.tenantId() != null && actor.tenantId().equals(organizationId)
+                        ? java.util.Optional.ofNullable(actor.tenantType())
+                        : java.util.Optional.empty())
+                .orElse(TenantType.EXTERNAL);
+    }
+
     private boolean shouldAuditView(
             AuthenticatedUser actor,
             String effectiveTenantId,
@@ -255,5 +278,11 @@ public class UserManagementService {
 
     private String metadataJson(boolean crossTenant) {
         return "{\"crossTenant\":" + crossTenant + "}";
+    }
+
+    private String resolveOrganizationName(String organizationId) {
+        return organizationDirectoryService.findById(organizationId)
+                .map(OrganizationDirectoryEntry::name)
+                .orElse(null);
     }
 }

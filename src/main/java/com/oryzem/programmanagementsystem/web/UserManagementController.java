@@ -37,11 +37,16 @@ public class UserManagementController {
     @GetMapping
     public List<UserSummaryResponse> listUsers(
             Authentication authentication,
-            @RequestParam(required = false) String tenantId,
+            @RequestParam(required = false) String organizationId,
+            @RequestParam(name = "tenantId", required = false) String legacyTenantId,
             @RequestParam(defaultValue = "false") boolean supportOverride,
             @RequestParam(required = false) String justification) {
         AuthenticatedUser actor = authenticatedUserMapper.from(authentication);
-        return userManagementService.listUsers(actor, tenantId, supportOverride, justification);
+        return userManagementService.listUsers(
+                actor,
+                firstNonBlank(organizationId, legacyTenantId),
+                supportOverride,
+                justification);
     }
 
     @PostMapping
@@ -80,5 +85,15 @@ public class UserManagementController {
             @RequestParam(required = false) String justification) {
         AuthenticatedUser actor = authenticatedUserMapper.from(authentication);
         return userManagementService.resetAccess(actor, userId, supportOverride, justification);
+    }
+
+    private String firstNonBlank(String primary, String fallback) {
+        if (primary != null && !primary.isBlank()) {
+            return primary;
+        }
+        if (fallback != null && !fallback.isBlank()) {
+            return fallback;
+        }
+        return null;
     }
 }
