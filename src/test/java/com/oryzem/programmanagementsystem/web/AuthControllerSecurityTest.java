@@ -68,4 +68,43 @@ class AuthControllerSecurityTest {
                 .andExpect(jsonPath("$.authorities[0]").value("ROLE_ADMIN"))
                 .andExpect(jsonPath("$.authorities[3]").value("SCOPE_profile"));
     }
+
+    @Test
+    void meShouldSupportCustomCognitoTenantClaims() throws Exception {
+        mockMvc.perform(get("/api/auth/me")
+                        .with(jwt().jwt(jwt -> jwt
+                                        .claim("sub", "user-456")
+                                        .claim("cognito:username", "bob")
+                                        .claim("email", "bob@oryzem.com")
+                                        .claim("custom:tenant_id", "tenant-b")
+                                        .claim("custom:tenant_type", "EXTERNAL")
+                                        .claim("custom:user_status", "ACTIVE")
+                                        .claim("token_use", "id"))
+                                .authorities(new SimpleGrantedAuthority("ROLE_MANAGER"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.subject").value("user-456"))
+                .andExpect(jsonPath("$.username").value("bob"))
+                .andExpect(jsonPath("$.tenantId").value("tenant-b"))
+                .andExpect(jsonPath("$.tenantType").value("EXTERNAL"))
+                .andExpect(jsonPath("$.tenantIdClaim").value("tenant-b"))
+                .andExpect(jsonPath("$.tenantTypeClaim").value("EXTERNAL"))
+                .andExpect(jsonPath("$.userStatusClaim").value("ACTIVE"));
+    }
+
+    @Test
+    void meShouldExposeAccessTokenUsernameClaimWhenCognitoUsernameIsMissing() throws Exception {
+        mockMvc.perform(get("/api/auth/me")
+                        .with(jwt().jwt(jwt -> jwt
+                                        .claim("sub", "user-789")
+                                        .claim("username", "access-user")
+                                        .claim("tenant_id", "internal-core")
+                                        .claim("tenant_type", "INTERNAL")
+                                        .claim("token_use", "access"))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.subject").value("user-789"))
+                .andExpect(jsonPath("$.username").value("access-user"))
+                .andExpect(jsonPath("$.tenantId").value("internal-core"))
+                .andExpect(jsonPath("$.tenantType").value("INTERNAL"));
+    }
 }

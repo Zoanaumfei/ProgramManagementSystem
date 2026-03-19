@@ -3,6 +3,7 @@ package com.oryzem.programmanagementsystem.portfolio;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.oryzem.programmanagementsystem.bootstrap.BootstrapDataService;
+import java.time.LocalDate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,9 +45,81 @@ class PortfolioManagementControllerSecurityTest {
     }
 
     @Test
+    void shouldAllowOrganizationCreationOnlyForInternalAdmin() throws Exception {
+        mockMvc.perform(post("/api/portfolio/organizations")
+                        .with(jwtFor("internal-admin", "internal-core", "INTERNAL", "ADMIN"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "Oryzem Internal",
+                                  "code": "ORY-INT"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("ORY-INT"))
+                .andExpect(jsonPath("$.setupStatus").value("INCOMPLETED"));
+
+        mockMvc.perform(post("/api/portfolio/organizations")
+                        .with(jwtFor("external-admin", "tenant-a", "EXTERNAL", "ADMIN"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "Supplier X",
+                                  "code": "SUP-X"
+                                }
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("Only INTERNAL admins can create organizations."));
+    }
+
+    @Test
+    void shouldRejectProgramCreationWhenOwnerOrganizationIsIncomplete() throws Exception {
+        String ownerOrganizationId = createOrganization("Oryzem Internal", "ORY-INT");
+        String milestoneTemplateId = createMilestoneTemplate();
+
+        mockMvc.perform(post("/api/portfolio/programs")
+                        .with(defaultJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "Blocked Program",
+                                  "code": "PRG-BLOCK-01",
+                                  "description": "Should fail while org is incomplete",
+                                  "ownerOrganizationId": "%s",
+                                  "plannedStartDate": "%s",
+                                  "plannedEndDate": "%s",
+                                  "initialProject": {
+                                    "name": "Initial Project",
+                                    "code": "PRJ-BLOCK-01",
+                                    "description": "Blocked project",
+                                    "plannedStartDate": "%s",
+                                    "plannedEndDate": "%s",
+                                    "milestoneTemplateId": "%s"
+                                  }
+                                }
+                                """.formatted(
+                                ownerOrganizationId,
+                                LocalDate.now().plusDays(1),
+                                LocalDate.now().plusMonths(1),
+                                LocalDate.now().plusDays(1),
+                                LocalDate.now().plusWeeks(4),
+                                milestoneTemplateId)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Owner organization is incomplete and requires an invited or active ADMIN user."));
+    }
+
+    @Test
     void shouldCreateAndRetrievePortfolioStructure() throws Exception {
+        LocalDate programStartDate = LocalDate.now().plusDays(1);
+        LocalDate programEndDate = programStartDate.plusMonths(4);
+        LocalDate projectStartDate = programStartDate;
+        LocalDate projectEndDate = projectStartDate.plusWeeks(10);
+        LocalDate deliverablePlannedDate = projectStartDate.plusWeeks(3);
+        LocalDate deliverableDueDate = projectStartDate.plusWeeks(4);
+
         String ownerOrganizationId = createOrganization("Oryzem Internal", "ORY-INT");
         String supplierOrganizationId = createOrganization("Supplier A", "SUP-A");
+        createAdminUser(ownerOrganizationId, "owner.admin@ory-int.com");
         String milestoneTemplateId = createMilestoneTemplate();
 
         JsonNode program = postForJson(
@@ -57,8 +130,8 @@ class PortfolioManagementControllerSecurityTest {
                           "code": "PRG-ROLL-01",
                           "description": "Shared automotive rollout",
                           "ownerOrganizationId": "%s",
-                          "plannedStartDate": "2026-03-16",
-                          "plannedEndDate": "2026-07-31",
+                          "plannedStartDate": "%s",
+                          "plannedEndDate": "%s",
                           "participants": [
                             {
                               "organizationId": "%s",
@@ -69,12 +142,19 @@ class PortfolioManagementControllerSecurityTest {
                             "name": "Body Project",
                             "code": "PRJ-BODY-01",
                             "description": "Initial body project",
-                            "plannedStartDate": "2026-03-16",
-                            "plannedEndDate": "2026-05-29",
+                            "plannedStartDate": "%s",
+                            "plannedEndDate": "%s",
                             "milestoneTemplateId": "%s"
                           }
                         }
-                        """.formatted(ownerOrganizationId, supplierOrganizationId, milestoneTemplateId));
+                        """.formatted(
+                        ownerOrganizationId,
+                        programStartDate,
+                        programEndDate,
+                        supplierOrganizationId,
+                        projectStartDate,
+                        projectEndDate,
+                        milestoneTemplateId));
 
         String programId = program.get("id").asText();
         String projectId = program.get("projects").get(0).get("id").asText();
@@ -108,10 +188,10 @@ class PortfolioManagementControllerSecurityTest {
                           "name": "PPAP Evidence",
                           "description": "Document package",
                           "type": "DOCUMENT",
-                          "plannedDate": "2026-04-06",
-                          "dueDate": "2026-04-13"
+                          "plannedDate": "%s",
+                          "dueDate": "%s"
                         }
-                        """);
+                        """.formatted(deliverablePlannedDate, deliverableDueDate));
 
         String deliverableId = mockMvc.perform(get("/api/portfolio/programs/" + programId).with(defaultJwt()))
                 .andExpect(status().isOk())
@@ -166,8 +246,8 @@ class PortfolioManagementControllerSecurityTest {
                 .andExpect(jsonPath("$.projects.length()").value(1))
                 .andExpect(jsonPath("$.projects[0].code").value("PRJ-BODY-01"))
                 .andExpect(jsonPath("$.projects[0].milestones.length()").value(2))
-                .andExpect(jsonPath("$.projects[0].milestones[0].plannedDate").value("2026-03-16"))
-                .andExpect(jsonPath("$.projects[0].milestones[1].plannedDate").value("2026-04-13"))
+                .andExpect(jsonPath("$.projects[0].milestones[0].plannedDate").value(projectStartDate.toString()))
+                .andExpect(jsonPath("$.projects[0].milestones[1].plannedDate").value(projectStartDate.plusWeeks(4).toString()))
                 .andExpect(jsonPath("$.projects[0].products[0].items[0].deliverables[0].type").value("DOCUMENT"))
                 .andExpect(jsonPath("$.projects[0].products[0].items[0].deliverables[0].documents.length()").value(1))
                 .andExpect(jsonPath("$.projects[0].products[0].items[0].deliverables[0].documents[0].status").value("AVAILABLE"))
@@ -213,6 +293,21 @@ class PortfolioManagementControllerSecurityTest {
         return response.get("id").asText();
     }
 
+    private void createAdminUser(String organizationId, String email) throws Exception {
+        mockMvc.perform(post("/api/users")
+                        .with(defaultJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "displayName": "Organization Admin",
+                                  "email": "%s",
+                                  "role": "ADMIN",
+                                  "organizationId": "%s"
+                                }
+                                """.formatted(email, organizationId)))
+                .andExpect(status().isCreated());
+    }
+
     private JsonNode postForJson(String path, String json) throws Exception {
         MvcResult result = mockMvc.perform(post(path)
                         .with(defaultJwt())
@@ -224,11 +319,19 @@ class PortfolioManagementControllerSecurityTest {
     }
 
     private static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor defaultJwt() {
+        return jwtFor("admin", "internal-core", "INTERNAL", "ADMIN");
+    }
+
+    private static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor jwtFor(
+            String username,
+            String tenantId,
+            String tenantType,
+            String role) {
         return jwt().jwt(jwt -> jwt
-                        .claim("sub", "admin-123")
-                        .claim("cognito:username", "admin")
-                        .claim("tenant_id", "internal-core")
-                        .claim("tenant_type", "INTERNAL"))
-                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
+                        .claim("sub", username + "-123")
+                        .claim("cognito:username", username)
+                        .claim("tenant_id", tenantId)
+                        .claim("tenant_type", tenantType))
+                .authorities(new SimpleGrantedAuthority("ROLE_" + role));
     }
 }

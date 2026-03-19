@@ -11,7 +11,13 @@ public interface UserRepository {
 
     Optional<ManagedUser> findById(String userId);
 
+    Optional<ManagedUser> findByIdentityUsername(String identityUsername);
+
+    Optional<ManagedUser> findByIdentitySubject(String identitySubject);
+
     Optional<ManagedUser> findByEmailIgnoreCase(String email);
+
+    boolean hasInvitedOrActiveAdmin(String tenantId);
 
     ManagedUser save(ManagedUser user);
 

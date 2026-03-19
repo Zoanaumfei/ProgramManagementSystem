@@ -15,29 +15,36 @@ import com.oryzem.programmanagementsystem.portfolio.OrganizationDirectoryService
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@Transactional
 public class UserManagementService {
 
     private final UserRepository userRepository;
     private final AuthorizationService authorizationService;
     private final AuditTrailService auditTrailService;
     private final OrganizationDirectoryService organizationDirectoryService;
+    private final UserIdentityGateway userIdentityGateway;
 
     public UserManagementService(
             UserRepository userRepository,
             AuthorizationService authorizationService,
             AuditTrailService auditTrailService,
-            OrganizationDirectoryService organizationDirectoryService) {
+            OrganizationDirectoryService organizationDirectoryService,
+            UserIdentityGateway userIdentityGateway) {
         this.userRepository = userRepository;
         this.authorizationService = authorizationService;
         this.auditTrailService = auditTrailService;
         this.organizationDirectoryService = organizationDirectoryService;
+        this.userIdentityGateway = userIdentityGateway;
     }
 
+    @Transactional(readOnly = true)
     public List<UserSummaryResponse> listUsers(
             AuthenticatedUser actor,
             String organizationId,
@@ -67,14 +74,16 @@ public class UserManagementService {
     }
 
     public UserSummaryResponse createUser(AuthenticatedUser actor, CreateUserRequest request) {
-        if (userRepository.findByEmailIgnoreCase(request.email()).isPresent()) {
+        String normalizedEmail = normalizeEmail(request.email());
+        if (userRepository.findByEmailIgnoreCase(normalizedEmail).isPresent()) {
             throw new IllegalArgumentException("A user with this email already exists.");
         }
 
-        OrganizationDirectoryEntry organization = organizationDirectoryService.getRequired(request.organizationId().trim());
+        OrganizationDirectoryEntry organization = organizationDirectoryService.getRequired(normalizeOrganizationId(request.organizationId()));
         if (!organization.active()) {
             throw new IllegalArgumentException("Inactive organization cannot receive new users.");
         }
+        assertOrganizationCanReceiveRole(organization.id(), request.role());
         TenantType targetTenantType = resolveTenantTypeForOrganization(actor, organization.id());
 
         AuthorizationContext context = AuthorizationContext.builder(AppModule.USERS, Action.CREATE)
@@ -87,10 +96,13 @@ public class UserManagementService {
         assertAllowed(decision);
         enforceTenantScope(actor, organization.id(), targetTenantType);
 
+        String userId = "USR-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase();
         ManagedUser created = new ManagedUser(
-                "USR-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase(),
-                request.displayName().trim(),
-                request.email().trim().toLowerCase(),
+                userId,
+                normalizedEmail,
+                null,
+                normalizeDisplayName(request.displayName()),
+                normalizedEmail,
                 request.role(),
                 organization.id(),
                 targetTenantType,
@@ -99,7 +111,53 @@ public class UserManagementService {
                 null,
                 null);
 
-        return UserSummaryResponse.from(userRepository.save(created), organization.name());
+        ManagedUser saved = userRepository.save(created);
+        userIdentityGateway.createUser(saved);
+        recordAudit(actor, organization.id(), "USER_CREATE", saved.id(), null, decision.crossTenant());
+        return UserSummaryResponse.from(saved, organization.name());
+    }
+
+    public UserSummaryResponse updateUser(AuthenticatedUser actor, String userId, UpdateUserRequest request) {
+        ManagedUser target = findRequiredUser(userId);
+        ensureUserIsMutable(target);
+
+        String normalizedEmail = normalizeEmail(request.email());
+        userRepository.findByEmailIgnoreCase(normalizedEmail)
+                .filter(existing -> !existing.id().equals(target.id()))
+                .ifPresent(existing -> {
+                    throw new IllegalArgumentException("A user with this email already exists.");
+                });
+
+        OrganizationDirectoryEntry organization = organizationDirectoryService.getRequired(normalizeOrganizationId(request.organizationId()));
+        if (!organization.active()) {
+            throw new IllegalArgumentException("Inactive organization cannot receive users.");
+        }
+        assertOrganizationCanReceiveRole(organization.id(), request.role());
+        TenantType targetTenantType = resolveTenantTypeForOrganization(actor, organization.id());
+        assertOrganizationChangeAllowed(target, organization.id());
+
+        AuthorizationContext context = AuthorizationContext.builder(AppModule.USERS, Action.EDIT)
+                .resourceTenantId(organization.id())
+                .resourceTenantType(targetTenantType)
+                .targetRole(request.role())
+                .targetUserId(target.id())
+                .build();
+
+        AuthorizationDecision decision = authorizationService.decide(actor, context);
+        assertAllowed(decision);
+        enforceTenantScope(actor, organization.id(), targetTenantType);
+
+        ManagedUser updated = target.withUpdatedDetails(
+                normalizeDisplayName(request.displayName()),
+                normalizedEmail,
+                request.role(),
+                organization.id(),
+                targetTenantType);
+
+        ManagedUser saved = userRepository.save(updated);
+        userIdentityGateway.updateUser(target, saved);
+        recordAudit(actor, organization.id(), "USER_UPDATE", saved.id(), null, decision.crossTenant());
+        return UserSummaryResponse.from(saved, organization.name());
     }
 
     public void deleteUser(AuthenticatedUser actor, String userId) {
@@ -115,7 +173,13 @@ public class UserManagementService {
         assertAllowed(decision);
         enforceTenantScope(actor, target.tenantId(), target.tenantType());
 
-        userRepository.deleteById(userId);
+        if (target.status() == UserStatus.INACTIVE) {
+            return;
+        }
+
+        ManagedUser updated = userRepository.save(target.withStatus(UserStatus.INACTIVE));
+        userIdentityGateway.disableUser(updated);
+        recordAudit(actor, target.tenantId(), "USER_INACTIVATE", updated.id(), null, decision.crossTenant());
     }
 
     public UserActionResponse resendInvite(
@@ -134,6 +198,39 @@ public class UserManagementService {
         return performSensitiveUserAction(actor, userId, Action.RESET_ACCESS, supportOverride, justification);
     }
 
+    public UserActionResponse purgeUser(
+            AuthenticatedUser actor,
+            String userId,
+            boolean supportOverride,
+            String justification) {
+        ManagedUser target = findRequiredUser(userId);
+        ensureUserIsInactive(target);
+        ensurePurgeIsExplicitlyConfirmed(supportOverride, justification);
+
+        AuthorizationContext context = AuthorizationContext.builder(AppModule.USERS, Action.PURGE)
+                .resourceTenantId(target.tenantId())
+                .resourceTenantType(target.tenantType())
+                .targetRole(target.role())
+                .targetUserId(target.id())
+                .auditTrailEnabled(true)
+                .supportOverride(supportOverride)
+                .justification(justification)
+                .build();
+
+        AuthorizationDecision decision = authorizationService.decide(actor, context);
+        assertAllowed(decision);
+        enforceTenantScope(actor, target.tenantId(), target.tenantType(), decision.crossTenant());
+
+        if (userIdentityGateway.identityExists(target)) {
+            throw new IllegalArgumentException(
+                    "User purge is allowed only when the identity is already absent from Cognito.");
+        }
+
+        userRepository.deleteById(target.id());
+        recordAudit(actor, target.tenantId(), "USER_PURGE", target.id(), justification, decision.crossTenant());
+        return new UserActionResponse(target.id(), Action.PURGE.name(), Instant.now(), "OK");
+    }
+
     private UserActionResponse performSensitiveUserAction(
             AuthenticatedUser actor,
             String userId,
@@ -141,6 +238,7 @@ public class UserManagementService {
             boolean supportOverride,
             String justification) {
         ManagedUser target = findRequiredUser(userId);
+        ensureUserCanReceiveSensitiveAction(target, action);
         AuthorizationContext context = AuthorizationContext.builder(AppModule.USERS, action)
                 .resourceTenantId(target.tenantId())
                 .resourceTenantType(target.tenantType())
@@ -161,14 +259,101 @@ public class UserManagementService {
             case RESET_ACCESS -> target.withAccessResetAt(performedAt);
             default -> throw new IllegalArgumentException("Unsupported user action: " + action);
         };
-        userRepository.save(updated);
+        ManagedUser saved = userRepository.save(updated);
+        if (action == Action.RESEND_INVITE) {
+            userIdentityGateway.resendInvite(saved);
+        } else {
+            userIdentityGateway.resetAccess(saved);
+        }
         recordAudit(actor, target.tenantId(), action.name(), target.id(), justification, decision.crossTenant());
 
         return new UserActionResponse(target.id(), action.name(), performedAt, "OK");
     }
 
+    public void synchronizeAuthenticatedUser(String identitySubject, String identityUsername, String email) {
+        boolean hasSubject = identitySubject != null && !identitySubject.isBlank();
+        boolean hasUsername = identityUsername != null && !identityUsername.isBlank();
+        boolean hasEmail = email != null && !email.isBlank();
+        if (!hasSubject && !hasUsername && !hasEmail) {
+            return;
+        }
+
+        ManagedUser user = null;
+        if (hasSubject) {
+            user = userRepository.findByIdentitySubject(identitySubject).orElse(null);
+        }
+        if (user == null && hasUsername) {
+            user = userRepository.findByIdentityUsername(identityUsername).orElse(null);
+        }
+        if (user == null && hasEmail) {
+            user = userRepository.findByEmailIgnoreCase(email).orElse(null);
+        }
+        if (user == null) {
+            return;
+        }
+
+        ManagedUser updated = user;
+        if (hasSubject
+                && (user.identitySubject() == null || !identitySubject.equals(user.identitySubject()))) {
+            updated = updated.withIdentitySubject(identitySubject);
+        }
+        if (updated.status() == UserStatus.INVITED) {
+            updated = updated.withStatus(UserStatus.ACTIVE);
+        }
+
+        if (!updated.equals(user)) {
+            userRepository.save(updated);
+        }
+    }
+
     private ManagedUser findRequiredUser(String userId) {
         return userRepository.findById(userId).orElseThrow(() -> new UserNotFoundException(userId));
+    }
+
+    private void ensureUserIsMutable(ManagedUser user) {
+        if (user.status() == UserStatus.INACTIVE) {
+            throw new IllegalArgumentException("Inactive users cannot be updated.");
+        }
+    }
+
+    private void ensureUserIsActive(ManagedUser user) {
+        if (user.status() == UserStatus.INACTIVE) {
+            throw new IllegalArgumentException("Inactive users cannot receive sensitive access actions.");
+        }
+    }
+
+    private void ensureUserCanReceiveSensitiveAction(ManagedUser user, Action action) {
+        ensureUserIsActive(user);
+        if (action == Action.RESEND_INVITE && user.status() != UserStatus.INVITED) {
+            throw new IllegalArgumentException("Only invited users can receive invite resend.");
+        }
+        if (action == Action.RESET_ACCESS && user.status() != UserStatus.ACTIVE) {
+            throw new IllegalArgumentException("Only active users can receive access reset.");
+        }
+    }
+
+    private void ensureUserIsInactive(ManagedUser user) {
+        if (user.status() != UserStatus.INACTIVE) {
+            throw new IllegalArgumentException("Only inactive users can be purged.");
+        }
+    }
+
+    private void ensurePurgeIsExplicitlyConfirmed(boolean supportOverride, String justification) {
+        if (!supportOverride) {
+            throw new IllegalArgumentException("User purge requires supportOverride=true.");
+        }
+        if (justification == null || justification.isBlank()) {
+            throw new IllegalArgumentException("User purge requires a justification.");
+        }
+    }
+
+    private void assertOrganizationChangeAllowed(ManagedUser target, String updatedOrganizationId) {
+        if (target.status() == UserStatus.ACTIVE
+                && updatedOrganizationId != null
+                && !updatedOrganizationId.equals(target.tenantId())) {
+            throw new IllegalArgumentException(
+                    "Active users cannot change organization. Inactivate and recreate the user or update while still invited.");
+        }
     }
 
     private void assertAllowed(AuthorizationDecision decision) {
@@ -284,5 +469,28 @@ public class UserManagementService {
         return organizationDirectoryService.findById(organizationId)
                 .map(OrganizationDirectoryEntry::name)
                 .orElse(null);
+    }
+
+    private void assertOrganizationCanReceiveRole(String organizationId, Role role) {
+        if (role == Role.ADMIN) {
+            return;
+        }
+
+        if (!userRepository.hasInvitedOrActiveAdmin(organizationId)) {
+            throw new IllegalArgumentException(
+                    "Organization is incomplete and requires a first ADMIN before non-admin users can be created or updated.");
+        }
+    }
+
+    private String normalizeDisplayName(String displayName) {
+        return displayName.trim();
+    }
+
+    private String normalizeEmail(String email) {
+        return email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String normalizeOrganizationId(String organizationId) {
+        return organizationId.trim();
     }
 }

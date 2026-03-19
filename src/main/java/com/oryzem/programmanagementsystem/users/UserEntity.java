@@ -18,6 +18,12 @@ public class UserEntity {
     @Column(length = 64, nullable = false)
     private String id;
 
+    @Column(name = "identity_username", length = 255, nullable = false, unique = true)
+    private String identityUsername;
+
+    @Column(name = "identity_subject", length = 255, unique = true)
+    private String identitySubject;
+
     @Column(name = "display_name", length = 160, nullable = false)
     private String displayName;
 
@@ -53,6 +59,8 @@ public class UserEntity {
 
     private UserEntity(
             String id,
+            String identityUsername,
+            String identitySubject,
             String displayName,
             String email,
             Role role,
@@ -63,6 +71,8 @@ public class UserEntity {
             Instant inviteResentAt,
             Instant accessResetAt) {
         this.id = id;
+        this.identityUsername = identityUsername;
+        this.identitySubject = identitySubject;
         this.displayName = displayName;
         this.email = email;
         this.role = role;
@@ -77,6 +87,8 @@ public class UserEntity {
     public static UserEntity fromDomain(ManagedUser user) {
         return new UserEntity(
                 user.id(),
+                user.identityUsername(),
+                user.identitySubject(),
                 user.displayName(),
                 user.email(),
                 user.role(),
@@ -89,6 +101,18 @@ public class UserEntity {
     }
 
     public ManagedUser toDomain() {
-        return new ManagedUser(id, displayName, email, role, tenantId, tenantType, status, createdAt, inviteResentAt, accessResetAt);
+        return new ManagedUser(
+                id,
+                identityUsername,
+                identitySubject,
+                displayName,
+                email,
+                role,
+                tenantId,
+                tenantType,
+                status,
+                createdAt,
+                inviteResentAt,
+                accessResetAt);
     }
 }

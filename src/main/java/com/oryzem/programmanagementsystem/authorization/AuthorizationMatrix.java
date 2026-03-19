@@ -113,6 +113,10 @@ public class AuthorizationMatrix {
         grant(matrix, Role.SUPPORT, AppModule.USERS, restrictions(
                 AuthorizationRestriction.SUPPORT_SCOPE_RESTRICTION,
                 AuthorizationRestriction.AUDIT_TRAIL_REQUIRED), Action.RESET_ACCESS, Action.RESEND_INVITE);
+        grant(matrix, Role.SUPPORT, AppModule.USERS, restrictions(
+                AuthorizationRestriction.SUPPORT_SCOPE_RESTRICTION,
+                AuthorizationRestriction.AUDIT_TRAIL_REQUIRED,
+                AuthorizationRestriction.JUSTIFICATION_REQUIRED), Action.PURGE);
 
         grant(matrix, Role.SUPPORT, AppModule.TENANT, restrictions(
                 AuthorizationRestriction.SUPPORT_SCOPE_RESTRICTION), Action.VIEW);

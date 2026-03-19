@@ -3,6 +3,7 @@ package com.oryzem.programmanagementsystem.web;
 import com.oryzem.programmanagementsystem.authorization.AuthenticatedUser;
 import com.oryzem.programmanagementsystem.authorization.AuthenticatedUserMapper;
 import com.oryzem.programmanagementsystem.users.CreateUserRequest;
+import com.oryzem.programmanagementsystem.users.UpdateUserRequest;
 import com.oryzem.programmanagementsystem.users.UserActionResponse;
 import com.oryzem.programmanagementsystem.users.UserManagementService;
 import com.oryzem.programmanagementsystem.users.UserSummaryResponse;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -58,6 +60,15 @@ public class UserManagementController {
         return ResponseEntity.created(URI.create("/api/users/" + created.id())).body(created);
     }
 
+    @PutMapping("/{userId}")
+    public UserSummaryResponse updateUser(
+            Authentication authentication,
+            @PathVariable String userId,
+            @Valid @RequestBody UpdateUserRequest request) {
+        AuthenticatedUser actor = authenticatedUserMapper.from(authentication);
+        return userManagementService.updateUser(actor, userId, request);
+    }
+
     @DeleteMapping("/{userId}")
     public ResponseEntity<Void> deleteUser(
             Authentication authentication,
@@ -85,6 +96,16 @@ public class UserManagementController {
             @RequestParam(required = false) String justification) {
         AuthenticatedUser actor = authenticatedUserMapper.from(authentication);
         return userManagementService.resetAccess(actor, userId, supportOverride, justification);
+    }
+
+    @PostMapping("/{userId}/purge")
+    public UserActionResponse purgeUser(
+            Authentication authentication,
+            @PathVariable String userId,
+            @RequestParam(defaultValue = "false") boolean supportOverride,
+            @RequestParam(required = false) String justification) {
+        AuthenticatedUser actor = authenticatedUserMapper.from(authentication);
+        return userManagementService.purgeUser(actor, userId, supportOverride, justification);
     }
 
     private String firstNonBlank(String primary, String fallback) {

@@ -75,11 +75,13 @@ public class BootstrapDataService {
         userRepository.save(user("USR-ADMIN-001", "Platform Admin", "admin@oryzem.com", Role.ADMIN, "internal-core", TenantType.INTERNAL, UserStatus.ACTIVE, baseTime));
         userRepository.save(user("USR-ADMIN-002", "Security Admin", "security.admin@oryzem.com", Role.ADMIN, "internal-core", TenantType.INTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(60)));
         userRepository.save(user("USR-INT-SUP-001", "Support Analyst", "support@oryzem.com", Role.SUPPORT, "internal-core", TenantType.INTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(120)));
-        userRepository.save(user("USR-EXT-A-MGR-001", "Tenant A Manager", "manager.a@tenant.com", Role.MANAGER, "tenant-a", TenantType.EXTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(180)));
-        userRepository.save(user("USR-EXT-A-MEM-001", "Tenant A Member", "member.a@tenant.com", Role.MEMBER, "tenant-a", TenantType.EXTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(240)));
-        userRepository.save(user("USR-EXT-B-MGR-001", "Tenant B Manager", "manager.b@tenant.com", Role.MANAGER, "tenant-b", TenantType.EXTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(300)));
-        userRepository.save(user("USR-EXT-B-MEM-001", "Tenant B Member", "member.b@tenant.com", Role.MEMBER, "tenant-b", TenantType.EXTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(360)));
-        userRepository.save(user("USR-EXT-B-AUD-001", "Tenant B Auditor", "auditor.b@tenant.com", Role.AUDITOR, "tenant-b", TenantType.EXTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(420)));
+        userRepository.save(user("USR-EXT-A-ADM-001", "Tenant A Admin", "admin.a@tenant.com", Role.ADMIN, "tenant-a", TenantType.EXTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(180)));
+        userRepository.save(user("USR-EXT-A-MGR-001", "Tenant A Manager", "manager.a@tenant.com", Role.MANAGER, "tenant-a", TenantType.EXTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(240)));
+        userRepository.save(user("USR-EXT-A-MEM-001", "Tenant A Member", "member.a@tenant.com", Role.MEMBER, "tenant-a", TenantType.EXTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(300)));
+        userRepository.save(user("USR-EXT-B-ADM-001", "Tenant B Admin", "admin.b@tenant.com", Role.ADMIN, "tenant-b", TenantType.EXTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(360)));
+        userRepository.save(user("USR-EXT-B-MGR-001", "Tenant B Manager", "manager.b@tenant.com", Role.MANAGER, "tenant-b", TenantType.EXTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(420)));
+        userRepository.save(user("USR-EXT-B-MEM-001", "Tenant B Member", "member.b@tenant.com", Role.MEMBER, "tenant-b", TenantType.EXTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(480)));
+        userRepository.save(user("USR-EXT-B-AUD-001", "Tenant B Auditor", "auditor.b@tenant.com", Role.AUDITOR, "tenant-b", TenantType.EXTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(540)));
     }
 
     private void seedOperations() {
@@ -121,7 +123,19 @@ public class BootstrapDataService {
             TenantType tenantType,
             UserStatus status,
             Instant createdAt) {
-        return new ManagedUser(id, displayName, email, role, tenantId, tenantType, status, createdAt, null, null);
+        return new ManagedUser(
+                id,
+                email.toLowerCase(java.util.Locale.ROOT),
+                null,
+                displayName,
+                email,
+                role,
+                tenantId,
+                tenantType,
+                status,
+                createdAt,
+                null,
+                null);
     }
 
     private OperationRecord operation(

@@ -1,6 +1,6 @@
 # Shared Project Context - ProgramManagementSystem
 
-Ultima atualizacao: `2026-03-14`
+Ultima atualizacao: `2026-03-19`
 
 ## Leia primeiro
 
@@ -94,7 +94,29 @@ Estado atual confirmado:
 - o upload de documentos esta restrito, por enquanto, a `Entregavel` do tipo `DOCUMENT`
 - o comportamento do modulo de portfolio e do fluxo de documentos foi validado por teste automatizado
 - o modulo de `users` agora expoe contrato orientado a `organizationId`, valida a existencia da `Organizacao` no backend e devolve `organizationName` na resposta
-- a ultima execucao conhecida de `./mvnw.cmd test` terminou com `50` testes passando
+- o modulo de `users` agora suporta criacao, atualizacao e inativacao logica, mantendo `organizationId` como referencia canonica e `tenant_id`/`tenant_type` apenas como compatibilidade interna
+- `DELETE /api/users/{userId}` nao remove mais fisicamente o registro; a operacao agora muda o status do usuario para `INACTIVE`
+- usuarios `INACTIVE` nao podem receber `reset-access` nem `resend-invite`
+- o modulo de `users` agora persiste vinculo de identidade em `identity_username` e `identity_subject`, preparando operacao real com Cognito sem perder a projecao administrativa local
+- o backend de `users` agora sincroniza `create`, `update`, `resend-invite`, `reset-access` e `inactivate` com um gateway de identidade configuravel por ambiente, usando `stub` em local/testes e deixando Cognito pronto para ativacao por configuracao
+- usuarios `INVITED` passam a ser promovidos para `ACTIVE` no primeiro request autenticado valido quando o backend consegue reconciliar a identidade por `sub`, `cognito:username` ou email
+- o backend agora tambem reconhece a claim `username` do `access_token` do Cognito como fallback operacional para reconciliacao de identidade e exibicao em `/api/auth/me`
+- `reset-access` agora aceita apenas usuarios `ACTIVE`, `resend-invite` aceita apenas usuarios `INVITED` e usuarios `ACTIVE` nao podem trocar de `Organizacao` sem recriacao controlada
+- a criacao de `Organizacao` no portfolio agora e protegida no backend e aceita apenas usuarios `ADMIN` com `TenantType=INTERNAL`
+- as respostas de `Organizacao` no portfolio agora expoem `setupStatus` calculado em runtime com valores `COMPLETED` e `INCOMPLETED`
+- uma `Organizacao` `INCOMPLETED` nao pode ser usada como `ownerOrganizationId` na criacao de `Programa`
+- uma `Organizacao` `INCOMPLETED` nao pode receber usuarios nao-`ADMIN`; o primeiro usuario precisa ser `ADMIN`
+- a ultima execucao conhecida de `./mvnw.cmd test` terminou com `62` testes passando
+- os atributos customizados `custom:tenant_id`, `custom:tenant_type` e `custom:user_status` ja existem no User Pool do Cognito e foram validados
+- o primeiro usuario real do pool recebeu backfill com `custom:tenant_id=internal-core`, `custom:tenant_type=INTERNAL` e `custom:user_status=ACTIVE`
+- foi publicada uma Lambda de `Pre Token Generation` para injetar claims de tenant e status no `access_token` e no `id_token`
+- o User Pool do Cognito agora esta configurado com `PreTokenGenerationConfig` em `V2_0`
+- a validacao real confirmou que o `access_token` agora carrega `tenant_id`, `tenant_type`, `user_status` e os equivalentes `custom:*`
+- o deploy AWS mais recente do backend esta ativo em `program-management-system:8`, com runtime configurado para `APP_SECURITY_IDENTITY_PROVIDER=cognito`
+- a role `program-management-system-ecs-task-role` recebeu permissao para operacoes administrativas de usuario no Cognito (`AdminCreateUser`, `AdminUpdateUserAttributes`, `AdminAddUserToGroup`, `AdminRemoveUserFromGroup`, `AdminResetUserPassword`, `AdminDisableUser`)
+- a role `program-management-system-ecs-task-role` agora tambem inclui `AdminGetUser`, habilitando verificacao de existencia da identidade no Cognito antes de saneamentos excepcionais
+- o fluxo real do modulo de `users` foi validado pela UI com usuario administrador interno: criar usuario, receber convite, editar, reenviar convite, resetar acesso, inativar, bloquear edicao de inativo e rejeitar login de usuario inativo
+- o backend de `users` agora expoe um endpoint excepcional `POST /api/users/{userId}/purge` para saneamento administrativo controlado por `SUPPORT`
 - ainda nao houve validacao operacional do fluxo de documentos contra um bucket S3 real no runtime AWS
 - a primeira UI basica do portfolio ja foi implementada no frontend local consumindo o contrato real de `/api/portfolio`
 - o frontend agora consegue listar e criar `Organizacao`, criar `MilestoneTemplate`, criar `Programa` com `Projeto` inicial, navegar no detalhe do programa e seguir o fluxo estrutural ate documento em modo `stub`
@@ -108,7 +130,11 @@ Ponto de retomada oficial:
 - evoluir o modulo `/api/portfolio` com edicao, update de status, ownership e permissoes de negocio
 - definir a primeira estrutura persistivel para os entregaveis do tipo `FORM`
 - preparar e validar o fluxo de documentos com bucket S3 real no ambiente AWS
-- manter em paralelo a validacao de autenticacao real via Cognito Hosted UI + ALB e a definicao da borda externa final com HTTPS/TLS
+- consolidar agora a implementacao do frontend sobre o fluxo autenticado real do Cognito ja alinhado com `access_token`
+- estender a UI de `users` agora que o smoke test principal com `ADMIN` interno foi validado de ponta a ponta
+- executar smoke test do workspace de `users` tambem com `MANAGER` externo
+- revisar, apos o smoke test expandido do frontend, se o fallback temporario para `id_token` ainda precisa permanecer
+- manter em paralelo a definicao da borda externa final com HTTPS/TLS
 - manter a observabilidade fina no backlog controlado, especialmente telemetria explicita de Secrets Manager e `FilterLogEvents`
 
 ## Recursos AWS atuais
@@ -129,6 +155,15 @@ Cognito:
 - hosted UI domain: `https://sa-east-1aa4i3temf.auth.sa-east-1.amazoncognito.com`
 - issuer: `https://cognito-idp.sa-east-1.amazonaws.com/sa-east-1_aA4I3tEmF`
 - JWKS: `https://cognito-idp.sa-east-1.amazonaws.com/sa-east-1_aA4I3tEmF/.well-known/jwks.json`
+- custom attributes validados no pool:
+  - `custom:tenant_id`
+  - `custom:tenant_type`
+  - `custom:user_status`
+- lambda de `Pre Token Generation`: `arn:aws:lambda:sa-east-1:439533253319:function:program-management-system-cognito-pre-token`
+- trigger ativo no pool: `PreTokenGenerationConfig.LambdaVersion=V2_0`
+- comportamento validado em token real:
+  - `access_token` agora inclui `tenant_id`, `tenant_type`, `user_status`, `custom:tenant_id`, `custom:tenant_type` e `custom:user_status`
+  - `id_token` continua incluindo os mesmos valores, alem de `email` e `cognito:username`
 
 RDS:
 - instancia: `program-management-system-db`
@@ -145,7 +180,7 @@ Secrets Manager:
 ECS/Fargate:
 - cluster: `program-management-system-cluster`
 - service: `program-management-system-service`
-- task definition atual: `program-management-system:7`
+- task definition atual: `program-management-system:8`
 - task role: `program-management-system-ecs-task-role`
 - execution role: `program-management-system-ecs-execution-role`
 - execution role ARN: `arn:aws:iam::439533253319:role/program-management-system-ecs-execution-role`
@@ -197,6 +232,9 @@ Scripts operacionais:
 Artefatos de deploy:
 - `Dockerfile`
 - `infra/ecs/README.md`
+- `infra/cognito/pre-token-generation/README.md`
+- `infra/cognito/pre-token-generation/index.mjs`
+- `infra/cognito/pre-token-generation/deploy.ps1`
 - `infra/ecs/task-definition.template.json`
 - `infra/ecs/service-definition.template.json`
 
@@ -271,17 +309,23 @@ Status do backend:
 Status do frontend:
 - a stack base do frontend esta definida com `React + JavaScript + Vite`
 - o frontend local foi alinhado para rodar em `http://localhost:3000`
-- as rotas ativas agora incluem `/`, `/callback`, `/logout`, `/workspace`, `/workspace/programs/:programId` e `/workspace/session`
+- as rotas ativas agora incluem `/`, `/callback`, `/logout`, `/workspace`, `/workspace/users`, `/workspace/programs/:programId` e `/workspace/session`
 - a autenticacao base usa `react-oidc-context` com Cognito Hosted UI via `authorization_code + PKCE`
 - a base de dados no cliente usa `@tanstack/react-query` e wrapper HTTP com `fetch`
 - o login real via localhost foi validado com sucesso
 - `GET /api/auth/me` respondeu `200` com token Cognito real via frontend local
 - a autorizacao real para usuario no grupo `ADMIN` foi validada em `GET /api/admin/ping` e `GET /api/authz/check`
+- a emissao real de claims de tenant no `access_token` foi validada com sucesso apos ativacao da Lambda de `Pre Token Generation`
 - o frontend agora possui um workspace de portfolio consumindo `organizations`, `milestone-templates`, `programs`, detalhe de programa, `products`, `items`, `deliverables`, `documents` e `open-issues`
+- o frontend agora tambem possui um workspace de `users` consumindo `GET/POST/PUT/DELETE /api/users`, filtro por `organizationId` e as acoes `resend-invite` e `reset-access`
+- o workspace de `users` agora tambem cobre a acao excepcional `POST /api/users/{userId}/purge` com justificativa obrigatoria, `supportOverride=true` e UX restrita a `SUPPORT`
 - o diagnostico de sessao, claims e validador de endpoints protegidos foi preservado em `/workspace/session`
 - a inicializacao do `PortfolioWorkspace` foi estabilizada apos correcao de ordem de inicializacao de estado no calculo de `ownerOrganizationId`
 - o workspace e o diagnostico autenticado agora reaproveitam `id_token` como fallback controlado quando o backend responde `403` ao `access_token`, com mensagem de erro orientando validacao em `/workspace/session`
-- os gaps atuais mais relevantes para integracao sao logout real, enriquecimento da identidade retornada, investigacao de `principal=null` nos endpoints de ping, alinhamento definitivo entre claims do Cognito e autorizacao esperada no backend e refinamento de UX/mensagens do novo fluxo de portfolio
+- o workspace de `users` ja cobre listagem, filtro por organizacao, criacao, edicao, inativacao, reenvio de convite, reset de acesso, orientacao para primeiro `ADMIN` e feedback visual minimo de loading/empty/error/toast
+- a acao excepcional de `purge` foi incorporada na UI de `users` como fluxo secundario, visivel apenas para `SUPPORT` e apenas em usuarios `INACTIVE`
+- o frontend de `users` agora precisa prever tambem a acao excepcional `POST /api/users/{userId}/purge`, visivel apenas para `SUPPORT`, apenas para usuarios `INACTIVE`, com `supportOverride=true` e `justification` obrigatoria
+- os gaps atuais mais relevantes para integracao sao logout real, enriquecimento da identidade retornada, investigacao de `principal=null` nos endpoints de ping, refinamento de UX/mensagens do novo fluxo de portfolio e smoke test integrado do novo workspace de `users`
 
 Leitura estrategica do momento:
 - o projeto saiu da fase de fundacao tecnica e entrou na fase de produto utilizavel
@@ -372,6 +416,7 @@ Status atual:
 - a primeira UI real do portfolio foi implementada consumindo o backend em AWS com token Cognito real
 - o workspace agora foi dividido entre fluxo de produto e diagnostico tecnico para preservar troubleshooting sem bloquear a evolucao da UI
 - o cliente HTTP autenticado do frontend agora aceita fallback para `id_token` quando o backend negar a mesma operacao com `access_token`
+- o fallback para `id_token` segue temporariamente disponivel, mas a trilha principal agora ja esta alinhada para uso de `access_token` com claims de tenant
 
 Stack atual:
 - framework base: `React`
@@ -409,12 +454,22 @@ Estado atual da integracao:
 - `POST /api/portfolio/projects/{projectId}/products`, `POST /api/portfolio/products/{productId}/items`, `POST /api/portfolio/items/{itemId}/deliverables` e `POST /api/portfolio/programs/{programId}/open-issues` consumidos no frontend
 - fluxo de documento via `upload-url`, `complete` e `download-url` exercitado na UI em modo `stub`
 - chamadas protegidas agora tentam primeiro `access_token` e, em caso de `403`, repetem uma unica vez com `id_token`
+- o `access_token` real passou a incluir `tenant_id`, `tenant_type`, `user_status` e os equivalentes `custom:*`, removendo o bloqueio original de claims ausentes
+- o fluxo principal real de `users` foi validado na UI com sucesso para `ADMIN` interno:
+  - criar usuario
+  - receber email com senha provisoria
+  - editar usuario
+  - reenviar convite
+  - resetar acesso
+  - inativar usuario
+  - bloquear edicao de usuario inativo
+  - rejeitar login de usuario inativo
 
 Gaps atuais e pontos de atencao:
 - validar logout real com Hosted UI
 - entender por que `principal` vem `null` em respostas atuais de ping
 - decidir se `/api/auth/me` deve enriquecer `username`, email, roles, groups e contexto de tenant para a UI
-- confirmar se o fallback temporario para `id_token` continuara necessario depois do alinhamento de claims/permissoes no backend
+- executar smoke test do frontend de `users` com `MANAGER` externo e decidir se o fallback temporario para `id_token` ja pode ser removido
 - definir tratamento refinado de `401` e `403`
 - refinar a UX do workspace do portfolio com feedback mais claro de erros e sucesso
 - decidir a melhor representacao visual para owner organization, participantes e breadcrumbs do portfolio
@@ -561,9 +616,46 @@ API atual de users:
 - `GET /api/users`
 - `GET /api/users?organizationId={organizationId}`
 - `POST /api/users` com `displayName`, `email`, `role` e `organizationId`
-- `DELETE /api/users/{userId}`
+- `PUT /api/users/{userId}` com `displayName`, `email`, `role` e `organizationId`
+- `DELETE /api/users/{userId}` com inativacao logica
 - `POST /api/users/{userId}/resend-invite`
 - `POST /api/users/{userId}/reset-access`
+- `POST /api/users/{userId}/purge` com `supportOverride=true` e `justification`
+
+Modulo users:
+- objetivo atual:
+  - centralizar o cadastro administrativo de usuarios vinculados obrigatoriamente a uma `Organizacao`
+  - manter o contrato HTTP orientado a `organizationId` e `organizationName`, ocultando `tenant_id` e `tenant_type` da UX principal
+  - suportar a jornada base `listar -> criar -> atualizar -> inativar -> executar acoes sensiveis`
+  - manter projecao administrativa local alinhada com identidade real no Cognito
+- modelo atual:
+  - `Usuario` sempre pertence a uma `Organizacao`
+  - o contrato principal responde `id`, `displayName`, `email`, `role`, `organizationId`, `organizationName`, `status`, `createdAt`, `inviteResentAt` e `accessResetAt`
+  - o backend ainda persiste `tenant_id` e `tenant_type` para compatibilidade de autorizacao e filtros internos
+  - o backend agora persiste tambem `identity_username` e `identity_subject` para reconciliar a identidade real do Cognito com a projecao local
+  - os statuses atuais do modulo sao `INVITED`, `ACTIVE` e `INACTIVE`
+- endpoints e funcao:
+  - `GET /api/users` -> lista usuarios visiveis no escopo do ator autenticado
+  - `GET /api/users?organizationId={organizationId}` -> lista usuarios filtrados por organizacao quando o ator possui permissao para esse escopo
+  - `POST /api/users` -> cria usuario com `displayName`, `email`, `role` e `organizationId`; o usuario nasce com status `INVITED` e e provisionado no Cognito
+  - `PUT /api/users/{userId}` -> atualiza `displayName`, `email`, `role` e `organizationId` de um usuario e sincroniza os atributos/grupos no Cognito
+  - `DELETE /api/users/{userId}` -> inativa logicamente o usuario definindo status `INACTIVE` e desabilita o acesso no Cognito
+  - `POST /api/users/{userId}/resend-invite` -> reenfileira o convite no Cognito para usuario `INVITED` e autorizado
+- `POST /api/users/{userId}/reset-access` -> dispara reset administrativo no Cognito para usuario `ACTIVE` e autorizado
+- `POST /api/users/{userId}/purge` -> remove fisicamente o registro administrativo local apenas como excecao operacional, exigindo `SUPPORT`, `supportOverride=true`, `justification`, usuario `INACTIVE` e identidade ja ausente no Cognito
+- regras implementadas:
+  - `email` e unico globalmente
+  - `organizationId` precisa existir e estar ativo para criacao ou atualizacao
+  - uma `Organizacao` sem `ADMIN` em status `INVITED` ou `ACTIVE` e considerada `INCOMPLETED`
+  - uma `Organizacao` `INCOMPLETED` so pode receber como primeiro usuario um `ADMIN`
+  - `MANAGER` pode operar apenas no proprio escopo e continua impedido de elevar alvo para `ADMIN`
+  - `SUPPORT` continua dependente de `supportOverride` e `justification` para operacoes cross-tenant sensiveis
+  - usuarios `INACTIVE` nao podem ser atualizados nem receber `resend-invite` ou `reset-access`
+  - usuarios `INVITED` sao promovidos para `ACTIVE` no primeiro request autenticado valido quando o backend reconcilia `sub`, `cognito:username`, `username` ou email
+  - o backend aceita tanto claims legadas `tenant_id` e `tenant_type` quanto claims reais do Cognito `custom:tenant_id` e `custom:tenant_type`
+- a emissao real do `access_token` agora depende da Lambda `infra/cognito/pre-token-generation/index.mjs`, ja validada no User Pool de desenvolvimento
+- a exclusao atual do modulo de usuarios e logica; o registro permanece persistido para rastreabilidade operacional
+- quando houver divergencia excepcional entre banco e Cognito, existe agora um `purge` administrativo controlado para remover apenas a projecao local depois de validar que a identidade ja nao existe mais no Cognito
 
 Regras implementadas no portfolio:
 - criacao de `Programa` exige `initialProject`
@@ -577,8 +669,14 @@ Regras implementadas no portfolio:
 - o fluxo de `complete` verifica a existencia do objeto no storage gateway antes de marcar o documento como `AVAILABLE`
 - a exclusao atual de documentos e logica, via status `DELETED`
 - todo `Usuario` criado via API precisa referenciar uma `Organizacao` existente
+- a resposta de `Organizacao` agora inclui `setupStatus`, calculado a partir da existencia de pelo menos um `ADMIN` com status `INVITED` ou `ACTIVE`
+- `Organizacao` com `setupStatus=INCOMPLETED` nao pode ser usada como dona de um novo `Programa`
 - a resposta de `users` agora expoe `organizationId` e `organizationName` em vez de expor `tenantId` e `tenantType` no contrato principal
 - o backend preserva `tenant_id` e `tenant_type` como compatibilidade interna de autorizacao ate a evolucao completa do modulo de identidade
+- `users` agora suporta update explicito via `PUT /api/users/{userId}`
+- `users` agora trata delete como inativacao logica via status `INACTIVE`
+- acoes sensiveis de `users` (`resend-invite` e `reset-access`) passaram a bloquear alvos `INACTIVE`
+- a criacao de `Organizacao` em `/api/portfolio/organizations` agora e operacao de plataforma protegida para `ADMIN + INTERNAL`
 
 Persistencia:
 - Flyway com PostgreSQL `17.6`
@@ -600,13 +698,20 @@ Storage de documentos:
 
 Frontend:
 - workspace de portfolio em `React` consumindo o contrato real do backend com `React Query`
+- workspace de `users` em `React` consumindo `GET/POST/PUT/DELETE /api/users` e `POST /api/users/{userId}/resend-invite|reset-access`
+- fluxo excepcional de saneamento no frontend para `POST /api/users/{userId}/purge` com justificativa obrigatoria e confirmacao explicita
 - formularios ativos para criacao de `Organizacao`, `MilestoneTemplate` e `Programa` com `Projeto` inicial
+- formularios ativos para `CreateUserForm` e `EditUserForm` com `displayName`, `email`, `role` e `organizationId`
 - detalhe de programa renderiza participantes, milestones, produtos, itens, entregaveis, documentos e `OpenIssue`
 - a UI permite criar `Produto`, `Item`, `Entregavel`, `OpenIssue` e registrar documento via provider `stub`
 - o workspace tecnico anterior foi preservado em `/workspace/session`
 - a inicializacao do workspace de portfolio foi corrigida apos um `ReferenceError` causado por acesso antecipado a estado do formulario de programa
 - o wrapper HTTP do frontend passou a repetir uma vez chamadas autenticadas com `id_token` quando o backend responder `403` ao `access_token`
 - as mensagens de erro de `403` no portfolio agora orientam relogin e validacao da sessao em `/workspace/session`
+- a UI de `users` oculta acoes sensiveis para `INACTIVE`, mostra `resend-invite` apenas para `INVITED`, `reset-access` apenas para `ACTIVE` e evita sugerir troca de organizacao para usuario `ACTIVE`
+- a UI de `users` mostra `Purge` apenas para `SUPPORT`, apenas em usuarios `INACTIVE` e executa refetch da listagem apos sucesso
+- a UI de `users` precisara adicionar a acao excepcional `purge` apenas para `SUPPORT`, com modal de confirmacao, justificativa obrigatoria e refresh da listagem apos sucesso
+- o workspace de `users` tambem trata `400`, `401`, `403` e `500` com mensagens amigaveis, confirmacao antes de inativar e toast de sucesso para create/update/resend/reset/inactivate
 
 AWS runtime:
 - RDS privado provisionado e validado
@@ -619,7 +724,10 @@ Qualidade:
 - suite `./mvnw.cmd test` validada repetidamente durante a implantacao
 - testes cobrindo autenticacao, autorizacao, CORS, `users`, `operations` e `reports`
 - teste do modulo de portfolio cobre autenticacao obrigatoria, criacao da hierarquia principal, aplicacao de milestone template, upload stub, confirmacao de upload, download, listagem de documentos e criacao de `OpenIssue`
-- ultima execucao conhecida: `48` testes passando
+- o teste do modulo de `users` agora cobre update, inativacao logica e bloqueio de acoes sensiveis para usuarios `INACTIVE`
+- o teste do modulo de `users` agora tambem cobre o fluxo excepcional de `purge` por `SUPPORT`, incluindo bloqueio para usuario ativo, exigencia de `supportOverride=true` e validacao de identidade ausente no Cognito
+- o teste do modulo de portfolio agora tambem cobre a restricao `ADMIN + INTERNAL` para criacao de `Organizacao`
+- ultima execucao conhecida: `70` testes passando
 
 ## Mapa oficial do dominio V1
 
@@ -659,6 +767,7 @@ Camada de governanca:
 
 Portfolio e documentos:
 - `OrganizationStatus`: `ACTIVE`, `INACTIVE`
+- `UserStatus`: `INVITED`, `ACTIVE`, `INACTIVE`
 - `ProgramStatus`: `DRAFT`, `ACTIVE`, `PAUSED`, `CLOSED`, `CANCELED`
 - `ParticipationRole`: `CLIENT`, `SUPPLIER`, `INTERNAL`, `PARTNER`
 - `ParticipationStatus`: `ACTIVE`, `INACTIVE`
@@ -724,6 +833,13 @@ Portfolio e documentos:
 46. O cadastro de `Usuario` na UI nao deve expor `tenantId` nem `tenantType`; deve sempre selecionar uma `Organizacao` existente.
 47. O fluxo de `Organizacao` e `Usuario` deve ser tratado como jornada integrada, com opcao explicita para criar o primeiro administrador logo apos o cadastro da organizacao.
 48. `ParticipacaoNoPrograma` continua representando o papel da organizacao dentro do programa e nao substitui o vinculo obrigatorio entre `Usuario` e `Organizacao`.
+49. A criacao de `Organizacao` passa a ser tratada como operacao de plataforma e deve ser permitida apenas para usuarios com `Role=ADMIN` e `TenantType=INTERNAL`.
+50. O primeiro usuario de uma `Organizacao` deve ser obrigatoriamente `ADMIN`.
+51. A UI deve forcar a jornada `Criar Organizacao -> Criar primeiro ADMIN`.
+52. O backend deve considerar a `Organizacao` em estado incompleto quando nao existir nenhum usuario `ADMIN` com status `INVITED` ou `ACTIVE`.
+53. O estado de onboarding da `Organizacao` sera calculado em runtime como `setupStatus`, com valores `COMPLETED` e `INCOMPLETED`, sem persistencia dedicada em banco nesta etapa.
+54. O frontend de `users` deve trabalhar apenas com `organizationId` e `organizationName`, sem expor `tenant_id` nem `tenant_type` na UX.
+55. O `access_token` permanece como trilha principal de autenticacao no frontend, mantendo fallback temporario com `id_token` ate o smoke test final confirmar que ele pode ser removido.
 
 ## Decisoes em aberto
 
@@ -747,20 +863,20 @@ Portfolio e documentos:
 18. Se a aprovacao futura de entregavel ocorrera no nivel do `Entregavel`, do `DeliverableDocument` ou em ambos.
 19. Como serao paginacao, filtros e busca das listagens de portfolio quando o volume crescer.
 20. Qual sera a regra exata para permitir ou bloquear inativacao/exclusao de `Organizacao` com usuarios vinculados.
-21. Se o primeiro usuario criado para uma `Organizacao` sera obrigatoriamente `ADMIN` e se essa exigencia sera validada apenas na UI ou tambem no backend.
-22. Como sera a integracao futura entre `Usuario` local e provisioning real no Cognito para convite, reenvio e sincronizacao de status.
-23. Como `SUPPORT` e `AUDITOR` serao apresentados operacionalmente na UI mantendo a regra de pertencimento obrigatorio a uma `Organizacao`.
+21. Como sera a integracao futura entre `Usuario` local e provisioning real no Cognito para convite, reenvio e sincronizacao de status.
+22. Como `SUPPORT` e `AUDITOR` serao apresentados operacionalmente na UI mantendo a regra de pertencimento obrigatorio a uma `Organizacao`.
+23. Se a V1 do frontend de `users` precisara expor filtros adicionais, paginacao, busca textual ou reativacao de usuario.
 
 ## Proxima sessao
 
 Checklist recomendado:
 - validar com uso real a UI basica de `Organizacao`, `MilestoneTemplate`, `Programa` e detalhe de `Programa`
 - revisar mensagens de erro, estados vazios e feedbacks de sucesso do workspace do portfolio
+- executar o smoke test manual do workspace de `users` cobrindo `ADMIN` interno, `MANAGER` externo, onboarding do primeiro `ADMIN`, `resend-invite`, `reset-access` e inativacao
 - validar no fluxo da UI a criacao ponta a ponta `Programa -> Projeto -> Produto -> Item -> Entregavel`
 - testar na UI o fluxo de documento com provider `stub` em mais de um cenario de uso
 - publicar no runtime AWS a correcao de tratamento de erro do backend e repetir o cadastro de `Organizacao` para confirmar a causa real caso ainda haja falha
-- evoluir o cadastro de `Organizacao` para preparar a jornada de criacao do primeiro administrador
-- adaptar a UI de `Usuario` ao contrato ja implementado com `organizationId` e `organizationName`
+- revisar, apos o smoke test de `users`, se o fallback temporario para `id_token` ainda e necessario nas chamadas autenticadas
 - decidir o primeiro recorte de edicao e mudanca de status no backend do portfolio
 - definir o desenho inicial do `FORM` antes de implementar respostas mais ricas
 - comecar a matriz de permissao por papel dentro de `ParticipacaoNoPrograma`
@@ -778,9 +894,6 @@ Se o foco for UI basica:
 - amadurecer o fluxo de documentos por URL assinada do entregavel `DOCUMENT`
 
 Se o foco for backend de negocio:
-- evoluir `POST /api/users` para contrato orientado a `organizationId`
-- validar que o `organizationId` informado existe e representar `tenant_id` como compatibilidade interna
-- enriquecer respostas de `users` com dados basicos da `Organizacao`
 - implementar update e mudanca de status para `Programa`, `Projeto`, `Entregavel` e `OpenIssue`
 - definir ownership por organizacao/usuario nas entidades criticas
 - desenhar a estrutura de perguntas e respostas do `FORM`
@@ -1118,12 +1231,82 @@ Proxima fila apos a sprint:
 - `ParticipacaoNoPrograma` foi reafirmada como vinculo entre `Organizacao` e `Programa`, sem substituir o pertencimento base do usuario a sua organizacao
 - o backlog das proximas sessoes passou a incluir a adaptacao do contrato de `users`, a UX do primeiro administrador e a exibicao de usuarios por organizacao
 
+### 2026-03-17 - Evolucao do modulo de `users` com update e inativacao logica
+- foi adicionado `PUT /api/users/{userId}` para atualizar `displayName`, `email`, `role` e `organizationId`
+- `DELETE /api/users/{userId}` deixou de remover fisicamente o registro e passou a definir o status `INACTIVE`
+- o enum `UserStatus` passou a incluir `INACTIVE`
+- `resend-invite` e `reset-access` passaram a bloquear usuarios inativos
+- o contrato de `users` manteve `organizationId` como referencia canonica e continuou ocultando `tenant_id` e `tenant_type` da UX principal
+- os testes do modulo de `users` foram ampliados para cobrir update, inativacao logica e bloqueio de acoes sensiveis em usuarios inativos
+- a suite completa `./mvnw.cmd test` foi reexecutada com sucesso, totalizando `53` testes passando
+
+### 2026-03-17 - Protecao de criacao de `Organizacao` para `ADMIN + INTERNAL`
+- `POST /api/portfolio/organizations` passou a validar no backend que apenas usuarios `ADMIN` com `TenantType=INTERNAL` podem criar organizacoes
+- a regra foi aplicada no controller/service do portfolio usando o contexto autenticado real do JWT
+- o teste de seguranca do portfolio passou a cobrir o cenario permitido para `ADMIN + INTERNAL` e o bloqueio para `ADMIN + EXTERNAL`
+- a suite completa `./mvnw.cmd test` foi reexecutada com sucesso, totalizando `54` testes passando
+
+### 2026-03-17 - `setupStatus` calculado para `Organizacao` e bloqueios de onboarding
+- `GET/POST /api/portfolio/organizations` passaram a responder `setupStatus` com valores `COMPLETED` e `INCOMPLETED`, calculados em runtime sem persistencia dedicada
+- o backend passou a considerar `Organizacao` incompleta quando nao existe nenhum usuario `ADMIN` com status `INVITED` ou `ACTIVE`
+- `POST /api/portfolio/programs` agora bloqueia `ownerOrganizationId` incompleto, exigindo ao menos um `ADMIN` convidado ou ativo
+- `POST /api/users` e `PUT /api/users/{userId}` agora bloqueiam criacao ou atualizacao de usuarios nao-`ADMIN` para `Organizacao` ainda incompleta
+- os dados seed de organizacoes externas passaram a incluir administradores para preservar coerencia com a nova regra
+- a cobertura de testes foi ampliada para validar `setupStatus`, bloqueio de `Programa` com organizacao incompleta, bloqueio de primeiro usuario nao-`ADMIN` e o contrato JSON de erro `500`
+- a suite completa `./mvnw.cmd test` foi reexecutada com sucesso, totalizando `56` testes passando
+
+### 2026-03-19 - Integracao factivel do modulo de `users` com identidade real
+- foi adicionada a migration `V5__add_user_identity_columns.sql` para persistir `identity_username` e `identity_subject` no modulo de `users`
+- o backend passou a ter um `UserIdentityGateway` configuravel por ambiente, com implementacao `stub` para local/testes e implementacao Cognito pronta para uso por configuracao
+- `POST /api/users`, `PUT /api/users/{userId}`, `POST /api/users/{userId}/resend-invite`, `POST /api/users/{userId}/reset-access` e `DELETE /api/users/{userId}` agora sincronizam o estado local com o gateway de identidade
+- a auditoria do modulo de `users` foi ampliada para cobrir `USER_CREATE`, `USER_UPDATE` e `USER_INACTIVATE`, alem das acoes sensiveis ja existentes
+- foi fechado que `reset-access` aceita apenas usuarios `ACTIVE`, `resend-invite` aceita apenas usuarios `INVITED` e usuarios `ACTIVE` nao podem trocar de `Organizacao`
+- foi adicionado um filtro autenticado para reconciliar identidade em runtime e promover usuarios `INVITED` para `ACTIVE` no primeiro request autenticado valido
+- a suite completa `./mvnw.cmd test` foi reexecutada com sucesso, totalizando `62` testes passando
+
+### 2026-03-19 - Alinhamento real do Cognito para claims de tenant no `access_token`
+- os atributos `custom:tenant_id`, `custom:tenant_type` e `custom:user_status` foram criados e validados no User Pool `sa-east-1_aA4I3tEmF`
+- o usuario administrador real recebeu backfill com `internal-core`, `INTERNAL` e `ACTIVE`
+- foi criada e publicada a Lambda `program-management-system-cognito-pre-token` com codigo versionado em `infra/cognito/pre-token-generation/index.mjs`
+- o User Pool passou a usar `PreTokenGenerationConfig` em `V2_0` apontando para a Lambda acima
+- a validacao real em `/workspace/session` confirmou que o `access_token` agora inclui `tenant_id`, `tenant_type`, `user_status` e os equivalentes `custom:*`
+- o backend de autenticacao e sincronizacao de usuarios foi ajustado para aceitar tambem a claim `username` presente no `access_token`
+
+### 2026-03-19 - Validacao funcional real do modulo de `users` via UI
+- o backend foi reimplantado no ECS/Fargate como `program-management-system:8`, agora com `APP_SECURITY_IDENTITY_PROVIDER=cognito` ativo no runtime
+- o runtime AWS falhou inicialmente ao criar usuarios por falta de permissao `cognito-idp:AdminCreateUser` na role `program-management-system-ecs-task-role`
+- a role da task recebeu permissao explicita para administrar usuarios no User Pool, cobrindo criacao, update de atributos, grupos, reset de senha e disable
+- apos novo deployment, o fluxo real do modulo de `users` foi validado com sucesso na UI:
+  - criacao de usuario com email de senha provisoria
+  - edicao de usuario
+  - reenvio de convite
+  - reset de acesso
+  - inativacao
+  - bloqueio de edicao para usuario inativo
+  - rejeicao de login para usuario inativo
+- com isso, o modulo de `users` passa a ser considerado funcional ponta a ponta para o fluxo principal com `ADMIN` interno
+
+### 2026-03-19 - Primeiro workspace de `users` no frontend
+- foi criada a rota `/workspace/users` para a administracao de usuarios ao lado do workspace de portfolio
+- o frontend passou a consumir `GET/POST/PUT/DELETE /api/users` e `POST /api/users/{userId}/resend-invite|reset-access` com `React Query`
+- o workspace de `users` passou a listar usuarios, filtrar por `organizationId`, criar, editar, inativar, reenviar convite e resetar acesso
+- a UI passou a refletir as regras do backend: esconder acoes sensiveis para `INACTIVE`, permitir `resend-invite` apenas para `INVITED`, `reset-access` apenas para `ACTIVE` e bloquear sugestao de troca de `Organizacao` para usuario `ACTIVE`
+- o frontend passou a orientar explicitamente a criacao do primeiro `ADMIN` quando a organizacao selecionada estiver com `setupStatus=INCOMPLETED`
+- `npm run lint`, `npm run test` e `npm run build` foram executados com sucesso apos a implementacao do workspace de `users`
+
+### 2026-03-19 - Acao excepcional de `purge` integrada ao frontend de `users`
+- o frontend passou a consumir `POST /api/users/{userId}/purge?supportOverride=true&justification=...`
+- a acao `Purge` ficou visivel apenas para sessao com role `SUPPORT` e apenas para usuarios `INACTIVE`
+- a UX de `purge` passou a exigir justificativa obrigatoria, confirmacao explicita e refetch da listagem apos sucesso
+- `npm run lint`, `npm run test` e `npm run build` foram reexecutados com sucesso apos a integracao do `purge`
+
 ## Regra de atualizacao
 
 Objetivo desta regra:
 - manter este arquivo como memoria operacional completa do projeto, e nao apenas como log resumido de alteracoes
 - permitir retomada de contexto em novas sessoes sem depender de memoria externa, arquivos paralelos ou historico informal
 - garantir que frontend e backend leiam o mesmo retrato atualizado do produto, da arquitetura e do backlog
+- para cada modulo importante do produto, manter uma secao dedicada com objetivo, modelo, endpoints, funcao de cada endpoint, regras implementadas e gaps relevantes; `users` passa a ser o primeiro modulo organizado nesse formato
 
 Como atualizar em cada etapa:
 - ao concluir cada etapa relevante, revisar o que mudou no produto, no contrato, na UX, na arquitetura, no backlog e na prioridade

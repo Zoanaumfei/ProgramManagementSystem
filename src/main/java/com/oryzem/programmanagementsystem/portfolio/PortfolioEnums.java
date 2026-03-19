@@ -5,6 +5,11 @@ enum OrganizationStatus {
     INACTIVE
 }
 
+enum OrganizationSetupStatus {
+    COMPLETED,
+    INCOMPLETED
+}
+
 enum ProgramStatus {
     DRAFT,
     ACTIVE,

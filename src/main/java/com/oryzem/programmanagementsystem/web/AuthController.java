@@ -21,6 +21,12 @@ public class AuthController {
 
     private static final String GROUPS_CLAIM = "cognito:groups";
     private static final String USERNAME_CLAIM = "cognito:username";
+    private static final String ACCESS_TOKEN_USERNAME_CLAIM = "username";
+    private static final String TENANT_ID_CLAIM = "tenant_id";
+    private static final String TENANT_TYPE_CLAIM = "tenant_type";
+    private static final String CUSTOM_TENANT_ID_CLAIM = "custom:tenant_id";
+    private static final String CUSTOM_TENANT_TYPE_CLAIM = "custom:tenant_type";
+    private static final String CUSTOM_USER_STATUS_CLAIM = "custom:user_status";
 
     private final CognitoProperties cognitoProperties;
     private final AuthenticatedUserMapper authenticatedUserMapper;
@@ -51,11 +57,21 @@ public class AuthController {
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("subject", jwt.getSubject());
-        body.put("username", firstNonBlank(jwt.getClaimAsString(USERNAME_CLAIM), jwtAuthentication.getName()));
+        body.put("username", firstNonBlank(
+                jwt.getClaimAsString(USERNAME_CLAIM),
+                jwt.getClaimAsString(ACCESS_TOKEN_USERNAME_CLAIM),
+                jwtAuthentication.getName()));
         body.put("email", jwt.getClaimAsString("email"));
         body.put("tokenUse", jwt.getClaimAsString("token_use"));
         body.put("tenantId", authenticatedUser.tenantId());
         body.put("tenantType", authenticatedUser.tenantType() != null ? authenticatedUser.tenantType().name() : null);
+        body.put("tenantIdClaim", firstNonBlank(
+                jwt.getClaimAsString(TENANT_ID_CLAIM),
+                jwt.getClaimAsString(CUSTOM_TENANT_ID_CLAIM)));
+        body.put("tenantTypeClaim", firstNonBlank(
+                jwt.getClaimAsString(TENANT_TYPE_CLAIM),
+                jwt.getClaimAsString(CUSTOM_TENANT_TYPE_CLAIM)));
+        body.put("userStatusClaim", jwt.getClaimAsString(CUSTOM_USER_STATUS_CLAIM));
         body.put("roles", authenticatedUser.roles().stream().map(Enum::name).sorted().toList());
         body.put("groups", defaultList(jwt.getClaimAsStringList(GROUPS_CLAIM)));
         body.put("scopes", scopes(jwt.getClaimAsString("scope")));
@@ -67,8 +83,8 @@ public class AuthController {
         return body;
     }
 
-    private String firstNonBlank(String firstValue, String fallbackValue) {
-        return Stream.of(firstValue, fallbackValue)
+    private String firstNonBlank(String... values) {
+        return Stream.of(values)
                 .filter(value -> value != null && !value.isBlank())
                 .findFirst()
                 .orElse("unknown");

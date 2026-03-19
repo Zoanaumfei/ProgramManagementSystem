@@ -1,5 +1,6 @@
 package com.oryzem.programmanagementsystem.users;
 
+import com.oryzem.programmanagementsystem.authorization.Role;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.context.annotation.Primary;
@@ -42,8 +43,29 @@ public class JpaUserRepository implements UserRepository {
 
     @Override
     @Transactional(readOnly = true)
+    public Optional<ManagedUser> findByIdentityUsername(String identityUsername) {
+        return delegate.findByIdentityUsernameIgnoreCase(identityUsername).map(UserEntity::toDomain);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<ManagedUser> findByIdentitySubject(String identitySubject) {
+        return delegate.findByIdentitySubject(identitySubject).map(UserEntity::toDomain);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public Optional<ManagedUser> findByEmailIgnoreCase(String email) {
         return delegate.findByEmailIgnoreCase(email).map(UserEntity::toDomain);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean hasInvitedOrActiveAdmin(String tenantId) {
+        return delegate.existsByTenantIdAndRoleAndStatusIn(
+                tenantId,
+                Role.ADMIN,
+                List.of(UserStatus.INVITED, UserStatus.ACTIVE));
     }
 
     @Override

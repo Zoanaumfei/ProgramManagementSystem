@@ -12,15 +12,17 @@ record OrganizationResponse(
         String name,
         String code,
         OrganizationStatus status,
+        OrganizationSetupStatus setupStatus,
         Instant createdAt,
         Instant updatedAt) {
 
-    static OrganizationResponse from(OrganizationEntity organization) {
+    static OrganizationResponse from(OrganizationEntity organization, OrganizationSetupStatus setupStatus) {
         return new OrganizationResponse(
                 organization.getId(),
                 organization.getName(),
                 organization.getCode(),
                 organization.getStatus(),
+                setupStatus,
                 organization.getCreatedAt(),
                 organization.getUpdatedAt());
     }

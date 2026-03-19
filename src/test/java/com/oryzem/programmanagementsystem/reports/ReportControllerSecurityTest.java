@@ -54,8 +54,9 @@ class ReportControllerSecurityTest {
                                 .authorities(new SimpleGrantedAuthority("ROLE_MEMBER"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tenantId").value("tenant-a"))
-                .andExpect(jsonPath("$.totalUsers").value(2))
+                .andExpect(jsonPath("$.totalUsers").value(3))
                 .andExpect(jsonPath("$.totalOperations").value(3))
+                .andExpect(jsonPath("$.usersByRole.ADMIN").value(1))
                 .andExpect(jsonPath("$.usersByRole.MANAGER").value(1))
                 .andExpect(jsonPath("$.operationsByStatus.DRAFT").value(2));
     }
@@ -74,7 +75,7 @@ class ReportControllerSecurityTest {
                                 .authorities(new SimpleGrantedAuthority("ROLE_SUPPORT"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tenantId").value("tenant-b"))
-                .andExpect(jsonPath("$.totalUsers").value(3))
+                .andExpect(jsonPath("$.totalUsers").value(4))
                 .andExpect(jsonPath("$.totalOperations").value(2))
                 .andReturn();
 

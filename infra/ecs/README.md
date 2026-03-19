@@ -29,6 +29,16 @@ Configuracao minima da aplicacao no container:
 - `AWS_REGION=sa-east-1`
 - `DB_SSL_MODE=require`
 
+Complemento operacional de autenticacao:
+- o backend depende do Cognito para JWT e grupos
+- o fluxo real de tenant no `access_token` agora depende tambem da Lambda versionada em `infra/cognito/pre-token-generation`
+- a task role do backend tambem precisa manter permissoes administrativas de usuario no Cognito, incluindo `AdminGetUser`, porque o modulo de `users` agora valida a existencia da identidade antes do saneamento excepcional `POST /api/users/{userId}/purge`
+- artefatos relevantes:
+  - `infra/cognito/pre-token-generation/index.mjs`
+  - `infra/cognito/pre-token-generation/deploy.ps1`
+  - `infra/cognito/pre-token-generation/README.md`
+- antes de validar o frontend contra o ambiente AWS, confirmar que o User Pool continua apontando para a Lambda `program-management-system-cognito-pre-token` com `PreTokenGenerationConfig.LambdaVersion=V2_0`
+
 Observacao de rede para esta primeira subida:
 - como as subnets atuais sao publicas, a primeira task/service pode usar `assignPublicIp=ENABLED`
 - quando a arquitetura amadurecer, revisar a topologia para subnets privadas

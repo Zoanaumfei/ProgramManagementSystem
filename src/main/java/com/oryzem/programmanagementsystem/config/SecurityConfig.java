@@ -6,6 +6,7 @@ import com.oryzem.programmanagementsystem.security.CognitoAudienceValidator;
 import com.oryzem.programmanagementsystem.security.CognitoJwtAuthenticationConverter;
 import com.oryzem.programmanagementsystem.security.JsonAccessDeniedHandler;
 import com.oryzem.programmanagementsystem.security.JsonAuthenticationEntryPoint;
+import com.oryzem.programmanagementsystem.users.AuthenticatedUserSynchronizationFilter;
 import java.util.List;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -39,6 +40,7 @@ public class SecurityConfig {
             HttpSecurity http,
             JwtDecoder jwtDecoder,
             RequestCorrelationFilter requestCorrelationFilter,
+            AuthenticatedUserSynchronizationFilter authenticatedUserSynchronizationFilter,
             ObjectMapper objectMapper) throws Exception {
 
         http
@@ -59,7 +61,8 @@ public class SecurityConfig {
                                 .jwtAuthenticationConverter(new CognitoJwtAuthenticationConverter())))
                 .exceptionHandling(exceptionHandling(objectMapper))
                 .addFilterBefore(requestCorrelationFilter, BearerTokenAuthenticationFilter.class)
-                .addFilterAfter(new AuthenticationLoggingFilter(), BearerTokenAuthenticationFilter.class);
+                .addFilterAfter(authenticatedUserSynchronizationFilter, BearerTokenAuthenticationFilter.class)
+                .addFilterAfter(new AuthenticationLoggingFilter(), AuthenticatedUserSynchronizationFilter.class);
 
         return http.build();
     }

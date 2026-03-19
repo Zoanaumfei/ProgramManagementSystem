@@ -1,5 +1,7 @@
 package com.oryzem.programmanagementsystem.portfolio;
 
+import com.oryzem.programmanagementsystem.authorization.AuthenticatedUser;
+import com.oryzem.programmanagementsystem.authorization.AuthenticatedUserMapper;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
@@ -17,9 +19,13 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 public class PortfolioManagementController {
 
     private final PortfolioManagementService portfolioManagementService;
+    private final AuthenticatedUserMapper authenticatedUserMapper;
 
-    public PortfolioManagementController(PortfolioManagementService portfolioManagementService) {
+    public PortfolioManagementController(
+            PortfolioManagementService portfolioManagementService,
+            AuthenticatedUserMapper authenticatedUserMapper) {
         this.portfolioManagementService = portfolioManagementService;
+        this.authenticatedUserMapper = authenticatedUserMapper;
     }
 
     @GetMapping("/organizations")
@@ -31,7 +37,8 @@ public class PortfolioManagementController {
     public ResponseEntity<OrganizationResponse> createOrganization(
             Authentication authentication,
             @Valid @RequestBody CreateOrganizationRequest request) {
-        return ResponseEntity.ok(portfolioManagementService.createOrganization(request, authentication.getName()));
+        AuthenticatedUser actor = authenticatedUserMapper.from(authentication);
+        return ResponseEntity.ok(portfolioManagementService.createOrganization(request, actor));
     }
 
     @GetMapping("/milestone-templates")

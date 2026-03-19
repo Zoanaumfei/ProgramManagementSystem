@@ -1,10 +1,14 @@
 package com.oryzem.programmanagementsystem.portfolio;
 
+import com.oryzem.programmanagementsystem.authorization.AuthenticatedUser;
+import com.oryzem.programmanagementsystem.authorization.TenantType;
+import com.oryzem.programmanagementsystem.users.UserRepository;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,6 +24,7 @@ public class PortfolioManagementService {
     private final DeliverableRepository deliverableRepository;
     private final DeliverableDocumentRepository deliverableDocumentRepository;
     private final MilestoneTemplateRepository milestoneTemplateRepository;
+    private final UserRepository userRepository;
     private final PortfolioDocumentStorageGateway documentStorageGateway;
     private final PortfolioDocumentProperties documentProperties;
 
@@ -32,6 +37,7 @@ public class PortfolioManagementService {
             DeliverableRepository deliverableRepository,
             DeliverableDocumentRepository deliverableDocumentRepository,
             MilestoneTemplateRepository milestoneTemplateRepository,
+            UserRepository userRepository,
             PortfolioDocumentStorageGateway documentStorageGateway,
             PortfolioDocumentProperties documentProperties) {
         this.organizationRepository = organizationRepository;
@@ -42,6 +48,7 @@ public class PortfolioManagementService {
         this.deliverableRepository = deliverableRepository;
         this.deliverableDocumentRepository = deliverableDocumentRepository;
         this.milestoneTemplateRepository = milestoneTemplateRepository;
+        this.userRepository = userRepository;
         this.documentStorageGateway = documentStorageGateway;
         this.documentProperties = documentProperties;
     }
@@ -49,21 +56,22 @@ public class PortfolioManagementService {
     @Transactional(readOnly = true)
     public List<OrganizationResponse> listOrganizations() {
         return organizationRepository.findAllByOrderByNameAsc().stream()
-                .map(OrganizationResponse::from)
+                .map(this::toOrganizationResponse)
                 .toList();
     }
 
-    public OrganizationResponse createOrganization(CreateOrganizationRequest request, String actor) {
+    public OrganizationResponse createOrganization(CreateOrganizationRequest request, AuthenticatedUser actor) {
+        assertCanCreateOrganization(actor);
         if (organizationRepository.existsByCodeIgnoreCase(request.code().trim())) {
             throw new IllegalArgumentException("Organization code already exists.");
         }
 
         OrganizationEntity organization = OrganizationEntity.create(
-                actor,
+                actor.username(),
                 request.name().trim(),
                 request.code().trim().toUpperCase(),
                 defaultValue(request.status(), OrganizationStatus.ACTIVE));
-        return OrganizationResponse.from(organizationRepository.save(organization));
+        return toOrganizationResponse(organizationRepository.save(organization));
     }
 
     @Transactional(readOnly = true)
@@ -115,6 +123,7 @@ public class PortfolioManagementService {
         }
 
         OrganizationEntity ownerOrganization = findOrganization(request.ownerOrganizationId());
+        assertOrganizationSetupComplete(ownerOrganization.getId(), "Owner organization");
         ProgramEntity program = ProgramEntity.create(
                 actor,
                 request.name().trim(),
@@ -446,5 +455,27 @@ public class PortfolioManagementService {
 
     private <T> T defaultValue(T value, T fallback) {
         return value != null ? value : fallback;
+    }
+
+    private void assertCanCreateOrganization(AuthenticatedUser actor) {
+        if (actor == null || !actor.isAdmin() || actor.tenantType() != TenantType.INTERNAL) {
+            throw new AccessDeniedException("Only INTERNAL admins can create organizations.");
+        }
+    }
+
+    private void assertOrganizationSetupComplete(String organizationId, String label) {
+        if (resolveOrganizationSetupStatus(organizationId) == OrganizationSetupStatus.INCOMPLETED) {
+            throw new IllegalArgumentException(label + " is incomplete and requires an invited or active ADMIN user.");
+        }
+    }
+
+    private OrganizationResponse toOrganizationResponse(OrganizationEntity organization) {
+        return OrganizationResponse.from(organization, resolveOrganizationSetupStatus(organization.getId()));
+    }
+
+    private OrganizationSetupStatus resolveOrganizationSetupStatus(String organizationId) {
+        return userRepository.hasInvitedOrActiveAdmin(organizationId)
+                ? OrganizationSetupStatus.COMPLETED
+                : OrganizationSetupStatus.INCOMPLETED;
     }
 }

@@ -12,8 +12,11 @@ import org.springframework.stereotype.Component;
 public class AuthenticatedUserMapper {
 
     private static final String USERNAME_CLAIM = "cognito:username";
+    private static final String ACCESS_TOKEN_USERNAME_CLAIM = "username";
     private static final String TENANT_ID_CLAIM = "tenant_id";
     private static final String TENANT_TYPE_CLAIM = "tenant_type";
+    private static final String CUSTOM_TENANT_ID_CLAIM = "custom:tenant_id";
+    private static final String CUSTOM_TENANT_TYPE_CLAIM = "custom:tenant_type";
 
     public AuthenticatedUser from(Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken jwtAuthentication)) {
@@ -28,16 +31,24 @@ public class AuthenticatedUserMapper {
 
         return new AuthenticatedUser(
                 jwt.getSubject(),
-                firstNonBlank(jwt.getClaimAsString(USERNAME_CLAIM), authentication.getName()),
+                firstNonBlank(
+                        jwt.getClaimAsString(USERNAME_CLAIM),
+                        jwt.getClaimAsString(ACCESS_TOKEN_USERNAME_CLAIM),
+                        authentication.getName()),
                 roles,
-                jwt.getClaimAsString(TENANT_ID_CLAIM),
-                TenantType.fromClaim(jwt.getClaimAsString(TENANT_TYPE_CLAIM)).orElse(null));
+                firstNonBlank(jwt.getClaimAsString(TENANT_ID_CLAIM), jwt.getClaimAsString(CUSTOM_TENANT_ID_CLAIM)),
+                TenantType.fromClaim(firstNonBlank(
+                                jwt.getClaimAsString(TENANT_TYPE_CLAIM),
+                                jwt.getClaimAsString(CUSTOM_TENANT_TYPE_CLAIM)))
+                        .orElse(null));
     }
 
-    private String firstNonBlank(String firstValue, String fallbackValue) {
-        if (firstValue != null && !firstValue.isBlank()) {
-            return firstValue;
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
         }
-        return fallbackValue;
+        return null;
     }
 }

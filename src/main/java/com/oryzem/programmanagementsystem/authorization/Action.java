@@ -14,6 +14,7 @@ public enum Action {
     IMPERSONATE,
     RESET_ACCESS,
     RESEND_INVITE,
+    PURGE,
     ASSIGN_ROLE,
     CONFIGURE,
     MANAGE_INTEGRATION,
