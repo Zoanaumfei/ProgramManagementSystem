@@ -1,0 +1,19 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowProgramManagementSystemUserAdministrationInCognito",
+      "Effect": "Allow",
+      "Action": [
+        "cognito-idp:AdminAddUserToGroup",
+        "cognito-idp:AdminCreateUser",
+        "cognito-idp:AdminDisableUser",
+        "cognito-idp:AdminGetUser",
+        "cognito-idp:AdminRemoveUserFromGroup",
+        "cognito-idp:AdminResetUserPassword",
+        "cognito-idp:AdminUpdateUserAttributes"
+      ],
+      "Resource": "arn:aws:cognito-idp:sa-east-1:439533253319:userpool/sa-east-1_aA4I3tEmF"
+    }
+  ]
+}

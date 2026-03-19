@@ -1,0 +1,53 @@
+{
+  "UserPoolId": "sa-east-1_aA4I3tEmF",
+  "PoolName": "User pool - 8x06",
+  "Policies": {
+    "PasswordPolicy": {
+      "MinimumLength": 8,
+      "RequireUppercase": true,
+      "RequireLowercase": true,
+      "RequireNumbers": true,
+      "RequireSymbols": true,
+      "TemporaryPasswordValidityDays": 7
+    },
+    "SignInPolicy": {
+      "AllowedFirstAuthFactors": ["PASSWORD"]
+    }
+  },
+  "DeletionProtection": "ACTIVE",
+  "LambdaConfig": {
+    "PreTokenGeneration": "arn:aws:lambda:sa-east-1:439533253319:function:program-management-system-cognito-pre-token",
+    "PreTokenGenerationConfig": {
+      "LambdaVersion": "V2_0",
+      "LambdaArn": "arn:aws:lambda:sa-east-1:439533253319:function:program-management-system-cognito-pre-token"
+    }
+  },
+  "AutoVerifiedAttributes": ["email"],
+  "VerificationMessageTemplate": {
+    "DefaultEmailOption": "CONFIRM_WITH_CODE"
+  },
+  "UserAttributeUpdateSettings": {
+    "AttributesRequireVerificationBeforeUpdate": []
+  },
+  "MfaConfiguration": "OFF",
+  "EmailConfiguration": {
+    "EmailSendingAccount": "COGNITO_DEFAULT"
+  },
+  "AdminCreateUserConfig": {
+    "AllowAdminCreateUserOnly": true,
+    "UnusedAccountValidityDays": 7
+  },
+  "AccountRecoverySetting": {
+    "RecoveryMechanisms": [
+      {
+        "Priority": 1,
+        "Name": "verified_email"
+      },
+      {
+        "Priority": 2,
+        "Name": "verified_phone_number"
+      }
+    ]
+  },
+  "UserPoolTier": "ESSENTIALS"
+}
