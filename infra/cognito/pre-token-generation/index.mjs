@@ -6,7 +6,7 @@ const CLAIM_MAPPINGS = [
 
 export const handler = async (event) => {
   const userAttributes = event.request?.userAttributes ?? {};
-  const claimsToAddOrOverride = buildClaims(userAttributes);
+  const claimsToAddOrOverride = buildClaims(event, userAttributes);
 
   if (Object.keys(claimsToAddOrOverride).length === 0) {
     console.log("No custom tenant claims found for user.", {
@@ -38,7 +38,7 @@ export const handler = async (event) => {
   return event;
 };
 
-function buildClaims(userAttributes) {
+function buildClaims(event, userAttributes) {
   const claims = {};
 
   for (const [attributeName, apiClaimName] of CLAIM_MAPPINGS) {
@@ -49,6 +49,16 @@ function buildClaims(userAttributes) {
 
     claims[attributeName] = value;
     claims[apiClaimName] = value;
+  }
+
+  const username = normalize(event.userName);
+  if (username) {
+    claims.username = username;
+  }
+
+  const email = normalize(userAttributes.email);
+  if (email) {
+    claims.email = email;
   }
 
   return claims;

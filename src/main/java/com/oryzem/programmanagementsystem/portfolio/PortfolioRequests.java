@@ -14,7 +14,13 @@ import java.util.List;
 record CreateOrganizationRequest(
         @NotBlank String name,
         @NotBlank String code,
+        String parentOrganizationId,
         OrganizationStatus status) {
+}
+
+record UpdateOrganizationRequest(
+        @NotBlank String name,
+        @NotBlank String code) {
 }
 
 record CreateMilestoneTemplateRequest(

@@ -6,6 +6,14 @@
   "launchType": "FARGATE",
   "platformVersion": "LATEST",
   "enableExecuteCommand": false,
+  "healthCheckGracePeriodSeconds": 120,
+  "loadBalancers": [
+    {
+      "targetGroupArn": "arn:aws:elasticloadbalancing:sa-east-1:439533253319:targetgroup/program-management-system-alb-tg/1425d73086a3393d",
+      "containerName": "program-management-system",
+      "containerPort": 8080
+    }
+  ],
   "networkConfiguration": {
     "awsvpcConfiguration": {
       "subnets": [

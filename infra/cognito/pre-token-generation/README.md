@@ -12,6 +12,13 @@ Ela tambem publica aliases sem o prefixo `custom:` para facilitar o consumo pelo
 - `tenant_type`
 - `user_status`
 
+Ela tambem passa a publicar no `access_token` identificadores operacionais para reconciliacao do usuario no backend:
+
+- `username` usando `event.userName`
+- `email` usando `userAttributes.email`, quando disponivel
+
+Essa extensao foi validada no fluxo real de `users` para destravar o primeiro login de usuarios `INVITED`, permitindo que o backend reconcilie o registro local e promova o status para `ACTIVE`.
+
 ## Arquivos
 
 - `infra/cognito/pre-token-generation/index.mjs`
@@ -65,6 +72,8 @@ aws cognito-idp admin-update-user-attributes `
    - `tenant_id`
    - `tenant_type`
    - `user_status`
+   - `username`
+   - `email` quando o usuario possuir email preenchido no pool
    - `custom:tenant_id`
    - `custom:tenant_type`
    - `custom:user_status`
@@ -73,3 +82,5 @@ aws cognito-idp admin-update-user-attributes `
 ## Observacao importante
 
 O frontend envia primeiro o `access_token` para a API. Sem essa Lambda, os atributos customizados do Cognito aparecem apenas no `id_token`, e a autorizacao do backend fica incompleta.
+
+Sem `username` e `email` no `access_token`, o primeiro login de usuarios convidados tambem pode falhar na reconciliacao local do backend, mantendo o usuario em `INVITED` na listagem administrativa mesmo apos autenticacao bem-sucedida.

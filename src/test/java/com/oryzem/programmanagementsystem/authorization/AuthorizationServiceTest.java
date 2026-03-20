@@ -11,7 +11,7 @@ class AuthorizationServiceTest {
             new AuthorizationService(new AuthorizationMatrix(), new AuthenticatedUserMapper());
 
     @Test
-    void managerCanDeleteMemberInSameTenant() {
+    void managerCannotDeleteMemberInUsersModule() {
         AuthenticatedUser user = new AuthenticatedUser("user-1", "manager", Set.of(Role.MANAGER), "tenant-a", TenantType.EXTERNAL);
         AuthorizationContext context = AuthorizationContext.builder(AppModule.USERS, Action.DELETE)
                 .resourceTenantId("tenant-a")
@@ -20,22 +20,34 @@ class AuthorizationServiceTest {
 
         AuthorizationDecision decision = authorizationService.decide(user, context);
 
-        assertThat(decision.allowed()).isTrue();
-        assertThat(decision.crossTenant()).isFalse();
+        assertThat(decision.allowed()).isFalse();
+        assertThat(decision.reason()).contains("No base permission");
     }
 
     @Test
-    void managerCannotDeleteAdmin() {
-        AuthenticatedUser user = new AuthenticatedUser("user-1", "manager", Set.of(Role.MANAGER), "tenant-a", TenantType.EXTERNAL);
-        AuthorizationContext context = AuthorizationContext.builder(AppModule.USERS, Action.DELETE)
-                .resourceTenantId("tenant-a")
-                .targetRole(Role.ADMIN)
+    void internalSupportCanViewUsersCrossTenantWithoutOverride() {
+        AuthenticatedUser user = new AuthenticatedUser("user-1", "support", Set.of(Role.SUPPORT), "internal-core", TenantType.INTERNAL);
+        AuthorizationContext context = AuthorizationContext.builder(AppModule.USERS, Action.VIEW)
+                .resourceTenantId("tenant-b")
                 .build();
 
         AuthorizationDecision decision = authorizationService.decide(user, context);
 
-        assertThat(decision.allowed()).isFalse();
-        assertThat(decision.reason()).contains("Target role");
+        assertThat(decision.allowed()).isTrue();
+        assertThat(decision.crossTenant()).isTrue();
+    }
+
+    @Test
+    void internalSupportCanViewTenantCrossTenantWithoutOverride() {
+        AuthenticatedUser user = new AuthenticatedUser("user-1", "support", Set.of(Role.SUPPORT), "internal-core", TenantType.INTERNAL);
+        AuthorizationContext context = AuthorizationContext.builder(AppModule.TENANT, Action.VIEW)
+                .resourceTenantId("tenant-b")
+                .build();
+
+        AuthorizationDecision decision = authorizationService.decide(user, context);
+
+        assertThat(decision.allowed()).isTrue();
+        assertThat(decision.crossTenant()).isTrue();
     }
 
     @Test

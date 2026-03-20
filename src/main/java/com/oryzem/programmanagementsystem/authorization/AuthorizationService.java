@@ -155,6 +155,15 @@ public class AuthorizationService {
             return true;
         }
 
+        if (user.hasRole(Role.SUPPORT)
+                && user.tenantType() == TenantType.INTERNAL
+                && context.action() == Action.VIEW
+                && (context.module() == AppModule.USERS
+                        || context.module() == AppModule.TENANT
+                        || context.module() == AppModule.PORTFOLIO)) {
+            return true;
+        }
+
         return context.supportOverride() && context.auditTrailEnabled() && context.hasJustification();
     }
 

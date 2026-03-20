@@ -36,6 +36,16 @@ class ApiExceptionHandlerTest {
                 .andExpect(jsonPath("$.correlationId", not(blankOrNullString())));
     }
 
+    @Test
+    void shouldReturnJsonForMissingRoutesInsteadOfInternalServerError() throws Exception {
+        mockMvc.perform(get("/api/test/missing")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("Not Found"))
+                .andExpect(jsonPath("$.path").value("/api/test/missing"))
+                .andExpect(jsonPath("$.correlationId", not(blankOrNullString())));
+    }
+
     @TestConfiguration
     static class TestConfig {
 

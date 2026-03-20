@@ -61,14 +61,14 @@ class UserManagementControllerSecurityTest {
     }
 
     @Test
-    void managerShouldSeeOnlyOwnTenantUsers() throws Exception {
+    void externalAdminShouldSeeOnlyOwnHierarchyUsersByDefault() throws Exception {
         mockMvc.perform(get("/api/users")
                         .with(jwt().jwt(jwt -> jwt
-                                        .claim("sub", "manager-123")
-                                        .claim("cognito:username", "manager")
+                                        .claim("sub", "admin-a-123")
+                                        .claim("cognito:username", "admin.a")
                                         .claim("tenant_id", "tenant-a")
                                         .claim("tenant_type", "EXTERNAL"))
-                                .authorities(new SimpleGrantedAuthority("ROLE_MANAGER"))))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(3))
                 .andExpect(jsonPath("$[0].organizationId").value("tenant-a"))
@@ -77,6 +77,19 @@ class UserManagementControllerSecurityTest {
                 .andExpect(jsonPath("$[1].organizationName").value("Tenant A"))
                 .andExpect(jsonPath("$[2].organizationId").value("tenant-a"))
                 .andExpect(jsonPath("$[2].organizationName").value("Tenant A"));
+    }
+
+    @Test
+    void managerShouldNotListUsers() throws Exception {
+        mockMvc.perform(get("/api/users")
+                        .with(jwt().jwt(jwt -> jwt
+                                        .claim("sub", "manager-123")
+                                        .claim("cognito:username", "manager")
+                                        .claim("tenant_id", "tenant-a")
+                                        .claim("tenant_type", "EXTERNAL"))
+                                .authorities(new SimpleGrantedAuthority("ROLE_MANAGER"))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value("Forbidden"));
     }
 
     @Test
@@ -93,7 +106,7 @@ class UserManagementControllerSecurityTest {
     }
 
     @Test
-    void managerShouldCreateMemberInOwnTenant() throws Exception {
+    void externalAdminShouldCreateMemberInOwnTenant() throws Exception {
         mockMvc.perform(post("/api/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -105,11 +118,11 @@ class UserManagementControllerSecurityTest {
                                 }
                                 """)
                         .with(jwt().jwt(jwt -> jwt
-                                        .claim("sub", "manager-123")
-                                        .claim("cognito:username", "manager")
+                                        .claim("sub", "admin-a-123")
+                                        .claim("cognito:username", "admin.a")
                                         .claim("tenant_id", "tenant-a")
                                         .claim("tenant_type", "EXTERNAL"))
-                                .authorities(new SimpleGrantedAuthority("ROLE_MANAGER"))))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", org.hamcrest.Matchers.containsString("/api/users/")))
                 .andExpect(jsonPath("$.role").value("MEMBER"))
@@ -131,11 +144,11 @@ class UserManagementControllerSecurityTest {
                                 }
                                 """)
                         .with(jwt().jwt(jwt -> jwt
-                                        .claim("sub", "manager-123")
-                                        .claim("cognito:username", "manager")
+                                        .claim("sub", "admin-a-123")
+                                        .claim("cognito:username", "admin.a")
                                         .claim("tenant_id", "tenant-a")
                                         .claim("tenant_type", "EXTERNAL"))
-                                .authorities(new SimpleGrantedAuthority("ROLE_MANAGER"))))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
                 .andExpect(status().isCreated())
                 .andReturn()
                 .getResponse()
@@ -154,7 +167,7 @@ class UserManagementControllerSecurityTest {
     }
 
     @Test
-    void managerShouldUpdateMemberInOwnTenant() throws Exception {
+    void externalAdminShouldUpdateMemberInOwnTenant() throws Exception {
         mockMvc.perform(put("/api/users/USR-EXT-A-MEM-001")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -166,11 +179,11 @@ class UserManagementControllerSecurityTest {
                                 }
                                 """)
                         .with(jwt().jwt(jwt -> jwt
-                                        .claim("sub", "manager-123")
-                                        .claim("cognito:username", "manager")
+                                        .claim("sub", "admin-a-123")
+                                        .claim("cognito:username", "admin.a")
                                         .claim("tenant_id", "tenant-a")
                                         .claim("tenant_type", "EXTERNAL"))
-                                .authorities(new SimpleGrantedAuthority("ROLE_MANAGER"))))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("USR-EXT-A-MEM-001"))
                 .andExpect(jsonPath("$.displayName").value("Tenant A Member Updated"))
@@ -193,11 +206,11 @@ class UserManagementControllerSecurityTest {
                                 }
                                 """)
                         .with(jwt().jwt(jwt -> jwt
-                                        .claim("sub", "manager-123")
-                                        .claim("cognito:username", "manager")
+                                        .claim("sub", "admin-a-123")
+                                        .claim("cognito:username", "admin.a")
                                         .claim("tenant_id", "tenant-a")
                                         .claim("tenant_type", "EXTERNAL"))
-                                .authorities(new SimpleGrantedAuthority("ROLE_MANAGER"))))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
                 .andExpect(status().isOk());
 
         StubUserIdentityGateway stubUserIdentityGateway = (StubUserIdentityGateway) userIdentityGateway;
@@ -211,7 +224,7 @@ class UserManagementControllerSecurityTest {
     }
 
     @Test
-    void managerShouldNotCreateAdmin() throws Exception {
+    void managerShouldNotCreateUsers() throws Exception {
         mockMvc.perform(post("/api/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -229,7 +242,7 @@ class UserManagementControllerSecurityTest {
                                         .claim("tenant_type", "EXTERNAL"))
                                 .authorities(new SimpleGrantedAuthority("ROLE_MANAGER"))))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Target role")));
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("No base permission")));
     }
 
     @Test
@@ -308,17 +321,17 @@ class UserManagementControllerSecurityTest {
                                 }
                                 """)
                         .with(jwt().jwt(jwt -> jwt
-                                        .claim("sub", "manager-123")
-                                        .claim("cognito:username", "manager")
+                                        .claim("sub", "admin-a-123")
+                                        .claim("cognito:username", "admin.a")
                                         .claim("tenant_id", "tenant-a")
                                         .claim("tenant_type", "EXTERNAL"))
-                                .authorities(new SimpleGrantedAuthority("ROLE_MANAGER"))))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Organization not found: tenant-z"));
     }
 
     @Test
-    void managerShouldNotUpdateAdminRole() throws Exception {
+    void managerShouldNotUpdateUsers() throws Exception {
         mockMvc.perform(put("/api/users/USR-EXT-A-MEM-001")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -336,7 +349,7 @@ class UserManagementControllerSecurityTest {
                                         .claim("tenant_type", "EXTERNAL"))
                                 .authorities(new SimpleGrantedAuthority("ROLE_MANAGER"))))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Target role")));
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("No base permission")));
     }
 
     @Test
@@ -376,6 +389,59 @@ class UserManagementControllerSecurityTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.action").value("RESET_ACCESS"))
                 .andExpect(jsonPath("$.status").value("OK"));
+    }
+
+    @Test
+    void internalSupportShouldListUsersForRequestedOrganizationWithoutOverride() throws Exception {
+        mockMvc.perform(get("/api/users")
+                        .param("organizationId", "tenant-b")
+                        .with(jwt().jwt(jwt -> jwt
+                                        .claim("sub", "support-123")
+                                        .claim("cognito:username", "support")
+                                        .claim("tenant_id", "internal-core")
+                                        .claim("tenant_type", "INTERNAL"))
+                                .authorities(new SimpleGrantedAuthority("ROLE_SUPPORT"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(4))
+                .andExpect(jsonPath("$[?(@.organizationId != 'tenant-b')]").doesNotExist());
+    }
+
+    @Test
+    void externalAdminShouldCreateUsersInDescendantOrganization() throws Exception {
+        String childOrganizationId = createChildOrganization("tenant-a", "Tenant A Tier 1", "TENANT-A-T1-USR");
+
+        mockMvc.perform(post("/api/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "displayName": "Tier 1 Admin",
+                                  "email": "tier1.admin@tenant.com",
+                                  "role": "ADMIN",
+                                  "organizationId": "%s"
+                                }
+                                """.formatted(childOrganizationId))
+                        .with(jwt().jwt(jwt -> jwt
+                                        .claim("sub", "admin-a-123")
+                                        .claim("cognito:username", "admin.a")
+                                        .claim("tenant_id", "tenant-a")
+                                        .claim("tenant_type", "EXTERNAL"))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.organizationId").value(childOrganizationId))
+                .andExpect(jsonPath("$.organizationName").value("Tenant A Tier 1"))
+                .andExpect(jsonPath("$.role").value("ADMIN"));
+
+        mockMvc.perform(get("/api/users")
+                        .param("organizationId", childOrganizationId)
+                        .with(jwt().jwt(jwt -> jwt
+                                        .claim("sub", "admin-a-123")
+                                        .claim("cognito:username", "admin.a")
+                                        .claim("tenant_id", "tenant-a")
+                                        .claim("tenant_type", "EXTERNAL"))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].organizationId").value(childOrganizationId));
     }
 
     @Test
@@ -552,11 +618,11 @@ class UserManagementControllerSecurityTest {
                                 }
                                 """)
                         .with(jwt().jwt(jwt -> jwt
-                                        .claim("sub", "manager-123")
-                                        .claim("cognito:username", "manager")
+                                        .claim("sub", "admin-a-123")
+                                        .claim("cognito:username", "admin.a")
                                         .claim("tenant_id", "tenant-a")
                                         .claim("tenant_type", "EXTERNAL"))
-                                .authorities(new SimpleGrantedAuthority("ROLE_MANAGER"))))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
                 .andExpect(status().isCreated())
                 .andReturn()
                 .getResponse()
@@ -566,11 +632,11 @@ class UserManagementControllerSecurityTest {
 
         mockMvc.perform(post("/api/users/" + createdUserId + "/reset-access")
                         .with(jwt().jwt(jwt -> jwt
-                                        .claim("sub", "manager-123")
-                                        .claim("cognito:username", "manager")
+                                        .claim("sub", "admin-a-123")
+                                        .claim("cognito:username", "admin.a")
                                         .claim("tenant_id", "tenant-a")
                                         .claim("tenant_type", "EXTERNAL"))
-                                .authorities(new SimpleGrantedAuthority("ROLE_MANAGER"))))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Only active users can receive access reset."));
     }
@@ -588,11 +654,11 @@ class UserManagementControllerSecurityTest {
                                 }
                                 """)
                         .with(jwt().jwt(jwt -> jwt
-                                        .claim("sub", "manager-123")
-                                        .claim("cognito:username", "manager")
+                                        .claim("sub", "admin-a-123")
+                                        .claim("cognito:username", "admin.a")
                                         .claim("tenant_id", "tenant-a")
                                         .claim("tenant_type", "EXTERNAL"))
-                                .authorities(new SimpleGrantedAuthority("ROLE_MANAGER"))))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
                 .andExpect(status().isCreated())
                 .andReturn()
                 .getResponse()
@@ -628,11 +694,11 @@ class UserManagementControllerSecurityTest {
                                 }
                                 """)
                         .with(jwt().jwt(jwt -> jwt
-                                        .claim("sub", "manager-123")
-                                        .claim("cognito:username", "manager")
+                                        .claim("sub", "admin-a-123")
+                                        .claim("cognito:username", "admin.a")
                                         .claim("tenant_id", "tenant-a")
                                         .claim("tenant_type", "EXTERNAL"))
-                                .authorities(new SimpleGrantedAuthority("ROLE_MANAGER"))))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
                 .andExpect(status().isCreated())
                 .andReturn()
                 .getResponse()
@@ -669,11 +735,11 @@ class UserManagementControllerSecurityTest {
                                 }
                                 """)
                         .with(jwt().jwt(jwt -> jwt
-                                        .claim("sub", "manager-123")
-                                        .claim("cognito:username", "manager")
+                                        .claim("sub", "admin-a-123")
+                                        .claim("cognito:username", "admin.a")
                                         .claim("tenant_id", "tenant-a")
                                         .claim("tenant_type", "EXTERNAL"))
-                                .authorities(new SimpleGrantedAuthority("ROLE_MANAGER"))))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
                 .andExpect(status().isCreated())
                 .andReturn()
                 .getResponse()
@@ -705,6 +771,30 @@ class UserManagementControllerSecurityTest {
                                   "code": "%s"
                                 }
                                 """.formatted(name, code))
+                        .with(jwt().jwt(jwt -> jwt
+                                        .claim("sub", "admin-123")
+                                        .claim("cognito:username", "admin")
+                                        .claim("tenant_id", "internal-core")
+                                        .claim("tenant_type", "INTERNAL"))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        JsonNode json = objectMapper.readTree(response);
+        return json.get("id").asText();
+    }
+
+    private String createChildOrganization(String parentOrganizationId, String name, String code) throws Exception {
+        String response = mockMvc.perform(post("/api/portfolio/organizations")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "%s",
+                                  "code": "%s",
+                                  "parentOrganizationId": "%s"
+                                }
+                                """.formatted(name, code, parentOrganizationId))
                         .with(jwt().jwt(jwt -> jwt
                                         .claim("sub", "admin-123")
                                         .claim("cognito:username", "admin")

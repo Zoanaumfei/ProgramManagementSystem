@@ -29,7 +29,7 @@ class AuthorizationControllerSecurityTest {
     }
 
     @Test
-    void authzCheckShouldAllowManagerDeletingMemberInSameTenant() throws Exception {
+    void authzCheckShouldDenyManagerDeletingMemberInUsersModule() throws Exception {
         mockMvc.perform(get("/api/authz/check")
                         .param("module", "USERS")
                         .param("action", "DELETE")
@@ -42,8 +42,25 @@ class AuthorizationControllerSecurityTest {
                                         .claim("tenant_type", "EXTERNAL"))
                                 .authorities(new SimpleGrantedAuthority("ROLE_MANAGER"))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.allowed").value(true))
+                .andExpect(jsonPath("$.allowed").value(false))
                 .andExpect(jsonPath("$.crossTenant").value(false));
+    }
+
+    @Test
+    void authzCheckShouldAllowInternalSupportViewingUsersCrossTenant() throws Exception {
+        mockMvc.perform(get("/api/authz/check")
+                        .param("module", "USERS")
+                        .param("action", "VIEW")
+                        .param("resourceTenantId", "tenant-b")
+                        .with(jwt().jwt(jwt -> jwt
+                                        .claim("sub", "support-123")
+                                        .claim("cognito:username", "support")
+                                        .claim("tenant_id", "internal-core")
+                                        .claim("tenant_type", "INTERNAL"))
+                                .authorities(new SimpleGrantedAuthority("ROLE_SUPPORT"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.allowed").value(true))
+                .andExpect(jsonPath("$.crossTenant").value(true));
     }
 
     @Test

@@ -7,7 +7,13 @@ interface OrganizationRepository extends JpaRepository<OrganizationEntity, Strin
 
     List<OrganizationEntity> findAllByOrderByNameAsc();
 
+    List<OrganizationEntity> findAllByCustomerOrganizationIdOrderByNameAsc(String customerOrganizationId);
+
+    List<OrganizationEntity> findAllByParentOrganizationIdOrderByNameAsc(String parentOrganizationId);
+
     boolean existsByCodeIgnoreCase(String code);
+
+    boolean existsByCodeIgnoreCaseAndIdNot(String code, String id);
 }
 
 interface ProgramRepository extends JpaRepository<ProgramEntity, String> {

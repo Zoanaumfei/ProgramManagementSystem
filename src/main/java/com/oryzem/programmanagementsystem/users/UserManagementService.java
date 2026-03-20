@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -51,7 +52,7 @@ public class UserManagementService {
             boolean supportOverride,
             String justification) {
 
-        String effectiveTenantId = resolveListTenantId(actor, organizationId);
+        String effectiveTenantId = resolveListTenantId(actor, organizationId, supportOverride, justification);
         AuthorizationContext context = AuthorizationContext.builder(AppModule.USERS, Action.VIEW)
                 .resourceTenantId(effectiveTenantId)
                 .resourceTenantType(resolveListTenantType(actor, effectiveTenantId))
@@ -67,7 +68,7 @@ public class UserManagementService {
             recordAudit(actor, effectiveTenantId, "USERS_VIEW", null, justification, decision.crossTenant());
         }
 
-        List<ManagedUser> users = effectiveTenantId == null ? userRepository.findAll() : userRepository.findByTenantId(effectiveTenantId);
+        List<ManagedUser> users = selectUsersForScope(actor, effectiveTenantId, supportOverride, justification);
         return users.stream()
                 .map(user -> UserSummaryResponse.from(user, resolveOrganizationName(user.tenantId())))
                 .toList();
@@ -94,7 +95,7 @@ public class UserManagementService {
 
         AuthorizationDecision decision = authorizationService.decide(actor, context);
         assertAllowed(decision);
-        enforceTenantScope(actor, organization.id(), targetTenantType);
+        enforceOrganizationScope(actor, organization.id(), targetTenantType, decision.crossTenant(), false);
 
         String userId = "USR-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase();
         ManagedUser created = new ManagedUser(
@@ -145,7 +146,7 @@ public class UserManagementService {
 
         AuthorizationDecision decision = authorizationService.decide(actor, context);
         assertAllowed(decision);
-        enforceTenantScope(actor, organization.id(), targetTenantType);
+        enforceOrganizationScope(actor, organization.id(), targetTenantType, decision.crossTenant(), false);
 
         ManagedUser updated = target.withUpdatedDetails(
                 normalizeDisplayName(request.displayName()),
@@ -171,7 +172,7 @@ public class UserManagementService {
 
         AuthorizationDecision decision = authorizationService.decide(actor, context);
         assertAllowed(decision);
-        enforceTenantScope(actor, target.tenantId(), target.tenantType());
+        enforceOrganizationScope(actor, target.tenantId(), target.tenantType(), decision.crossTenant(), false);
 
         if (target.status() == UserStatus.INACTIVE) {
             return;
@@ -219,7 +220,7 @@ public class UserManagementService {
 
         AuthorizationDecision decision = authorizationService.decide(actor, context);
         assertAllowed(decision);
-        enforceTenantScope(actor, target.tenantId(), target.tenantType(), decision.crossTenant());
+        enforceOrganizationScope(actor, target.tenantId(), target.tenantType(), decision.crossTenant(), supportOverride);
 
         if (userIdentityGateway.identityExists(target)) {
             throw new IllegalArgumentException(
@@ -251,7 +252,7 @@ public class UserManagementService {
 
         AuthorizationDecision decision = authorizationService.decide(actor, context);
         assertAllowed(decision);
-        enforceTenantScope(actor, target.tenantId(), target.tenantType(), decision.crossTenant());
+        enforceOrganizationScope(actor, target.tenantId(), target.tenantType(), decision.crossTenant(), supportOverride);
 
         Instant performedAt = Instant.now();
         ManagedUser updated = switch (action) {
@@ -362,16 +363,38 @@ public class UserManagementService {
         }
     }
 
-    private void enforceTenantScope(AuthenticatedUser actor, String targetTenantId, TenantType targetTenantType) {
-        enforceTenantScope(actor, targetTenantId, targetTenantType, false);
-    }
-
-    private void enforceTenantScope(
+    private void enforceOrganizationScope(
             AuthenticatedUser actor,
             String targetTenantId,
             TenantType targetTenantType,
-            boolean crossTenantAllowed) {
-        if (actor.isAdmin() || crossTenantAllowed) {
+            boolean crossTenantAllowed,
+            boolean supportOverride) {
+        if (actor.hasRole(Role.ADMIN) && actor.tenantType() == TenantType.INTERNAL) {
+            return;
+        }
+
+        if (actor.hasRole(Role.SUPPORT) && actor.tenantType() == TenantType.INTERNAL) {
+            if (crossTenantAllowed && supportOverride) {
+                return;
+            }
+            if (actor.tenantId() != null && actor.tenantId().equals(targetTenantId)) {
+                return;
+            }
+            throw new AccessDeniedException("Tenant scope mismatch for requested operation.");
+        }
+
+        if (actor.tenantType() == TenantType.EXTERNAL && actor.hasRole(Role.SUPPORT)) {
+            if (actor.tenantId() == null || !actor.tenantId().equals(targetTenantId)) {
+                throw new AccessDeniedException("Tenant scope mismatch for requested operation.");
+            }
+            return;
+        }
+
+        if (actor.hasRole(Role.ADMIN) && actor.tenantType() == TenantType.EXTERNAL) {
+            Set<String> manageableOrganizationIds = organizationDirectoryService.collectSubtreeIds(actor.tenantId());
+            if (!manageableOrganizationIds.contains(targetTenantId)) {
+                throw new AccessDeniedException("Tenant scope mismatch for requested operation.");
+            }
             return;
         }
 
@@ -384,12 +407,34 @@ public class UserManagementService {
         }
     }
 
-    private String resolveListTenantId(AuthenticatedUser actor, String tenantId) {
+    private String resolveListTenantId(
+            AuthenticatedUser actor,
+            String tenantId,
+            boolean supportOverride,
+            String justification) {
         if (tenantId != null && !tenantId.isBlank()) {
-            return tenantId.trim();
+            String requestedTenantId = tenantId.trim();
+            enforceListScope(actor, requestedTenantId, supportOverride, justification);
+            return requestedTenantId;
         }
 
-        return actor.isAdmin() ? null : actor.tenantId();
+        if (actor.hasRole(Role.ADMIN) && actor.tenantType() == TenantType.INTERNAL) {
+            return null;
+        }
+
+        if (actor.hasRole(Role.ADMIN) && actor.tenantType() == TenantType.EXTERNAL) {
+            return null;
+        }
+
+        if (actor.hasRole(Role.SUPPORT)
+                && actor.tenantType() == TenantType.INTERNAL
+                && supportOverride
+                && justification != null
+                && !justification.isBlank()) {
+            return null;
+        }
+
+        return actor.tenantId();
     }
 
     private TenantType resolveListTenantType(AuthenticatedUser actor, String effectiveTenantId) {
@@ -397,16 +442,14 @@ public class UserManagementService {
             return null;
         }
 
-        return userRepository.findByTenantId(effectiveTenantId).stream()
-                .map(ManagedUser::tenantType)
-                .findFirst()
+        return organizationDirectoryService.findById(effectiveTenantId)
+                .map(OrganizationDirectoryEntry::tenantType)
                 .orElse(actor.tenantType());
     }
 
     private TenantType resolveTenantTypeForOrganization(AuthenticatedUser actor, String organizationId) {
-        return userRepository.findByTenantId(organizationId).stream()
-                .map(ManagedUser::tenantType)
-                .findFirst()
+        return organizationDirectoryService.findById(organizationId)
+                .map(OrganizationDirectoryEntry::tenantType)
                 .or(() -> actor.tenantId() != null && actor.tenantId().equals(organizationId)
                         ? java.util.Optional.ofNullable(actor.tenantType())
                         : java.util.Optional.empty())
@@ -469,6 +512,70 @@ public class UserManagementService {
         return organizationDirectoryService.findById(organizationId)
                 .map(OrganizationDirectoryEntry::name)
                 .orElse(null);
+    }
+
+    private List<ManagedUser> selectUsersForScope(
+            AuthenticatedUser actor,
+            String effectiveTenantId,
+            boolean supportOverride,
+            String justification) {
+        if (effectiveTenantId == null) {
+            if (actor.hasRole(Role.ADMIN) && actor.tenantType() == TenantType.INTERNAL) {
+                return userRepository.findAll();
+            }
+
+            if (actor.hasRole(Role.SUPPORT)
+                    && actor.tenantType() == TenantType.INTERNAL
+                    && supportOverride
+                    && justification != null
+                    && !justification.isBlank()) {
+                return userRepository.findAll();
+            }
+        }
+
+        if (effectiveTenantId != null) {
+            return userRepository.findByTenantId(effectiveTenantId);
+        }
+
+        if (actor.hasRole(Role.ADMIN)
+                && actor.tenantType() == TenantType.EXTERNAL
+                && actor.tenantId() != null) {
+            Set<String> visibleOrganizationIds = organizationDirectoryService.collectSubtreeIds(actor.tenantId());
+            return userRepository.findAll().stream()
+                    .filter(user -> visibleOrganizationIds.contains(user.tenantId()))
+                    .toList();
+        }
+
+        return List.of();
+    }
+
+    private void enforceListScope(
+            AuthenticatedUser actor,
+            String requestedTenantId,
+            boolean supportOverride,
+            String justification) {
+        if (actor.hasRole(Role.ADMIN) && actor.tenantType() == TenantType.INTERNAL) {
+            return;
+        }
+
+        if (actor.hasRole(Role.SUPPORT) && actor.tenantType() == TenantType.INTERNAL) {
+            if (actor.tenantId() != null && actor.tenantId().equals(requestedTenantId)) {
+                return;
+            }
+            return;
+        }
+
+        if (actor.hasRole(Role.ADMIN) && actor.tenantType() == TenantType.EXTERNAL) {
+            if (actor.tenantId() != null
+                    && organizationDirectoryService.isSameOrDescendant(actor.tenantId(), requestedTenantId)) {
+                return;
+            }
+            throw new AccessDeniedException("Tenant scope mismatch for requested operation.");
+        }
+
+        if (actor.tenantId() == null || !actor.tenantId().equals(requestedTenantId)) {
+            throw new AccessDeniedException("Tenant scope mismatch for requested operation.");
+        }
     }
 
     private void assertOrganizationCanReceiveRole(String organizationId, Role role) {

@@ -4,7 +4,8 @@ param(
     [string]$RepositoryName = 'oryzem-backend-dev',
     [string]$ImageTag = 'latest',
     [string]$ClusterName = 'program-management-system-cluster',
-    [string]$ServiceName = 'program-management-system-service'
+    [string]$ServiceName = 'program-management-system-service',
+    [switch]$ForceNewDeployment
 )
 
 $ErrorActionPreference = 'Stop'
@@ -98,13 +99,21 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 if ($serviceLookup.services -and $serviceLookup.services.Count -gt 0 -and $serviceLookup.services[0].status -ne 'INACTIVE') {
-    & $aws ecs update-service `
-        --profile $AwsProfile `
-        --region $AwsRegion `
-        --cluster $ClusterName `
-        --service $ServiceName `
-        --task-definition $taskDefinitionArn `
-        --desired-count 1
+    $updateArgs = @(
+        'ecs', 'update-service',
+        '--profile', $AwsProfile,
+        '--region', $AwsRegion,
+        '--cluster', $ClusterName,
+        '--service', $ServiceName,
+        '--task-definition', $taskDefinitionArn,
+        '--desired-count', '1'
+    )
+
+    if ($ForceNewDeployment.IsPresent) {
+        $updateArgs += '--force-new-deployment'
+    }
+
+    & $aws @updateArgs
 
     if ($LASTEXITCODE -ne 0) {
         throw "Unable to update the ECS service '$ServiceName'."
@@ -118,4 +127,36 @@ if ($serviceLookup.services -and $serviceLookup.services.Count -gt 0 -and $servi
     if ($LASTEXITCODE -ne 0) {
         throw "Unable to create the ECS service '$ServiceName'."
     }
+}
+
+& $aws ecs wait services-stable `
+    --profile $AwsProfile `
+    --region $AwsRegion `
+    --cluster $ClusterName `
+    --services $ServiceName
+
+if ($LASTEXITCODE -ne 0) {
+    throw "Timed out waiting for the ECS service '$ServiceName' to reach a steady state."
+}
+
+$serviceStatus = & $aws ecs describe-services `
+    --profile $AwsProfile `
+    --region $AwsRegion `
+    --cluster $ClusterName `
+    --services $ServiceName `
+    --output json | ConvertFrom-Json
+
+if ($LASTEXITCODE -ne 0 -or -not $serviceStatus.services -or $serviceStatus.services.Count -eq 0) {
+    throw "Unable to describe the ECS service '$ServiceName' after deployment."
+}
+
+$service = $serviceStatus.services[0]
+$primaryDeployment = $service.deployments | Where-Object { $_.status -eq 'PRIMARY' } | Select-Object -First 1
+
+Write-Host "ECS service is stable."
+Write-Host "Cluster: $ClusterName"
+Write-Host "Service: $ServiceName"
+Write-Host "Task definition: $($service.taskDefinition)"
+if ($primaryDeployment) {
+    Write-Host "Primary rollout state: $($primaryDeployment.rolloutState)"
 }

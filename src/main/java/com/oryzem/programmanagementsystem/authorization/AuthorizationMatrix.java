@@ -49,7 +49,10 @@ public class AuthorizationMatrix {
     private void grantAdmin(EnumMap<Role, Map<AppModule, Map<Action, Set<AuthorizationRestriction>>>> matrix) {
         grant(matrix, Role.ADMIN, AppModule.USERS, Action.VIEW, Action.CREATE, Action.EDIT, Action.DELETE,
                 Action.RESET_ACCESS, Action.RESEND_INVITE, Action.ASSIGN_ROLE);
-        grant(matrix, Role.ADMIN, AppModule.TENANT, Action.VIEW, Action.EDIT, Action.CONFIGURE, Action.MANAGE_INTEGRATION);
+        grant(matrix, Role.ADMIN, AppModule.TENANT, Action.VIEW, Action.CREATE, Action.EDIT, Action.DELETE,
+                Action.CONFIGURE, Action.MANAGE_INTEGRATION);
+        grant(matrix, Role.ADMIN, AppModule.PORTFOLIO, Action.VIEW, Action.CREATE, Action.EDIT, Action.DELETE,
+                Action.CONFIGURE);
         grant(matrix, Role.ADMIN, AppModule.OPERATIONS, Action.VIEW, Action.CREATE, Action.EDIT, Action.DELETE,
                 Action.APPROVE, Action.REJECT, Action.SUBMIT, Action.REOPEN, Action.REPROCESS);
         grant(matrix, Role.ADMIN, AppModule.REPORTS, Action.VIEW, Action.EXPORT);
@@ -59,17 +62,7 @@ public class AuthorizationMatrix {
     }
 
     private void grantManager(EnumMap<Role, Map<AppModule, Map<Action, Set<AuthorizationRestriction>>>> matrix) {
-        grant(matrix, Role.MANAGER, AppModule.USERS, restrictions(
-                AuthorizationRestriction.SAME_TENANT_ONLY), Action.VIEW, Action.RESET_ACCESS, Action.RESEND_INVITE);
-        grant(matrix, Role.MANAGER, AppModule.USERS, restrictions(
-                AuthorizationRestriction.SAME_TENANT_ONLY,
-                AuthorizationRestriction.MANAGER_TARGET_ROLE_LIMIT), Action.CREATE, Action.EDIT, Action.DELETE,
-                Action.ASSIGN_ROLE);
-
-        grant(matrix, Role.MANAGER, AppModule.TENANT, restrictions(
-                AuthorizationRestriction.SAME_TENANT_ONLY), Action.VIEW, Action.EDIT, Action.CONFIGURE,
-                Action.MANAGE_INTEGRATION);
-
+        grant(matrix, Role.MANAGER, AppModule.PORTFOLIO, Action.VIEW, Action.CREATE, Action.EDIT, Action.DELETE);
         grant(matrix, Role.MANAGER, AppModule.OPERATIONS, restrictions(
                 AuthorizationRestriction.SAME_TENANT_ONLY), Action.VIEW, Action.CREATE, Action.EDIT, Action.DELETE,
                 Action.APPROVE, Action.REJECT, Action.SUBMIT);
@@ -94,9 +87,7 @@ public class AuthorizationMatrix {
     }
 
     private void grantMember(EnumMap<Role, Map<AppModule, Map<Action, Set<AuthorizationRestriction>>>> matrix) {
-        grant(matrix, Role.MEMBER, AppModule.TENANT, restrictions(
-                AuthorizationRestriction.SAME_TENANT_ONLY), Action.VIEW);
-
+        grant(matrix, Role.MEMBER, AppModule.PORTFOLIO, Action.VIEW, Action.CREATE, Action.EDIT, Action.DELETE);
         grant(matrix, Role.MEMBER, AppModule.OPERATIONS, restrictions(
                 AuthorizationRestriction.SAME_TENANT_ONLY), Action.VIEW, Action.CREATE, Action.SUBMIT);
         grant(matrix, Role.MEMBER, AppModule.OPERATIONS, restrictions(
@@ -119,6 +110,8 @@ public class AuthorizationMatrix {
                 AuthorizationRestriction.JUSTIFICATION_REQUIRED), Action.PURGE);
 
         grant(matrix, Role.SUPPORT, AppModule.TENANT, restrictions(
+                AuthorizationRestriction.SUPPORT_SCOPE_RESTRICTION), Action.VIEW);
+        grant(matrix, Role.SUPPORT, AppModule.PORTFOLIO, restrictions(
                 AuthorizationRestriction.SUPPORT_SCOPE_RESTRICTION), Action.VIEW);
 
         grant(matrix, Role.SUPPORT, AppModule.OPERATIONS, restrictions(
@@ -153,10 +146,7 @@ public class AuthorizationMatrix {
     }
 
     private void grantAuditor(EnumMap<Role, Map<AppModule, Map<Action, Set<AuthorizationRestriction>>>> matrix) {
-        grant(matrix, Role.AUDITOR, AppModule.USERS, restrictions(
-                AuthorizationRestriction.SAME_TENANT_ONLY), Action.VIEW);
-        grant(matrix, Role.AUDITOR, AppModule.TENANT, restrictions(
-                AuthorizationRestriction.SAME_TENANT_ONLY), Action.VIEW);
+        grant(matrix, Role.AUDITOR, AppModule.PORTFOLIO, Action.VIEW);
         grant(matrix, Role.AUDITOR, AppModule.OPERATIONS, restrictions(
                 AuthorizationRestriction.SAME_TENANT_ONLY), Action.VIEW);
         grant(matrix, Role.AUDITOR, AppModule.REPORTS, restrictions(

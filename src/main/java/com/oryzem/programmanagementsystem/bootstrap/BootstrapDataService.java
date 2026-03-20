@@ -99,18 +99,24 @@ public class BootstrapDataService {
                 "bootstrap",
                 "Oryzem Internal Core",
                 "CORE-INT",
+                TenantType.INTERNAL,
+                null,
                 true);
         organizationDirectoryService.ensureSeeded(
                 "tenant-a",
                 "bootstrap",
                 "Tenant A",
                 "TENANT-A",
+                TenantType.EXTERNAL,
+                null,
                 true);
         organizationDirectoryService.ensureSeeded(
                 "tenant-b",
                 "bootstrap",
                 "Tenant B",
                 "TENANT-B",
+                TenantType.EXTERNAL,
+                null,
                 true);
     }
 
