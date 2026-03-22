@@ -30,11 +30,29 @@ Configuracao minima da aplicacao no container:
 - `AWS_REGION=sa-east-1`
 - `DB_SSL_MODE=require`
 
+Bootstrap opcional do primeiro acesso administrativo:
+- o backend agora garante `internal-core` mesmo quando `APP_BOOTSTRAP_SEED_DATA=false`
+- para criar o primeiro `ADMIN INTERNAL` de forma controlada, o container aceita:
+  - `APP_BOOTSTRAP_INTERNAL_ADMIN_ENABLED`
+  - `APP_BOOTSTRAP_INTERNAL_ADMIN_EMAIL`
+  - `APP_BOOTSTRAP_INTERNAL_ADMIN_DISPLAY_NAME`
+  - `APP_BOOTSTRAP_INTERNAL_ADMIN_PRUNE_OTHER_INTERNAL_USERS` (opcional, saneamento temporario de usuarios internos legados)
+  - `APP_BOOTSTRAP_INTERNAL_ADMIN_PASSWORD` (opcional, define senha permanente e suprime o convite)
+  - `APP_BOOTSTRAP_INTERNAL_ADMIN_TEMPORARY_PASSWORD` (opcional)
+- comportamento:
+  - so executa quando `APP_BOOTSTRAP_INTERNAL_ADMIN_ENABLED=true`
+  - garante/reconcilia o usuario configurado por e-mail, mesmo quando ele estiver ausente apenas no banco local ou apenas no Cognito
+  - salva o usuario interno bootstrapado como `ACTIVE`
+  - garante os grupos `ADMIN`, `SUPPORT` e `AUDITOR` para o usuario interno de emergencia
+  - se `APP_BOOTSTRAP_INTERNAL_ADMIN_PRUNE_OTHER_INTERNAL_USERS=true`, remove do banco e tenta remover do Cognito outros usuarios internos de `internal-core` diferentes do e-mail preservado
+  - se `APP_BOOTSTRAP_INTERNAL_ADMIN_PASSWORD` estiver preenchido, cria/atualiza o usuario com senha permanente no Cognito
+  - recomendacao operacional: usar a flag apenas no deploy de bootstrap inicial e depois voltar para `false`
+
 Complemento operacional de autenticacao:
 - o backend depende do Cognito para JWT e grupos
 - o fluxo real de tenant no `access_token` agora depende tambem da Lambda versionada em `infra/cognito/pre-token-generation`
 - o primeiro login de usuarios `INVITED` no backend agora tambem depende dessa Lambda publicar `username` e `email` no `access_token`, para a reconciliacao local do modulo de `users`
-- a task role do backend tambem precisa manter permissoes administrativas de usuario no Cognito, incluindo `AdminGetUser`, porque o modulo de `users` agora valida a existencia da identidade antes do saneamento excepcional `POST /api/users/{userId}/purge`
+- a task role do backend tambem precisa manter permissoes administrativas de usuario no Cognito, incluindo `AdminGetUser` e `AdminDeleteUser`, porque os saneamentos excepcionais de `users` e `portfolio` agora podem validar/remover identidades durante `purge`
 - artefatos relevantes:
   - `infra/cognito/pre-token-generation/index.mjs`
   - `infra/cognito/pre-token-generation/deploy.ps1`
@@ -42,7 +60,7 @@ Complemento operacional de autenticacao:
 - antes de validar o frontend contra o ambiente AWS, confirmar que o User Pool continua apontando para a Lambda `program-management-system-cognito-pre-token` com `PreTokenGenerationConfig.LambdaVersion=V2_0`
 
 Checklist operacional adicional para `users`:
-- confirmar que a task role `program-management-system-ecs-task-role` inclui `AdminCreateUser`, `AdminUpdateUserAttributes`, `AdminAddUserToGroup`, `AdminRemoveUserFromGroup`, `AdminResetUserPassword`, `AdminDisableUser` e `AdminGetUser`
+- confirmar que a task role `program-management-system-ecs-task-role` inclui `AdminCreateUser`, `AdminUpdateUserAttributes`, `AdminAddUserToGroup`, `AdminRemoveUserFromGroup`, `AdminResetUserPassword`, `AdminSetUserPassword`, `AdminDisableUser`, `AdminGetUser` e `AdminDeleteUser`
 - se houver ajuste de policy IAM da task role, executar `force-new-deployment` no service ECS para reciclar as tasks e renovar as credenciais efetivas
 - se houver ajuste na Lambda de `Pre Token Generation`, fazer logout/login no frontend antes de retestar o fluxo autenticado
 - se `POST /api/users/{userId}/purge` falhar, verificar primeiro CloudWatch para distinguir rota ausente, IAM faltante no Cognito ou regra de negocio
@@ -104,3 +122,21 @@ Operacao minima recomendada apos o deploy:
    `powershell -ExecutionPolicy Bypass -File .\scripts\test-observability-read-access.ps1`
 4. se a validacao for feita via role assumivel:
    `powershell -ExecutionPolicy Bypass -File .\scripts\test-observability-read-access.ps1 -RoleArn arn:aws:iam::439533253319:role/program-management-system-platform-admin-role`
+
+Observacao importante sobre rollout:
+- `scripts/deploy-to-ecs-fargate.ps1` agora reaplica `healthCheckGracePeriodSeconds` tambem em `update-service`
+- isso evita que rollouts de task definition em services ja existentes ignorem a grace period configurada no template/rendered service definition
+- no ambiente dev atual, o service opera com `healthCheckGracePeriodSeconds=120`
+- apos a recuperacao de acesso do usuario interno, o bootstrap emergencial foi desligado no task definition versionado e os valores sensiveis (`email` e `password`) deixaram de ficar embutidos no template do ECS
+- se esse bootstrap precisar ser reativado no futuro, a recomendacao e habilitar temporariamente as variaveis `APP_BOOTSTRAP_INTERNAL_ADMIN_*` apenas para a janela operacional necessaria e removelas novamente apos validacao do acesso
+- pendencia futura: remover do codigo a logica temporaria de bootstrap/prune do usuario interno de emergencia quando o procedimento operacional definitivo de recuperacao de acesso estiver decidido
+
+Ultima validacao operacional registrada:
+- data: `2026-03-20`
+- script executado: `powershell -ExecutionPolicy Bypass -File .\scripts\deploy-to-ecs-fargate.ps1`
+- imagem publicada: `439533253319.dkr.ecr.sa-east-1.amazonaws.com/oryzem-backend-dev:latest`
+- digest publicado: `sha256:036c2f3d977a02c444ffe743f9d17a1f2f317b11980ca1010141c0e84e783abe`
+- task definition resultante: `program-management-system:20` (hardening anterior) e depois `program-management-system:21` com bootstrap emergencial desligado no runtime
+- validacao final: `powershell -ExecutionPolicy Bypass -File .\scripts\status-dev-aws-environment.ps1` com `runningCount=1`, `Primary rollout=COMPLETED` e `GET /public/ping` retornando `OK`
+- observacao adicional desta rodada: o bootstrap interno de emergencia ficou configurado temporariamente para `vanderson.verza@gmail.com`, com reconciliacao automatica banco/Cognito e grupos `ADMIN`, `SUPPORT` e `AUDITOR`; a task definition `program-management-system:19` executou o prune temporario de usuarios internos legados, a `program-management-system:20` consolidou o hardening com a grace period aplicada no update do service e a `program-management-system:21` desligou o bootstrap automatico no runtime
+- observacao operacional: a policy IAM da task role ainda precisa receber integralmente `AdminDeleteUser` e `AdminSetUserPassword`; a tentativa de atualizar via `put-role-policy` falhou por falta de permissao `iam:PutRolePolicy` do principal atual

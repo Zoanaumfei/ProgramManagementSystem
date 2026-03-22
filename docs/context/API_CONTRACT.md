@@ -1,0 +1,177 @@
+# API Contract
+
+Ultima atualizacao: `2026-03-22`
+
+## Auth e erros
+- Backend protegido por Bearer JWT do Cognito.
+- Endpoints publicos atuais:
+- `GET /public/ping`
+- `GET /public/auth/config`
+- `GET /actuator/health`
+- `GET /actuator/health/liveness`
+- `GET /actuator/health/readiness`
+- `401` e retornado sem token valido.
+- `403` e retornado quando a sessao autenticada nao possui permissao.
+- `404` e `500` retornam JSON com `correlationId`.
+- Corpo padrao de erro tratado:
+- `timestamp`
+- `status`
+- `error`
+- `message` para erros tratados pelo `ApiExceptionHandler`
+- `path`
+- `correlationId` quando disponivel
+- `401` e `403` retornam JSON curto com `timestamp`, `status`, `error` e `path`.
+
+## Sessao e autorizacao
+### `GET /public/auth/config`
+- Uso: bootstrap do frontend.
+- Resposta: `provider`, `issuerUri`, `jwkSetUri`, `appClientId`, `timestamp`.
+
+### `GET /api/auth/me`
+- Uso: contexto da sessao autenticada.
+- Resposta atual inclui:
+- `subject`, `username`, `email`, `tokenUse`
+- `tenantId`, `tenantType`
+- `tenantIdClaim`, `tenantTypeClaim`, `userStatusClaim`
+- `roles`, `groups`, `scopes`, `authorities`, `timestamp`
+
+### `GET /api/authz/check`
+- Uso: diagnostico e validacao da matriz de autorizacao.
+- Parametros principais: `module`, `action`, `resourceTenantId`, `resourceTenantType`, `targetRole`, `supportOverride`, `justification`.
+- Resposta: `allowed`, `reason`, `restrictions`, `auditRequired`, `maskedViewRequired`, `crossTenant`, `timestamp`.
+
+## Organizacoes
+### `GET /api/portfolio/organizations`
+- Filtros: `status`, `setupStatus`, `customerOrganizationId`, `parentOrganizationId`, `hierarchyLevel`, `search`.
+- Resposta: lista de `OrganizationResponse`.
+- Campos principais: `id`, `name`, `code`, `tenantType`, `parentOrganizationId`, `customerOrganizationId`, `hierarchyLevel`, `childrenCount`, `hasChildren`, `status`, `setupStatus`, `userSummary`, `programSummary`, `canInactivate`, `inactivationBlockedReason`, `createdAt`, `updatedAt`.
+
+### `GET /api/portfolio/organizations/{organizationId}`
+- Uso: detalhe administrativo de organizacao.
+- Resposta: mesmo shape de `OrganizationResponse`.
+
+### `POST /api/portfolio/organizations`
+- Request: `name`, `code`, `parentOrganizationId`, `status`.
+- Observacao: `parentOrganizationId=null` cria customer raiz e exige `ADMIN INTERNAL`.
+- Response: `OrganizationResponse`.
+
+### `PUT /api/portfolio/organizations/{organizationId}`
+- Request: `name`, `code`.
+- Response: `OrganizationResponse`.
+
+### `DELETE /api/portfolio/organizations/{organizationId}`
+- Sem body.
+- Efeito: inativacao logica.
+- Response: `OrganizationResponse`.
+
+### `POST /api/portfolio/organizations/{organizationId}/purge-subtree`
+- Query params: `supportOverride`, `justification`.
+- Response: `organizationId`, `action`, `performedAt`, `status`, `purgedOrganizations`, `purgedPrograms`, `purgedUsers`, `purgedDocuments`.
+
+## Users
+### `GET /api/users`
+- Filtros: `organizationId`, `tenantId` legado, `supportOverride`, `justification`.
+- Response: lista de `UserSummaryResponse`.
+
+### `POST /api/users`
+- Request: `displayName`, `email`, `role`, `organizationId`.
+- Response: `201 Created` com `UserSummaryResponse`.
+
+### `PUT /api/users/{userId}`
+- Request: `displayName`, `email`, `role`, `organizationId`.
+- Response: `UserSummaryResponse`.
+
+### `DELETE /api/users/{userId}`
+- Efeito: inativacao logica.
+- Response: `204 No Content`.
+
+### `POST /api/users/{userId}/resend-invite`
+### `POST /api/users/{userId}/reset-access`
+### `POST /api/users/{userId}/purge`
+- Query params sensiveis: `supportOverride`, `justification`.
+- Response: `userId`, `action`, `performedAt`, `status`.
+
+### `UserSummaryResponse`
+- `id`, `displayName`, `email`, `role`, `organizationId`, `organizationName`, `status`, `createdAt`, `inviteResentAt`, `accessResetAt`
+
+## Portfolio
+### Milestone templates
+- `GET /api/portfolio/milestone-templates`
+- `POST /api/portfolio/milestone-templates`
+- Request principal: `name`, `description`, `status`, `items[]`.
+
+### Programs
+- `GET /api/portfolio/programs`
+- Filtro: `ownerOrganizationId`
+- Resposta resumida: `ProgramSummaryResponse`
+- `POST /api/portfolio/programs`
+- Request principal: `name`, `code`, `description`, `ownerOrganizationId`, `plannedStartDate`, `plannedEndDate`, `participants[]`, `initialProject`
+- `GET /api/portfolio/programs/{programId}`
+- Resposta detalhada agregada: participantes, projetos, milestones, produtos, itens, entregaveis, documentos e open issues.
+
+### Camadas de criacao
+- `POST /api/portfolio/programs/{programId}/projects`
+- `POST /api/portfolio/projects/{projectId}/products`
+- `POST /api/portfolio/products/{productId}/items`
+- `POST /api/portfolio/items/{itemId}/deliverables`
+- `POST /api/portfolio/programs/{programId}/open-issues`
+
+### Documentos de entregavel
+- `GET /api/portfolio/deliverables/{deliverableId}/documents`
+- `POST /api/portfolio/deliverables/{deliverableId}/documents/upload-url`
+- `POST /api/portfolio/deliverables/{deliverableId}/documents/{documentId}/complete`
+- `POST /api/portfolio/deliverables/{deliverableId}/documents/{documentId}/download-url`
+- `DELETE /api/portfolio/deliverables/{deliverableId}/documents/{documentId}`
+
+### Requests principais do portfolio
+- `CreateProjectRequest`: `name`, `code`, `description`, `plannedStartDate`, `plannedEndDate`, `milestoneTemplateId`, `status`
+- `CreateProductRequest`: `name`, `code`, `description`, `status`
+- `CreateItemRequest`: `name`, `code`, `description`, `status`
+- `CreateDeliverableRequest`: `name`, `description`, `type`, `status`, `plannedDate`, `dueDate`
+- `CreateOpenIssueRequest`: `title`, `description`, `severity`, `status`, `openedAt`
+- `PrepareDeliverableDocumentUploadRequest`: `fileName`, `contentType`, `fileSize`
+
+## Operations
+- `GET /api/operations`
+- `POST /api/operations`
+- `PUT /api/operations/{operationId}`
+- `DELETE /api/operations/{operationId}`
+- `POST /api/operations/{operationId}/submit`
+- `POST /api/operations/{operationId}/approve`
+- `POST /api/operations/{operationId}/reject`
+- `POST /api/operations/{operationId}/reopen`
+- `POST /api/operations/{operationId}/reprocess`
+- `CreateOperationRequest`: `title`, `description`, `tenantId`, `tenantType`
+- `UpdateOperationRequest`: `title`, `description`
+
+## Reports
+- `GET /api/reports/summary`
+- `GET /api/reports/operations`
+- `GET /api/reports/operations/export`
+- Parametros relevantes: `tenantId`, `status`, `includeSensitiveData`, `maskedView`, `supportOverride`, `justification`
+
+## Enums expostos de forma relevante
+- `Role`: `ADMIN`, `MANAGER`, `MEMBER`, `SUPPORT`, `AUDITOR`
+- `TenantType`: `INTERNAL`, `EXTERNAL`
+- `UserStatus`: `INVITED`, `ACTIVE`, `INACTIVE`
+- `OrganizationStatus`: `ACTIVE`, `INACTIVE`
+- `OrganizationSetupStatus`: `COMPLETED`, `INCOMPLETED`
+- `ProgramStatus`: `DRAFT`, `ACTIVE`, `PAUSED`, `CLOSED`, `CANCELED`
+- `ParticipationRole`: `CLIENT`, `SUPPLIER`, `INTERNAL`, `PARTNER`
+- `ParticipationStatus`: `ACTIVE`, `INACTIVE`
+- `ProjectStatus`: `DRAFT`, `ACTIVE`, `PAUSED`, `COMPLETED`, `CANCELED`
+- `ProductStatus`: `ACTIVE`, `INACTIVE`
+- `ItemStatus`: `ACTIVE`, `INACTIVE`
+- `DeliverableType`: `DOCUMENT`, `FORM`
+- `DeliverableStatus`: `PENDING`, `IN_PROGRESS`, `SUBMITTED`, `APPROVED`, `REJECTED`, `CANCELED`
+- `DeliverableDocumentStatus`: `PENDING_UPLOAD`, `AVAILABLE`, `DELETED`
+- `MilestoneTemplateStatus`: `ACTIVE`, `INACTIVE`
+- `ProjectMilestoneStatus`: `PLANNED`, `COMPLETED`, `CANCELED`
+- `OpenIssueStatus`: `OPEN`, `IN_PROGRESS`, `RESOLVED`, `CLOSED`, `CANCELED`
+- `OpenIssueSeverity`: `LOW`, `MEDIUM`, `HIGH`, `CRITICAL`
+- `OperationStatus`: `DRAFT`, `SUBMITTED`, `APPROVED`, `REJECTED`, `RETURNED`, `REPROCESSING`
+
+## Paginacao e busca
+- Nao ha paginacao no contrato atual.
+- Busca textual esta presente apenas em `GET /api/portfolio/organizations` via `search`.
+- Crescimento de volume e paginação futura permanecem em `OPEN_GAPS.md`.

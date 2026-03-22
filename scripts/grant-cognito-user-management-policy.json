@@ -7,10 +7,12 @@
       "Action": [
         "cognito-idp:AdminAddUserToGroup",
         "cognito-idp:AdminCreateUser",
+        "cognito-idp:AdminDeleteUser",
         "cognito-idp:AdminDisableUser",
         "cognito-idp:AdminGetUser",
         "cognito-idp:AdminRemoveUserFromGroup",
         "cognito-idp:AdminResetUserPassword",
+        "cognito-idp:AdminSetUserPassword",
         "cognito-idp:AdminUpdateUserAttributes"
       ],
       "Resource": "arn:aws:cognito-idp:sa-east-1:439533253319:userpool/sa-east-1_aA4I3tEmF"

@@ -48,6 +48,7 @@ A visibilidade e sempre descendente.
 - organizacoes `INTERNAL`, como `internal-core`, ficam fora do diretório funcional do portfolio
 - `GET /api/portfolio/organizations` e `GET /api/portfolio/organizations/{organizationId}` agora exigem papel administrativo de `ADMIN` ou `SUPPORT`
 - `POST`, `PUT` e `DELETE` em `/api/portfolio/organizations` agora exigem `ADMIN`
+- `POST /api/portfolio/organizations/{organizationId}/purge-subtree` agora existe como saneamento operacional explicito para `SUPPORT INTERNAL`, exigindo `supportOverride=true` e `justification`
 - `MANAGER` e `MEMBER` nao acessam mais o diretorio administrativo de organizacoes
 - `GET /api/portfolio/organizations` respeita a subarvore visivel do ator autenticado
 - `GET /api/portfolio/organizations` tambem aceita filtros por `customerOrganizationId`, `parentOrganizationId` e `hierarchyLevel`
@@ -69,6 +70,7 @@ Permissoes fechadas:
 - `MEMBER` pode visualizar o portfolio e operar apenas a camada de execucao
 - `SUPPORT` interno e externo ficam somente leitura no portfolio; o interno pode atravessar arvores e o externo fica restrito ao proprio escopo visivel
 - `AUDITOR` fica somente leitura
+- excecao operacional: `SUPPORT INTERNAL` pode executar `purge-subtree` de organizacoes externas para limpeza de ambiente, sempre com `supportOverride=true`, `justification` e auditoria
 
 Mapeamento atual dos endpoints:
 - `GET /api/portfolio/milestone-templates`, `GET /api/portfolio/programs`, `GET /api/portfolio/programs/{programId}`, `GET /api/portfolio/deliverables/{deliverableId}/documents` e `POST /api/portfolio/deliverables/{deliverableId}/documents/{documentId}/download-url` usam permissao de `VIEW`
@@ -76,12 +78,19 @@ Mapeamento atual dos endpoints:
 - `POST /api/portfolio/programs` usa governanca de portfolio e fica restrito a `ADMIN`
 - `POST /api/portfolio/programs/{programId}/projects`, `POST /api/portfolio/projects/{projectId}/products` e `POST /api/portfolio/programs/{programId}/open-issues` ficam com `ADMIN` e `MANAGER`
 - `POST /api/portfolio/products/{productId}/items`, `POST /api/portfolio/items/{itemId}/deliverables`, `POST /api/portfolio/deliverables/{deliverableId}/documents/upload-url`, `POST /api/portfolio/deliverables/{deliverableId}/documents/{documentId}/complete` e `DELETE /api/portfolio/deliverables/{deliverableId}/documents/{documentId}` ficam com `ADMIN`, `MANAGER` e `MEMBER`
+- `POST /api/portfolio/organizations/{organizationId}/purge-subtree` fica com `SUPPORT INTERNAL` e nao substitui o `DELETE` normal, que continua sendo apenas inativacao
 
 Observacao:
 - na API atual do backend ainda nao existem rotas de update/delete para `Program`, `Project`, `Product`, `Item`, `Deliverable` e `OpenIssue`; as permissoes acima cobrem a superficie hoje exposta
+- o `purge-subtree` apaga usuarios, programas e a subarvore de organizacoes; por seguranca, ele falha se a subarvore ainda participar de programas cujo owner esteja fora dela
+
+Impacto no frontend:
+- o workspace de organizacoes deve expor `Purge Subtree` apenas para `SUPPORT INTERNAL`
+- a chamada deve exigir `supportOverride=true` e `justification`
+- `DELETE /api/portfolio/organizations/{organizationId}` continua sendo apenas inativacao; `purge-subtree` deve aparecer como acao separada e claramente destrutiva
 
 Validacao:
-- suite completa `./mvnw.cmd test` executada com sucesso em `2026-03-20`, com `90` testes passando
+- suite completa `./mvnw.cmd test` executada com sucesso em `2026-03-20`, com `94` testes passando
 
 ## Regras de inativacao
 

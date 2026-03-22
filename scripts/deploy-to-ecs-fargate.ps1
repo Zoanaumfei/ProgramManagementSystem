@@ -87,6 +87,12 @@ if ($LASTEXITCODE -ne 0) {
     throw 'Unable to render the ECS service definition.'
 }
 
+$renderedServiceDefinition = Get-Content -Path .\infra\ecs\service-definition.rendered.json -Raw | ConvertFrom-Json
+$healthCheckGracePeriodSeconds = 0
+if ($renderedServiceDefinition.PSObject.Properties.Name -contains 'healthCheckGracePeriodSeconds') {
+    $healthCheckGracePeriodSeconds = [int]$renderedServiceDefinition.healthCheckGracePeriodSeconds
+}
+
 $serviceLookup = & $aws ecs describe-services `
     --profile $AwsProfile `
     --region $AwsRegion `
@@ -106,7 +112,8 @@ if ($serviceLookup.services -and $serviceLookup.services.Count -gt 0 -and $servi
         '--cluster', $ClusterName,
         '--service', $ServiceName,
         '--task-definition', $taskDefinitionArn,
-        '--desired-count', '1'
+        '--desired-count', '1',
+        '--health-check-grace-period-seconds', $healthCheckGracePeriodSeconds.ToString()
     )
 
     if ($ForceNewDeployment.IsPresent) {

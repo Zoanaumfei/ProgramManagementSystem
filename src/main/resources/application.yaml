@@ -31,6 +31,13 @@ spring:
 app:
   bootstrap:
     seed-data: ${APP_BOOTSTRAP_SEED_DATA:true}
+    internal-admin:
+      enabled: ${APP_BOOTSTRAP_INTERNAL_ADMIN_ENABLED:false}
+      email: ${APP_BOOTSTRAP_INTERNAL_ADMIN_EMAIL:}
+      display-name: ${APP_BOOTSTRAP_INTERNAL_ADMIN_DISPLAY_NAME:}
+      prune-other-internal-users: ${APP_BOOTSTRAP_INTERNAL_ADMIN_PRUNE_OTHER_INTERNAL_USERS:false}
+      password: ${APP_BOOTSTRAP_INTERNAL_ADMIN_PASSWORD:}
+      temporary-password: ${APP_BOOTSTRAP_INTERNAL_ADMIN_TEMPORARY_PASSWORD:}
   portfolio:
     documents:
       provider: ${APP_PORTFOLIO_DOCUMENTS_PROVIDER:stub}

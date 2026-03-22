@@ -1,0 +1,238 @@
+package com.oryzem.programmanagementsystem.app.bootstrap;
+
+import com.oryzem.programmanagementsystem.platform.audit.AuditTrailService;
+import com.oryzem.programmanagementsystem.platform.authorization.Role;
+import com.oryzem.programmanagementsystem.platform.authorization.TenantType;
+import com.oryzem.programmanagementsystem.modules.projectmanagement.PortfolioResetPort;
+import com.oryzem.programmanagementsystem.modules.operations.OperationRepository;
+import com.oryzem.programmanagementsystem.platform.tenant.OrganizationBootstrapPort;
+import com.oryzem.programmanagementsystem.platform.tenant.OrganizationLookup;
+import com.oryzem.programmanagementsystem.platform.users.domain.ManagedUser;
+import com.oryzem.programmanagementsystem.platform.users.domain.UserIdentityGateway;
+import com.oryzem.programmanagementsystem.platform.users.domain.UserRepository;
+import com.oryzem.programmanagementsystem.platform.users.domain.UserStatus;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+
+@SpringBootTest(
+        classes = com.oryzem.programmanagementsystem.app.ProgramManagementSystemApplication.class,
+        properties = "app.bootstrap.seed-data=false")
+class BootstrapDataServiceTest {
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private OperationRepository operationRepository;
+
+    @Autowired
+    private AuditTrailService auditTrailService;
+
+    @Autowired
+    private PortfolioResetPort portfolioResetPort;
+
+    @Autowired
+    private OrganizationBootstrapPort organizationBootstrapPort;
+
+    @Autowired
+    private OrganizationLookup organizationLookup;
+
+    @Autowired
+    private UserIdentityGateway userIdentityGateway;
+
+    @BeforeEach
+    void setUp() {
+        resetWithProperties(new BootstrapProperties(false, new BootstrapProperties.InternalAdminProperties(false, null, null, false, null, null)));
+        clearStubIdentityGatewayIfPresent();
+    }
+
+    @Test
+    void shouldEnsureInternalCoreEvenWhenSeedDataIsDisabled() {
+        OrganizationLookup.OrganizationView internalCore =
+                organizationLookup.getRequired("internal-core");
+
+        Assertions.assertThat(internalCore.id()).isEqualTo("internal-core");
+        Assertions.assertThat(internalCore.tenantType()).isEqualTo(TenantType.INTERNAL);
+        Assertions.assertThat(internalCore.active()).isTrue();
+    }
+
+    @Test
+    void shouldBootstrapInternalAdminWhenExplicitlyEnabled() {
+        resetWithProperties(new BootstrapProperties(
+                false,
+                new BootstrapProperties.InternalAdminProperties(
+                        true,
+                        "bootstrap.admin@oryzem.com",
+                        "Bootstrap Admin",
+                        false,
+                        "PermanentPassword123!",
+                        "TempPassword123!")));
+
+        ManagedUser createdUser = userRepository.findByEmailIgnoreCase("bootstrap.admin@oryzem.com").orElseThrow();
+        Assertions.assertThat(createdUser.role()).isEqualTo(Role.ADMIN);
+        Assertions.assertThat(createdUser.tenantId()).isEqualTo("internal-core");
+        Assertions.assertThat(createdUser.tenantType()).isEqualTo(TenantType.INTERNAL);
+        Assertions.assertThat(createdUser.status()).isEqualTo(UserStatus.ACTIVE);
+        Assertions.assertThat(userIdentityGateway.identityExists(createdUser)).isTrue();
+        assertBootstrapRoles(Role.ADMIN, Role.SUPPORT, Role.AUDITOR);
+    }
+
+    @Test
+    void shouldNotBootstrapDuplicateInternalAdminWhenOneAlreadyExists() {
+        BootstrapProperties properties = new BootstrapProperties(
+                false,
+                new BootstrapProperties.InternalAdminProperties(
+                        true,
+                        "bootstrap.admin@oryzem.com",
+                        "Bootstrap Admin",
+                        false,
+                        "PermanentPassword123!",
+                        "TempPassword123!"));
+
+        BootstrapDataService service = new BootstrapDataService(
+                userRepository,
+                operationRepository,
+                auditTrailService,
+                portfolioResetPort,
+                organizationBootstrapPort,
+                userIdentityGateway,
+                properties);
+
+        service.seedIfEmpty();
+        service.seedIfEmpty();
+
+        Assertions.assertThat(userRepository.findAll())
+                .filteredOn(user -> user.tenantId().equals("internal-core") && user.role() == Role.ADMIN)
+                .hasSize(1);
+    }
+
+    @Test
+    void shouldCreateConfiguredBootstrapAdminEvenWhenAnotherInternalAdminAlreadyExists() {
+        resetWithProperties(new BootstrapProperties(
+                false,
+                new BootstrapProperties.InternalAdminProperties(
+                        true,
+                        "bootstrap.admin@oryzem.com",
+                        "Bootstrap Admin",
+                        false,
+                        "PermanentPassword123!",
+                        "TempPassword123!")));
+
+        BootstrapDataService service = new BootstrapDataService(
+                userRepository,
+                operationRepository,
+                auditTrailService,
+                portfolioResetPort,
+                organizationBootstrapPort,
+                userIdentityGateway,
+                new BootstrapProperties(
+                        false,
+                        new BootstrapProperties.InternalAdminProperties(
+                                true,
+                                "recovery.admin@oryzem.com",
+                                "Recovery Admin",
+                                false,
+                                "PermanentPassword123!",
+                                "TempPassword123!")));
+
+        service.seedIfEmpty();
+
+        Assertions.assertThat(userRepository.findAll())
+                .filteredOn(user -> user.tenantId().equals("internal-core") && user.role() == Role.ADMIN)
+                .hasSize(2)
+                .extracting(ManagedUser::email)
+                .contains("bootstrap.admin@oryzem.com", "recovery.admin@oryzem.com");
+    }
+
+    @Test
+    void shouldPruneOtherInternalUsersWhenExplicitlyEnabled() {
+        resetWithProperties(new BootstrapProperties(
+                false,
+                new BootstrapProperties.InternalAdminProperties(
+                        true,
+                        "vanderson.verza@gmail.com",
+                        "Vanderson Verza",
+                        false,
+                        "PermanentPassword123!",
+                        "TempPassword123!")));
+
+        userRepository.save(new ManagedUser(
+                "USR-LEGACY-ADMIN-001",
+                "admin@oryzem.com",
+                null,
+                "Legacy Admin",
+                "admin@oryzem.com",
+                Role.ADMIN,
+                "internal-core",
+                TenantType.INTERNAL,
+                UserStatus.ACTIVE,
+                java.time.Instant.now(),
+                null,
+                null));
+
+        BootstrapDataService service = new BootstrapDataService(
+                userRepository,
+                operationRepository,
+                auditTrailService,
+                portfolioResetPort,
+                organizationBootstrapPort,
+                userIdentityGateway,
+                new BootstrapProperties(
+                        false,
+                        new BootstrapProperties.InternalAdminProperties(
+                                true,
+                                "vanderson.verza@gmail.com",
+                                "Vanderson Verza",
+                                true,
+                                "PermanentPassword123!",
+                                "TempPassword123!")));
+
+        service.seedIfEmpty();
+
+        Assertions.assertThat(userRepository.findByEmailIgnoreCase("vanderson.verza@gmail.com")).isPresent();
+        Assertions.assertThat(userRepository.findByEmailIgnoreCase("admin@oryzem.com")).isNotPresent();
+    }
+
+    private void resetWithProperties(BootstrapProperties properties) {
+        BootstrapDataService service = new BootstrapDataService(
+                userRepository,
+                operationRepository,
+                auditTrailService,
+                portfolioResetPort,
+                organizationBootstrapPort,
+                userIdentityGateway,
+                properties);
+        service.reset();
+    }
+
+    private void clearStubIdentityGatewayIfPresent() {
+        try {
+            java.lang.reflect.Method clearMethod = userIdentityGateway.getClass().getDeclaredMethod("clear");
+            clearMethod.setAccessible(true);
+            clearMethod.invoke(userIdentityGateway);
+        } catch (NoSuchMethodException ignored) {
+            // Non-stub gateway: nothing to clear.
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalStateException("Unable to clear stub user identity gateway for test setup.", exception);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void assertBootstrapRoles(Role... expectedRoles) {
+        try {
+            java.lang.reflect.Method groupsMethod = userIdentityGateway.getClass().getDeclaredMethod("bootstrapRoles");
+            groupsMethod.setAccessible(true);
+            java.util.Set<Role> actualRoles = (java.util.Set<Role>) groupsMethod.invoke(userIdentityGateway);
+            Assertions.assertThat(actualRoles).containsExactlyInAnyOrder(expectedRoles);
+        } catch (NoSuchMethodException ignored) {
+            // Non-stub gateway: role tracking is not available.
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalStateException("Unable to inspect stub bootstrap roles for test verification.", exception);
+        }
+    }
+}
+
+

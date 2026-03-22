@@ -1,2 +1,3 @@
 org.springframework.boot.env.EnvironmentPostProcessor=\
-com.oryzem.programmanagementsystem.config.RdsSecretEnvironmentPostProcessor
+com.oryzem.programmanagementsystem.app.config.RdsSecretEnvironmentPostProcessor
+
