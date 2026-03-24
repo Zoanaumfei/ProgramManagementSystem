@@ -52,7 +52,8 @@ class ProjectManagementTenantPortfolioAdapter implements TenantProjectPortfolioP
                                 documentStorageGateway.deleteObject(new DocumentStorageObject(
                                         document.getStorageBucket(),
                                         document.getStorageKey(),
-                                        document.getContentType()));
+                                        document.getContentType(),
+                                        document.getFileName()));
                                 purgedDocuments++;
                             }
                         }

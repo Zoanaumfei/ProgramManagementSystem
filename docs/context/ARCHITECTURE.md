@@ -13,7 +13,7 @@ Ultima atualizacao: `2026-03-22`
 - Banco principal: PostgreSQL 17.6 no RDS.
 - Testes: H2 em modo compatibilidade PostgreSQL, Spring Boot Test, Spring Security Test.
 - Frontend: React, JavaScript, Vite, React Router, react-oidc-context, React Query, zod.
-- Auth: Amazon Cognito Hosted UI + JWT.
+- Auth: Amazon Cognito + JWT; Hosted UI ainda existe na trilha atual, mas o backend ja prepara login proprio brokerado.
 - AWS: ECS/Fargate, ALB, ECR, RDS, Secrets Manager, Lambda de Pre Token Generation.
 
 ## Monolito modular atual
@@ -21,7 +21,7 @@ Ultima atualizacao: `2026-03-22`
 - Bootstrap global, `ProgramManagementSystemApplication`, config global e exception handling.
 
 ### `platform.auth`
-- Configuracao de seguranca, conversao de JWT, filtros e `/api/auth/*`.
+- Configuracao de seguranca, conversao de JWT, filtros e `/api/auth/*` / `/public/auth/*`.
 
 ### `platform.authorization`
 - Matriz de autorizacao, contexto, decisao e `/api/authz/check`.
@@ -65,13 +65,13 @@ Ultima atualizacao: `2026-03-22`
 - RDS: `program-management-system-db`
 - ECS cluster: `program-management-system-cluster`
 - ECS service: `program-management-system-service`
-- Task definition validada: `program-management-system:21`
+- Task definition validada: `program-management-system:24`
 - ALB DNS atual: `program-management-system-alb-1082436660.sa-east-1.elb.amazonaws.com`
 - Secret do banco: `program-management-system/rds/master`
 - Lambda de token: `program-management-system-cognito-pre-token`
 
 ## Observacoes tecnicas vigentes
-- O backend opera como OAuth2 Resource Server stateless; nao existe login por senha local.
+- O backend opera como OAuth2 Resource Server stateless; nao existe login por senha local, apenas broker Cognito para a trilha de login proprio.
 - A autorizacao final e feita na aplicacao, nao apenas nas claims.
 - O provider de documentos continua em `stub` no runtime atual; S3 real ainda nao foi fechado.
 - `ResourceNotFoundException` agora mora em `platform.shared`, e nao mais em `app`.

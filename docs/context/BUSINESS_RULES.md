@@ -26,6 +26,11 @@ Ultima atualizacao: `2026-03-22`
 - O vinculo canonico do contrato de usuarios e `organizationId`.
 - `tenant_id` e `tenant_type` permanecem apenas como compatibilidade interna de autorizacao.
 - O primeiro usuario de uma organizacao deve ser `ADMIN`.
+- Usuario criado administrativamente entra em `INVITED`; trocar a senha temporaria no primeiro login nao verifica o email automaticamente no Cognito.
+- A plataforma nao possui senha local; a autenticacao continua pertencendo ao Cognito mesmo quando o frontend usar login proprio.
+- A trilha nova de login proprio deve tratar explicitamente `NEW_PASSWORD_REQUIRED` para primeiro acesso com senha temporaria.
+- Quando um admin executar `reset-access`, o proximo login do usuario pode entrar em `PASSWORD_RESET_REQUIRED` e a UX correta e consumir o codigo ja recebido, sem forcar um segundo `forgot password`.
+- A verificacao do email e explicita e orientada ao proprio usuario autenticado, com envio e confirmacao de codigo.
 - Uma organizacao sem `ADMIN` em status `INVITED` ou `ACTIVE` fica com `setupStatus=INCOMPLETED`.
 - Uma organizacao `INCOMPLETED` nao pode receber usuarios nao-`ADMIN`.
 - Uma organizacao `INCOMPLETED` nao pode ser usada como `ownerOrganizationId` de um novo programa.
@@ -59,6 +64,8 @@ Ultima atualizacao: `2026-03-22`
 - `email` e unico globalmente.
 - Usuario `ACTIVE` nao troca de organizacao; o fluxo aceito e inativar/recriar ou editar enquanto ainda estiver `INVITED`.
 - Usuario `INACTIVE` nao pode receber `resend-invite` nem `reset-access`.
+- `reset-access` exige usuario `ACTIVE` e ao menos um canal de recovery verificado no Cognito; na jornada atual isso significa `email_verified=true`.
+- Quando o email ainda nao estiver verificado, `reset-access` deve falhar como regra de negocio clara, nunca como `500`.
 
 ## 7. Inativacao e purge
 - `DELETE /api/users/{userId}` faz inativacao logica.

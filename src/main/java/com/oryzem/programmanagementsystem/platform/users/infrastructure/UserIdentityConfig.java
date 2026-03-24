@@ -16,15 +16,22 @@ class UserIdentityConfig {
 
     @Bean
     @ConditionalOnProperty(prefix = "app.security.identity", name = "provider", havingValue = "cognito")
-    UserIdentityGateway cognitoUserIdentityGateway(UserIdentityProperties properties) {
+    CognitoIdentityProviderClient cognitoIdentityProviderClient(UserIdentityProperties properties) {
         if (!StringUtils.hasText(properties.userPoolId())) {
             throw new IllegalStateException("Cognito identity integration requires app.security.identity.user-pool-id.");
         }
 
-        CognitoIdentityProviderClient client = CognitoIdentityProviderClient.builder()
+        return CognitoIdentityProviderClient.builder()
                 .region(Region.of(properties.region()))
                 .credentialsProvider(DefaultCredentialsProvider.create())
                 .build();
+    }
+
+    @Bean
+    @ConditionalOnProperty(prefix = "app.security.identity", name = "provider", havingValue = "cognito")
+    CognitoUserIdentityGateway cognitoUserIdentityGateway(
+            UserIdentityProperties properties,
+            CognitoIdentityProviderClient client) {
         return new CognitoUserIdentityGateway(properties, client);
     }
 

@@ -5,8 +5,14 @@ Ultima atualizacao: `2026-03-22`
 ## Cognito como autenticacao oficial
 - Decisao: o backend nao implementa login por senha local e valida apenas JWT emitido pelo Cognito.
 - Motivo: manter autenticacao stateless e centralizar identidade fora da aplicacao.
-- Impacto: frontend depende do Hosted UI e o backend opera como Resource Server.
+- Impacto: o backend opera como Resource Server e tambem pode brokerar login proprio contra o Cognito sem criar senha local.
 - Status: ATIVA
+
+## Hosted UI em retirada gradual
+- Decisao: manter o Cognito como IdP, mas preparar o frontend para sair do Hosted UI e usar login proprio consumindo endpoints publicos do backend.
+- Motivo: controlar melhor os fluxos `NEW_PASSWORD_REQUIRED`, `PASSWORD_RESET_REQUIRED`, verificacao de email e logout, evitando UX confusa como o envio de dois codigos no reset.
+- Impacto: backend agora expone endpoints publicos de auth e o Hosted UI passa a ser trilha temporaria ate o cutover completo do frontend e a estabilizacao do runtime AWS que ainda precisa assumir a task corrigida de login proprio.
+- Status: TEMPORARIA
 
 ## Monolito modular em vez de microservicos agora
 - Decisao: manter uma unica aplicacao Spring Boot e um unico deploy, organizados em modulos.

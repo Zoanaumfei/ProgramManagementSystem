@@ -1,20 +1,31 @@
 package com.oryzem.programmanagementsystem.platform.users.infrastructure;
 
+import com.oryzem.programmanagementsystem.platform.auth.AuthenticatedIdentityContext;
+import com.oryzem.programmanagementsystem.platform.auth.CurrentUserEmailVerificationGateway;
+import com.oryzem.programmanagementsystem.platform.auth.CurrentUserEmailVerificationState;
+import com.oryzem.programmanagementsystem.platform.auth.EmailVerificationCodeDelivery;
 import com.oryzem.programmanagementsystem.platform.authorization.Role;
+import com.oryzem.programmanagementsystem.platform.shared.ConflictException;
 import com.oryzem.programmanagementsystem.platform.users.domain.ManagedUser;
 import com.oryzem.programmanagementsystem.platform.users.domain.UserIdentityGateway;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
+import org.springframework.util.StringUtils;
 
-public final class StubUserIdentityGateway implements UserIdentityGateway {
+public final class StubUserIdentityGateway implements UserIdentityGateway, CurrentUserEmailVerificationGateway {
+
+    private static final String STUB_VERIFICATION_CODE = "123456";
 
     private final List<StubUserIdentityOperation> operations = new ArrayList<>();
     private final Set<String> existingIdentityUsernames = new HashSet<>();
     private final Set<Role> bootstrapRoles = new LinkedHashSet<>();
+    private final Map<String, Boolean> emailVerificationByIdentityKey = new HashMap<>();
 
     @Override
     public void createUser(ManagedUser user) {
@@ -35,6 +46,9 @@ public final class StubUserIdentityGateway implements UserIdentityGateway {
 
     @Override
     public void resetAccess(ManagedUser user) {
+        if (!isRecoveryChannelVerified(identityKey(user.identityUsername(), user.email(), user.id()))) {
+            throw new ConflictException("The user must verify email before access reset can be used.");
+        }
         operations.add(operation("RESET_ACCESS", user));
     }
 
@@ -82,10 +96,50 @@ public final class StubUserIdentityGateway implements UserIdentityGateway {
         operations.clear();
         existingIdentityUsernames.clear();
         bootstrapRoles.clear();
+        emailVerificationByIdentityKey.clear();
     }
 
     public Set<Role> bootstrapRoles() {
         return Set.copyOf(bootstrapRoles);
+    }
+
+    @Override
+    public CurrentUserEmailVerificationState describeCurrentUser(AuthenticatedIdentityContext context) {
+        String identityKey = identityKey(context.username(), context.email(), context.subject());
+        boolean verified = emailVerificationByIdentityKey.computeIfAbsent(
+                identityKey,
+                ignored -> context.emailVerifiedClaim() != null ? context.emailVerifiedClaim() : true);
+        return new CurrentUserEmailVerificationState(context.email(), verified);
+    }
+
+    @Override
+    public EmailVerificationCodeDelivery sendCurrentUserEmailVerificationCode(AuthenticatedIdentityContext context) {
+        if (!StringUtils.hasText(context.email())) {
+            throw new IllegalArgumentException("The authenticated user does not expose an email for verification.");
+        }
+
+        String identityKey = identityKey(context.username(), context.email(), context.subject());
+        emailVerificationByIdentityKey.putIfAbsent(identityKey, false);
+        return new EmailVerificationCodeDelivery("email", "EMAIL", maskEmail(context.email()));
+    }
+
+    @Override
+    public CurrentUserEmailVerificationState verifyCurrentUserEmail(AuthenticatedIdentityContext context, String code) {
+        if (!STUB_VERIFICATION_CODE.equals(code)) {
+            throw new IllegalArgumentException("The email verification code is invalid.");
+        }
+
+        String identityKey = identityKey(context.username(), context.email(), context.subject());
+        emailVerificationByIdentityKey.put(identityKey, true);
+        return new CurrentUserEmailVerificationState(context.email(), true);
+    }
+
+    public void markRecoveryChannelVerified(String identityUsername) {
+        emailVerificationByIdentityKey.put(identityKey(identityUsername, identityUsername, identityUsername), true);
+    }
+
+    public void markRecoveryChannelUnverified(String identityUsername) {
+        emailVerificationByIdentityKey.put(identityKey(identityUsername, identityUsername, identityUsername), false);
     }
 
     private StubUserIdentityOperation operation(String action, ManagedUser user) {
@@ -102,11 +156,33 @@ public final class StubUserIdentityGateway implements UserIdentityGateway {
         markIdentityPresent(user.identityUsername());
     }
 
+    private boolean isRecoveryChannelVerified(String identityKey) {
+        return emailVerificationByIdentityKey.getOrDefault(identityKey, true);
+    }
+
     private void trackBootstrapGroups(Set<Role> grantedRoles) {
         if (grantedRoles == null || grantedRoles.isEmpty()) {
             bootstrapRoles.add(Role.ADMIN);
             return;
         }
         bootstrapRoles.addAll(grantedRoles);
+    }
+
+    private String identityKey(String username, String email, String fallback) {
+        if (StringUtils.hasText(username)) {
+            return username.toLowerCase(Locale.ROOT);
+        }
+        if (StringUtils.hasText(email)) {
+            return email.toLowerCase(Locale.ROOT);
+        }
+        return fallback == null ? "unknown" : fallback.toLowerCase(Locale.ROOT);
+    }
+
+    private String maskEmail(String email) {
+        int atIndex = email.indexOf('@');
+        if (atIndex <= 1) {
+            return email;
+        }
+        return email.charAt(0) + "***" + email.substring(atIndex - 1);
     }
 }

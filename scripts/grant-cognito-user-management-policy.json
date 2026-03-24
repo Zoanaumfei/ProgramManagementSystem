@@ -9,11 +9,14 @@
         "cognito-idp:AdminCreateUser",
         "cognito-idp:AdminDeleteUser",
         "cognito-idp:AdminDisableUser",
+        "cognito-idp:AdminInitiateAuth",
         "cognito-idp:AdminGetUser",
         "cognito-idp:AdminRemoveUserFromGroup",
+        "cognito-idp:AdminRespondToAuthChallenge",
         "cognito-idp:AdminResetUserPassword",
         "cognito-idp:AdminSetUserPassword",
-        "cognito-idp:AdminUpdateUserAttributes"
+        "cognito-idp:AdminUpdateUserAttributes",
+        "cognito-idp:GlobalSignOut"
       ],
       "Resource": "arn:aws:cognito-idp:sa-east-1:439533253319:userpool/sa-east-1_aA4I3tEmF"
     }

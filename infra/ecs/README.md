@@ -29,6 +29,16 @@ Configuracao minima da aplicacao no container:
 - `DB_SECRET_ID=program-management-system/rds/master`
 - `AWS_REGION=sa-east-1`
 - `DB_SSL_MODE=require`
+- `APP_PORTFOLIO_DOCUMENTS_PROVIDER=s3`
+- `APP_PORTFOLIO_DOCUMENTS_BUCKET_NAME=program-management-system-documents-dev-439533253319-sa-east-1`
+- `APP_PORTFOLIO_DOCUMENTS_KEY_PREFIX=portfolio`
+
+Checklist minimo para documentos em S3 real:
+- criar/confirmar o bucket `program-management-system-documents-dev-439533253319-sa-east-1`
+- aplicar `Block Public Access`, `BucketOwnerEnforced` e encryption `AES256`
+- aplicar CORS para `PUT/GET/HEAD` a partir de `http://localhost:3000`, `http://localhost:5173` e `https://oryzem.com`
+- anexar a policy `scripts/grant-document-storage-policy.json` na task role `program-management-system-ecs-task-role`
+- reciclar as tasks do ECS apos qualquer ajuste de policy IAM
 
 Bootstrap opcional do primeiro acesso administrativo:
 - o backend agora garante `internal-core` mesmo quando `APP_BOOTSTRAP_SEED_DATA=false`
@@ -65,6 +75,12 @@ Checklist operacional adicional para `users`:
 - se houver ajuste na Lambda de `Pre Token Generation`, fazer logout/login no frontend antes de retestar o fluxo autenticado
 - se `POST /api/users/{userId}/purge` falhar, verificar primeiro CloudWatch para distinguir rota ausente, IAM faltante no Cognito ou regra de negocio
 
+Checklist operacional adicional para `documents`:
+- garantir que a task role tenha `s3:GetObject`, `s3:PutObject` e `s3:DeleteObject` no bucket de documentos
+- se o upload via browser falhar antes de chegar no backend, revisar o CORS do bucket
+- se o `complete` falhar, verificar se o objeto realmente foi enviado ao bucket e se a task role consegue executar `HeadObject`
+- se a task role receber policy nova, executar `force-new-deployment` no ECS para renovar as credenciais
+
 Observacoes sobre os artefatos versionados:
 - `infra/ecs/service-definition.template.json` agora inclui o `targetGroupArn` do ALB, `containerName`, `containerPort` e `healthCheckGracePeriodSeconds=120`, para que um `create-service` reflita melhor o runtime atual
 - `scripts/deploy-to-ecs-fargate.ps1` agora espera o service atingir `steady state` antes de retornar e aceita `-ForceNewDeployment` para reciclar tasks mesmo quando o ajuste relevante nao muda a imagem
@@ -99,11 +115,15 @@ Sequencia exata sugerida:
    `powershell -ExecutionPolicy Bypass -File .\scripts\create-ecs-execution-role.ps1`
 2. Garantir o repositorio ECR:
    `powershell -ExecutionPolicy Bypass -File .\scripts\ensure-ecr-repository.ps1`
-3. Renderizar a task definition para revisao:
-   `powershell -ExecutionPolicy Bypass -File .\scripts\render-ecs-task-definition.ps1 -ImageUri 439533253319.dkr.ecr.sa-east-1.amazonaws.com/oryzem-backend-dev:latest`
-4. Renderizar o service para revisao:
+3. Garantir o bucket de documentos:
+   `powershell -ExecutionPolicy Bypass -File .\scripts\ensure-document-storage-bucket.ps1`
+4. Anexar a policy de documentos na task role:
+   `powershell -ExecutionPolicy Bypass -File .\scripts\attach-document-storage-policy-to-role.ps1`
+5. Renderizar a task definition para revisao:
+   `powershell -ExecutionPolicy Bypass -File .\scripts\render-ecs-task-definition.ps1 -ImageUri 439533253319.dkr.ecr.sa-east-1.amazonaws.com/oryzem-backend-dev:latest -DocumentBucketName program-management-system-documents-dev-439533253319-sa-east-1`
+6. Renderizar o service para revisao:
    `powershell -ExecutionPolicy Bypass -File .\scripts\render-ecs-service-definition.ps1 -TaskDefinitionArn arn:aws:ecs:sa-east-1:439533253319:task-definition/program-management-system:1`
-5. Executar o deploy inicial completo:
+7. Executar o deploy inicial completo:
    `powershell -ExecutionPolicy Bypass -File .\scripts\deploy-to-ecs-fargate.ps1`
 
 Sequencia sugerida:

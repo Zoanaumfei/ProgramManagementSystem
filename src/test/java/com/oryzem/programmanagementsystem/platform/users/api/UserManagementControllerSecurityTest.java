@@ -648,6 +648,22 @@ class UserManagementControllerSecurityTest {
     }
 
     @Test
+    void shouldRequireVerifiedEmailBeforeResetAccess() throws Exception {
+        StubUserIdentityGateway stubUserIdentityGateway = (StubUserIdentityGateway) userIdentityGateway;
+        stubUserIdentityGateway.markRecoveryChannelUnverified("member.b@tenant.com");
+
+        mockMvc.perform(post("/api/users/USR-EXT-B-MEM-001/reset-access")
+                        .with(jwt().jwt(jwt -> jwt
+                                        .claim("sub", "admin-123")
+                                        .claim("cognito:username", "admin")
+                                        .claim("tenant_id", "internal-core")
+                                        .claim("tenant_type", "INTERNAL"))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("The user must verify email before access reset can be used."));
+    }
+
+    @Test
     void invitedUserShouldBecomeActiveAfterFirstAuthenticatedRequest() throws Exception {
         String response = mockMvc.perform(post("/api/users")
                         .contentType(MediaType.APPLICATION_JSON)

@@ -5,6 +5,8 @@ param(
     [string]$ImageTag = 'latest',
     [string]$ClusterName = 'program-management-system-cluster',
     [string]$ServiceName = 'program-management-system-service',
+    [string]$DocumentBucketName,
+    [string]$DocumentKeyPrefix = 'portfolio',
     [switch]$ForceNewDeployment
 )
 
@@ -23,10 +25,23 @@ $identity = & $aws sts get-caller-identity --profile $AwsProfile --output json |
 $accountId = $identity.Account
 $repositoryUri = "$accountId.dkr.ecr.$AwsRegion.amazonaws.com/$RepositoryName"
 $imageUri = "${repositoryUri}:$ImageTag"
+$resolvedDocumentBucketName = if ($DocumentBucketName) {
+    $DocumentBucketName
+} else {
+    "program-management-system-documents-dev-$accountId-$AwsRegion"
+}
 
 powershell -ExecutionPolicy Bypass -File .\scripts\ensure-ecr-repository.ps1 -AwsProfile $AwsProfile -AwsRegion $AwsRegion -RepositoryName $RepositoryName
 if ($LASTEXITCODE -ne 0) {
     throw 'Unable to validate the target ECR repository.'
+}
+
+powershell -ExecutionPolicy Bypass -File .\scripts\ensure-document-storage-bucket.ps1 `
+    -AwsProfile $AwsProfile `
+    -AwsRegion $AwsRegion `
+    -BucketName $resolvedDocumentBucketName *> $null
+if ($LASTEXITCODE -ne 0) {
+    throw "Unable to validate the S3 document bucket '$resolvedDocumentBucketName'."
 }
 
 & $aws ecr get-login-password --profile $AwsProfile --region $AwsRegion | docker login --username AWS --password-stdin "$accountId.dkr.ecr.$AwsRegion.amazonaws.com"
@@ -44,7 +59,10 @@ if ($LASTEXITCODE -ne 0) {
     throw "Docker push failed for image '$imageUri'."
 }
 
-powershell -ExecutionPolicy Bypass -File .\scripts\render-ecs-task-definition.ps1 -ImageUri $imageUri *> $null
+powershell -ExecutionPolicy Bypass -File .\scripts\render-ecs-task-definition.ps1 `
+    -ImageUri $imageUri `
+    -DocumentBucketName $resolvedDocumentBucketName `
+    -DocumentKeyPrefix $DocumentKeyPrefix *> $null
 if ($LASTEXITCODE -ne 0) {
     throw 'Unable to render the ECS task definition.'
 }

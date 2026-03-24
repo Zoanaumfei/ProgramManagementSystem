@@ -14,6 +14,7 @@ import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
@@ -120,11 +121,14 @@ class PortfolioDocumentStorageConfig {
 
         @Override
         public PreparedDocumentDownload prepareDownload(DocumentStorageObject document) {
-            GetObjectRequest getObjectRequest = GetObjectRequest.builder()
+            GetObjectRequest.Builder getObjectRequestBuilder = GetObjectRequest.builder()
                     .bucket(document.storageBucket())
                     .key(document.storageKey())
-                    .responseContentType(document.contentType())
-                    .build();
+                    .responseContentType(document.contentType());
+            if (StringUtils.hasText(document.fileName())) {
+                getObjectRequestBuilder.responseContentDisposition(contentDisposition(document.fileName()));
+            }
+            GetObjectRequest getObjectRequest = getObjectRequestBuilder.build();
             GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
                     .signatureDuration(properties.presignDuration())
                     .getObjectRequest(getObjectRequest)
@@ -138,10 +142,20 @@ class PortfolioDocumentStorageConfig {
 
         @Override
         public void assertObjectExists(DocumentStorageObject document) {
-            s3Client.headObject(HeadObjectRequest.builder()
-                    .bucket(document.storageBucket())
-                    .key(document.storageKey())
-                    .build());
+            try {
+                s3Client.headObject(HeadObjectRequest.builder()
+                        .bucket(document.storageBucket())
+                        .key(document.storageKey())
+                        .build());
+            } catch (S3Exception exception) {
+                if (exception.statusCode() == 404) {
+                    throw new IllegalArgumentException("Uploaded document object was not found in storage.");
+                }
+                if (exception.statusCode() == 403) {
+                    throw new IllegalStateException("Document storage access was denied while validating the uploaded object.");
+                }
+                throw exception;
+            }
         }
 
         @Override
@@ -156,6 +170,10 @@ class PortfolioDocumentStorageConfig {
         public void close() {
             presigner.close();
             s3Client.close();
+        }
+
+        private String contentDisposition(String fileName) {
+            return "attachment; filename=\"%s\"".formatted(fileName.replace("\"", ""));
         }
     }
 }

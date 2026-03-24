@@ -1,10 +1,17 @@
 # Open Gaps
 
-Ultima atualizacao: `2026-03-22`
+Ultima atualizacao: `2026-03-23`
 
-## Logout real com Cognito Hosted UI
-- Descricao: o fluxo ja foi implementado no frontend, mas ainda falta homologacao ponta a ponta com o app client atual e `logout_uri` em uso real.
-- Impacto: risco de experiencia inconsistente de sessao entre frontend e Hosted UI.
+## Estabilizacao do runtime AWS do login proprio
+- Descricao: a correcao que impede o fallback indevido para `StubPublicAuthenticationGateway` ja esta em codigo, testada e publicada em imagem, mas a task `program-management-system:27` ainda nao estabilizou no ECS; ao fim do dia a task `:26` seguia atendendo o ALB em dev.
+- Impacto: enquanto a task corrigida nao assumir o trafego com estabilidade, a homologacao real do login proprio fica bloqueada e o ambiente de dev pode continuar respondendo com comportamento de `stub`.
+- Prioridade: P0
+- Area: integracao
+- Status: aberto
+
+## Homologacao real do login proprio com Cognito
+- Descricao: o frontend ja migrou para login proprio consumindo os endpoints publicos do backend, o app client ja aceita `ALLOW_USER_PASSWORD_AUTH` e o Cognito respondeu corretamente a `initiate-auth` direta; ainda falta validar ponta a ponta em runtime corrigido os fluxos de login, primeiro acesso, reset por codigo, restore de sessao e logout global.
+- Impacto: sem essa homologacao, ainda existe risco de divergencia entre o comportamento local, o runtime AWS e o app client real do Cognito.
 - Prioridade: P0
 - Area: integracao
 - Status: aberto
@@ -16,9 +23,16 @@ Ultima atualizacao: `2026-03-22`
 - Area: integracao
 - Status: aberto
 
-## Fluxo de documentos em S3 real
-- Descricao: o contrato de documentos esta pronto, mas o bucket definitivo, IAM, encryption, lifecycle e homologacao em runtime AWS ainda nao foram fechados.
-- Impacto: o modulo de documentos segue preso ao provider `stub` no ambiente atual.
+## Habilitacao operacional do app client para login proprio
+- Descricao: o app client ja recebeu `ALLOW_USER_PASSWORD_AUTH` e `ALLOW_ADMIN_USER_PASSWORD_AUTH`, mas ainda precisa ser homologado em uso real para refresh token e logout global na UI propria do PMS.
+- Impacto: a implementacao do frontend pode falhar em homologacao se ainda houver divergencia entre os flows habilitados e o comportamento real esperado no ambiente.
+- Prioridade: P0
+- Area: integracao
+- Status: aberto
+
+## Virada operacional do runtime AWS para documentos em S3
+- Descricao: o codigo ja suporta `S3` real e o frontend ja envia o binario ao presigned URL, mas o principal operacional atual nao possui `s3:CreateBucket` nem `iam:PutRolePolicy` para concluir bucket e permissao da task role no ambiente AWS.
+- Impacto: o runtime AWS segue preso ao provider `stub`, apesar de o fluxo real ja existir no codigo.
 - Prioridade: P0
 - Area: backend
 - Status: aberto
@@ -44,9 +58,9 @@ Ultima atualizacao: `2026-03-22`
 - Area: negocio
 - Status: aberto
 
-## Enriquecimento de /api/auth/me
-- Descricao: `/api/auth/me` ja atende a sessao atual, mas permanece aberto decidir se ele deve expor mais dados normalizados para a interface.
-- Impacto: risco de duplicacao de normalizacao no frontend e leitura incompleta do contexto de sessao.
+## Visibilidade administrativa do status de verificacao de email
+- Descricao: a sessao autenticada ja enxerga `emailVerified`, mas o diretorio administrativo de usuarios ainda nao expoe o estado de verificacao de cada usuario gerenciado.
+- Impacto: administradores ainda descobrem a falta de verificacao apenas ao tentar `reset-access` ou via console do Cognito.
 - Prioridade: P1
 - Area: integracao
 - Status: aberto

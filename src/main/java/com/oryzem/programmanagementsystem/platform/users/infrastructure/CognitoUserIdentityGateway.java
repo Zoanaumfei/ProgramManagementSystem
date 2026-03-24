@@ -1,6 +1,12 @@
 package com.oryzem.programmanagementsystem.platform.users.infrastructure;
 
+import com.oryzem.programmanagementsystem.platform.auth.AuthenticatedIdentityContext;
+import com.oryzem.programmanagementsystem.platform.auth.CurrentUserEmailVerificationGateway;
+import com.oryzem.programmanagementsystem.platform.auth.CurrentUserEmailVerificationState;
+import com.oryzem.programmanagementsystem.platform.auth.EmailVerificationCodeDelivery;
 import com.oryzem.programmanagementsystem.platform.authorization.Role;
+import com.oryzem.programmanagementsystem.platform.shared.ConflictException;
+import com.oryzem.programmanagementsystem.platform.shared.RateLimitExceededException;
 import com.oryzem.programmanagementsystem.platform.users.domain.ManagedUser;
 import com.oryzem.programmanagementsystem.platform.users.domain.UserIdentityGateway;
 import java.util.ArrayList;
@@ -21,10 +27,21 @@ import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminResetU
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminSetUserPasswordRequest;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminUpdateUserAttributesRequest;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AttributeType;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.CodeDeliveryDetailsType;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.CodeMismatchException;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.CognitoIdentityProviderException;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.DeliveryMediumType;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.ExpiredCodeException;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.GetUserAttributeVerificationCodeRequest;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.GetUserRequest;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.GetUserResponse;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.InvalidParameterException;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.LimitExceededException;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.MessageActionType;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.NotAuthorizedException;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.VerifyUserAttributeRequest;
 
-final class CognitoUserIdentityGateway implements UserIdentityGateway, AutoCloseable {
+final class CognitoUserIdentityGateway implements UserIdentityGateway, CurrentUserEmailVerificationGateway, AutoCloseable {
 
     private static final Logger log = LoggerFactory.getLogger(CognitoUserIdentityGateway.class);
 
@@ -61,20 +78,37 @@ final class CognitoUserIdentityGateway implements UserIdentityGateway, AutoClose
 
     @Override
     public void resendInvite(ManagedUser user) {
-        client.adminCreateUser(AdminCreateUserRequest.builder()
-                .userPoolId(properties.userPoolId())
-                .username(requiredIdentityUsername(user))
-                .messageAction(MessageActionType.RESEND)
-                .userAttributes(attributes(user))
-                .build());
+        try {
+            client.adminCreateUser(AdminCreateUserRequest.builder()
+                    .userPoolId(properties.userPoolId())
+                    .username(requiredIdentityUsername(user))
+                    .messageAction(MessageActionType.RESEND)
+                    .userAttributes(attributes(user))
+                    .build());
+        } catch (LimitExceededException exception) {
+            throw new RateLimitExceededException(
+                    "Cognito temporarily blocked invite resend attempts for this user. Wait a few minutes and try again.",
+                    exception);
+        }
     }
 
     @Override
     public void resetAccess(ManagedUser user) {
-        client.adminResetUserPassword(AdminResetUserPasswordRequest.builder()
-                .userPoolId(properties.userPoolId())
-                .username(requiredIdentityUsername(user))
-                .build());
+        try {
+            client.adminResetUserPassword(AdminResetUserPasswordRequest.builder()
+                    .userPoolId(properties.userPoolId())
+                    .username(requiredIdentityUsername(user))
+                    .build());
+        } catch (InvalidParameterException exception) {
+            if (requiresVerifiedRecoveryChannel(exception)) {
+                throw new ConflictException("The user must verify email before access reset can be used.", exception);
+            }
+            throw new IllegalArgumentException(resolveAwsMessage(exception));
+        } catch (LimitExceededException exception) {
+            throw new RateLimitExceededException(
+                    "Cognito temporarily blocked password reset attempts for this user. Wait a few minutes and try again.",
+                    exception);
+        }
     }
 
     @Override
@@ -171,6 +205,73 @@ final class CognitoUserIdentityGateway implements UserIdentityGateway, AutoClose
         client.close();
     }
 
+    @Override
+    public CurrentUserEmailVerificationState describeCurrentUser(AuthenticatedIdentityContext context) {
+        if (!isAccessTokenContext(context)) {
+            return new CurrentUserEmailVerificationState(
+                    context.email(),
+                    Boolean.TRUE.equals(context.emailVerifiedClaim()));
+        }
+
+        GetUserResponse response = client.getUser(GetUserRequest.builder()
+                .accessToken(context.bearerToken())
+                .build());
+        String email = attributeValue(response.userAttributes(), "email");
+        boolean emailVerified = Boolean.parseBoolean(attributeValue(response.userAttributes(), "email_verified"));
+        return new CurrentUserEmailVerificationState(
+                StringUtils.hasText(email) ? email : context.email(),
+                emailVerified);
+    }
+
+    @Override
+    public EmailVerificationCodeDelivery sendCurrentUserEmailVerificationCode(AuthenticatedIdentityContext context) {
+        requireAccessTokenContext(context);
+
+        try {
+            CodeDeliveryDetailsType delivery = client.getUserAttributeVerificationCode(GetUserAttributeVerificationCodeRequest.builder()
+                            .accessToken(context.bearerToken())
+                            .attributeName("email")
+                            .build())
+                    .codeDeliveryDetails();
+            return new EmailVerificationCodeDelivery(
+                    "email",
+                    delivery != null && delivery.deliveryMedium() != null ? delivery.deliveryMedium().name() : null,
+                    delivery != null ? delivery.destination() : null);
+        } catch (InvalidParameterException exception) {
+            throw new IllegalArgumentException(resolveAwsMessage(exception));
+        } catch (LimitExceededException exception) {
+            throw new RateLimitExceededException(
+                    "Cognito temporarily blocked email verification attempts. Wait a few minutes and try again.",
+                    exception);
+        } catch (NotAuthorizedException exception) {
+            throw new IllegalArgumentException("Email verification requires a valid Cognito access token. Sign in again and try once more.");
+        }
+    }
+
+    @Override
+    public CurrentUserEmailVerificationState verifyCurrentUserEmail(AuthenticatedIdentityContext context, String code) {
+        requireAccessTokenContext(context);
+
+        try {
+            client.verifyUserAttribute(VerifyUserAttributeRequest.builder()
+                    .accessToken(context.bearerToken())
+                    .attributeName("email")
+                    .code(code)
+                    .build());
+            return new CurrentUserEmailVerificationState(context.email(), true);
+        } catch (CodeMismatchException exception) {
+            throw new IllegalArgumentException("The email verification code is invalid.");
+        } catch (ExpiredCodeException exception) {
+            throw new IllegalArgumentException("The email verification code has expired. Request a new code and try again.");
+        } catch (LimitExceededException exception) {
+            throw new RateLimitExceededException(
+                    "Cognito temporarily blocked email verification attempts. Wait a few minutes and try again.",
+                    exception);
+        } catch (NotAuthorizedException exception) {
+            throw new IllegalArgumentException("Email verification requires a valid Cognito access token. Sign in again and try once more.");
+        }
+    }
+
     private void syncRoleGroup(Role previousRole, ManagedUser user) {
         if (previousRole != null && previousRole != user.role()) {
             client.adminRemoveUserFromGroup(AdminRemoveUserFromGroupRequest.builder()
@@ -231,5 +332,35 @@ final class CognitoUserIdentityGateway implements UserIdentityGateway, AutoClose
             normalizedRoles.add(Role.ADMIN);
         }
         return normalizedRoles;
+    }
+
+    private boolean isAccessTokenContext(AuthenticatedIdentityContext context) {
+        return "access".equalsIgnoreCase(context.tokenUse()) && StringUtils.hasText(context.bearerToken());
+    }
+
+    private void requireAccessTokenContext(AuthenticatedIdentityContext context) {
+        if (!isAccessTokenContext(context)) {
+            throw new IllegalArgumentException("Email verification requires a valid Cognito access token. Sign in again and try once more.");
+        }
+    }
+
+    private String attributeValue(List<AttributeType> attributes, String attributeName) {
+        return attributes.stream()
+                .filter(attribute -> attributeName.equals(attribute.name()))
+                .map(AttributeType::value)
+                .filter(StringUtils::hasText)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private boolean requiresVerifiedRecoveryChannel(InvalidParameterException exception) {
+        return resolveAwsMessage(exception).toLowerCase().contains("no registered/verified email or phone_number");
+    }
+
+    private String resolveAwsMessage(CognitoIdentityProviderException exception) {
+        if (exception.awsErrorDetails() != null && StringUtils.hasText(exception.awsErrorDetails().errorMessage())) {
+            return exception.awsErrorDetails().errorMessage();
+        }
+        return exception.getMessage();
     }
 }

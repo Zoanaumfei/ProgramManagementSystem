@@ -2,6 +2,9 @@ package com.oryzem.programmanagementsystem.app.web;
 
 import com.oryzem.programmanagementsystem.modules.operations.OperationNotFoundException;
 import com.oryzem.programmanagementsystem.platform.audit.RequestCorrelationContext;
+import com.oryzem.programmanagementsystem.platform.auth.AuthenticationFailedException;
+import com.oryzem.programmanagementsystem.platform.shared.ConflictException;
+import com.oryzem.programmanagementsystem.platform.shared.RateLimitExceededException;
 import com.oryzem.programmanagementsystem.platform.shared.ResourceNotFoundException;
 import com.oryzem.programmanagementsystem.platform.users.domain.UserNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -80,6 +83,30 @@ public class ApiExceptionHandler {
             HttpServletRequest request) {
         return ResponseEntity.badRequest()
                 .body(errorBody(request, HttpStatus.BAD_REQUEST, "Bad Request", exception.getMessage(), null));
+    }
+
+    @ExceptionHandler(AuthenticationFailedException.class)
+    public ResponseEntity<Map<String, Object>> handleAuthenticationFailed(
+            AuthenticationFailedException exception,
+            HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(errorBody(request, HttpStatus.UNAUTHORIZED, "Unauthorized", exception.getMessage(), null));
+    }
+
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<Map<String, Object>> handleConflict(
+            ConflictException exception,
+            HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(errorBody(request, HttpStatus.CONFLICT, "Conflict", exception.getMessage(), null));
+    }
+
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity<Map<String, Object>> handleRateLimitExceeded(
+            RateLimitExceededException exception,
+            HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .body(errorBody(request, HttpStatus.TOO_MANY_REQUESTS, "Too Many Requests", exception.getMessage(), null));
     }
 
     @ExceptionHandler(NoResourceFoundException.class)

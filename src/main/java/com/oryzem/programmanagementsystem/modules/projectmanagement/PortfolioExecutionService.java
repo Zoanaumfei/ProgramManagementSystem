@@ -181,9 +181,7 @@ class PortfolioExecutionService {
         ProjectEntity project = product.getProject();
         ProgramEntity program = project.getProgram();
         String sanitizedFileName = sanitizeFileName(fileName);
-        String keyPrefix = (documentProperties.keyPrefix() == null || documentProperties.keyPrefix().isBlank())
-                ? "portfolio"
-                : documentProperties.keyPrefix().trim();
+        String keyPrefix = normalizeKeyPrefix(documentProperties.keyPrefix());
         return "%s/organization/%s/program/%s/project/%s/deliverable/%s/document/%s/%s".formatted(
                 keyPrefix,
                 program.getOwnerOrganizationId(),
@@ -198,10 +196,18 @@ class PortfolioExecutionService {
         return fileName.trim().replaceAll("[^a-zA-Z0-9._-]", "_");
     }
 
+    private String normalizeKeyPrefix(String keyPrefix) {
+        String resolvedKeyPrefix = (keyPrefix == null || keyPrefix.isBlank())
+                ? "portfolio"
+                : keyPrefix.trim();
+        return resolvedKeyPrefix.replaceAll("^/+", "").replaceAll("/+$", "");
+    }
+
     private DocumentStorageObject documentStorageObject(DeliverableDocumentEntity document) {
         return new DocumentStorageObject(
                 document.getStorageBucket(),
                 document.getStorageKey(),
-                document.getContentType());
+                document.getContentType(),
+                document.getFileName());
     }
 }

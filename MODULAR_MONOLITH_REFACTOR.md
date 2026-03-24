@@ -281,7 +281,7 @@ Implemented by:
 - accepted the current modular-monolith layout as the baseline and stopped short of another broad package redesign
 - reduced bootstrap coupling by switching `BootstrapDataService` from concrete tenant/projectmanagement services to small module-facing ports
 - added ArchUnit guardrails for app/config scope, bootstrap boundaries, generic web buckets, shared neutrality and concrete repository leakage
-- kept the detailed shared context in `docs/context/` and preserved the root `PROJECT_CONTEXT.md` as a short entrypoint
+- kept the shared context centralized in `docs/context/PROJECT_CONTEXT.md` to avoid duplication
 - consolidated `platform.users` into explicit `api/application/domain/infrastructure` packages without changing behavior or contracts
 - moved user DTOs into `api`, orchestration services into `application`, core contracts into `domain`, and JPA/identity adapters into `infrastructure`
 - split stub and Cognito identity implementations into dedicated infrastructure files so tests no longer depend on package-private helpers

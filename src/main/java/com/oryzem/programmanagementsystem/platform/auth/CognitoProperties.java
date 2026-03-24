@@ -11,5 +11,6 @@ public record CognitoProperties(
         @NotBlank String issuerUri,
         @NotBlank String jwkSetUri,
         @NotBlank String appClientId,
+        String appClientSecret,
         List<String> allowedOrigins) {
 }

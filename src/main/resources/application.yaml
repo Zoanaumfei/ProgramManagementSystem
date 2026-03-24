@@ -50,6 +50,7 @@ app:
       issuer-uri: ${COGNITO_ISSUER_URI:https://cognito-idp.sa-east-1.amazonaws.com/sa-east-1_aA4I3tEmF}
       jwk-set-uri: ${COGNITO_JWK_SET_URI:https://cognito-idp.sa-east-1.amazonaws.com/sa-east-1_aA4I3tEmF/.well-known/jwks.json}
       app-client-id: ${COGNITO_APP_CLIENT_ID:rv7hk9nkugspb3i4p269sv828}
+      app-client-secret: ${COGNITO_APP_CLIENT_SECRET:}
       allowed-origins:
         - ${APP_ALLOWED_ORIGIN_LOCAL:http://localhost:3000}
         - ${APP_ALLOWED_ORIGIN_WEB:https://oryzem.com}

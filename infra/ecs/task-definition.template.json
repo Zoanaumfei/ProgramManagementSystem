@@ -44,7 +44,15 @@
         },
         {
           "name": "APP_PORTFOLIO_DOCUMENTS_PROVIDER",
-          "value": "stub"
+          "value": "s3"
+        },
+        {
+          "name": "APP_PORTFOLIO_DOCUMENTS_BUCKET_NAME",
+          "value": "__DOCUMENT_BUCKET_NAME__"
+        },
+        {
+          "name": "APP_PORTFOLIO_DOCUMENTS_KEY_PREFIX",
+          "value": "__DOCUMENT_KEY_PREFIX__"
         },
         {
           "name": "APP_SECURITY_IDENTITY_PROVIDER",
