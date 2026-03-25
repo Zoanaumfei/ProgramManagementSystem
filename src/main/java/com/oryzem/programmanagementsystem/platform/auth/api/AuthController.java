@@ -111,6 +111,7 @@ public class AuthController {
         body.put("emailVerified", emailVerificationState.emailVerified());
         body.put("emailVerificationRequired", emailVerificationState.emailVerificationRequired());
         body.put("tokenUse", jwt.getClaimAsString("token_use"));
+        body.put("userId", authenticatedUser.userId());
         body.put("tenantId", authenticatedUser.tenantId());
         body.put("membershipId", authenticatedUser.membershipId());
         body.put("activeTenantId", authenticatedUser.activeTenantId());

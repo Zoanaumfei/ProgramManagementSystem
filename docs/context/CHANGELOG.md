@@ -67,3 +67,5 @@ Ultima atualizacao: `2026-03-24`
 - Organizacoes raiz agora provisionam `tenant` explicito e o bootstrap/reset passou a limpar tambem as estruturas contextuais novas.
 - Fluxos de `users`, `portfolio` e `/api/auth/me` seguem compatíveis com campos legados durante a transicao.
 - A pasta `docs` foi realinhada ao modelo `User -> Membership -> Tenant / Organization / Market -> Role -> Permission`, incluindo contexto ativo e gaps atualizados.
+- O frontend passou a operar a trilha nova de acesso com seletor de contexto ativo no `AppShell`, administracao de memberships em `Users` e gestao de markets em `/workspace/markets`.
+- `/api/auth/me` passou a expor tambem `userId` para permitir que a UI resolva os memberships do proprio usuario sem heuristicas extras.

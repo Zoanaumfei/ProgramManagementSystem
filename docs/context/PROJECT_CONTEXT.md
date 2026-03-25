@@ -41,11 +41,16 @@ Ultima atualizacao: `2026-03-24`
 - `GET/POST/PUT/DELETE /api/access/users/{userId}/memberships`
 - `POST /api/access/context/activate`
 - `GET/POST/PUT/DELETE /api/access/tenants/{tenantId}/markets`
-- `GET /api/auth/me` agora reflete contexto ativo real e aceita `X-Access-Context` para troca por request.
+- `GET /api/auth/me` agora reflete contexto ativo real, expoe `userId` e aceita `X-Access-Context` para troca por request.
 - O fluxo atual de `users` continua funcional sem quebra abrupta, com sincronizacao incremental entre modelo legado e membership default.
 - A hierarquia externa por customer/subarvore continua sendo a base de visibilidade operacional do portfolio.
 - O backend continua entregando os modulos de organizacoes, portfolio, users, operations e reports.
 - O frontend ja consome login proprio via backend, verificacao explicita de email e os fluxos principais de portfolio e users.
+- O frontend agora tambem consome a trilha nova de acesso contextual:
+- seletor de contexto ativo no `AppShell`
+- administracao de memberships no workspace de users
+- superficie administrativa de markets em `/workspace/markets`
+- uso automatico de `X-Access-Context` para operar a sessao no membership selecionado
 
 ## Fluxos principais
 - `Tenant -> Organization -> Program -> Project -> Product -> Item -> Deliverable -> Document`
@@ -61,8 +66,8 @@ Ultima atualizacao: `2026-03-24`
 
 ## Proximos passos resumidos
 - Migrar o contrato principal de `users` para expor memberships como recurso de primeira classe.
-- Adotar a selecao de contexto ativo no frontend e nos fluxos administrativos.
-- Popular e administrar `tenant_market` com mercados reais de negocio.
+- Refinar a UX da trilha nova de memberships e reduzir dependencia visual do bloco legado de users.
+- Evoluir a superficie de `tenant_market` com filtros, busca e naming real de negocio.
 - Reduzir gradualmente a dependencia funcional de `app_user.role` e `app_user.tenant_id`.
 - Continuar a homologacao do fluxo de auth proprio e da operacao AWS para documentos em `S3` real.
 

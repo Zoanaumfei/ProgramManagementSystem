@@ -58,7 +58,7 @@ Ultima atualizacao: `2026-03-24`
 ### `GET /api/auth/me`
 - Uso: contexto autenticado atual.
 - Resposta atual inclui:
-- identidade: `subject`, `username`, `email`, `emailVerified`, `emailVerificationRequired`, `tokenUse`
+- identidade: `subject`, `userId`, `username`, `email`, `emailVerified`, `emailVerificationRequired`, `tokenUse`
 - contexto novo: `membershipId`, `activeTenantId`, `activeOrganizationId`, `activeMarketId`, `roles`, `permissions`
 - compatibilidade: `tenantId`, `tenantType`, `tenantIdClaim`, `tenantTypeClaim`, `userStatusClaim`
 - diagnostico: `groups`, `scopes`, `authorities`, `timestamp`

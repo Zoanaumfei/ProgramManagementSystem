@@ -10,15 +10,15 @@ Ultima atualizacao: `2026-03-24`
 - Status: aberto
 
 ## Adoção do contexto ativo no frontend
-- Descricao: o backend ja suporta `POST /api/access/context/activate` e `X-Access-Context`, mas a UI ainda nao permite trocar e visualizar o contexto ativo de forma nativa.
-- Impacto: usuarios multi-contexto ainda operam principalmente no membership default.
+- Descricao: a UI ja permite trocar e visualizar o contexto ativo no `AppShell`, mas ainda precisa de homologacao mais ampla e refinamento visual entre contexto request-scoped e default persistido.
+- Impacto: o fluxo principal existe, mas ainda ha risco de confusao operacional sem uma rodada final de UX e validacao manual.
 - Prioridade: P0
 - Area: frontend
 - Status: aberto
 
 ## Gestao funcional de markets na UI
-- Descricao: `tenant_market` ja existe com CRUD no backend, mas ainda nao ha superficie funcional no frontend para administrar mercados.
-- Impacto: a dimensao multi-market existe tecnicamente, mas ainda nao esta operacional para negocio.
+- Descricao: a superficie administrativa de markets ja existe em `/workspace/markets`, mas ainda precisa de homologacao com dados reais, filtros adicionais e naming final de negocio.
+- Impacto: a dimensao multi-market ja esta operacional na UI, porem ainda requer amadurecimento para escala e uso cotidiano.
 - Prioridade: P0
 - Area: frontend
 - Status: aberto
