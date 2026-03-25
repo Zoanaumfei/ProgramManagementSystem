@@ -15,7 +15,8 @@ Este documento registra a evolucao da hierarquia de `Organization` para um model
 ### Tenant
 - `tenant` representa o cliente SaaS.
 - Toda `organization` pertence a um `tenant`.
-- Tenant raiz e provisionado explicitamente para organizacoes raiz.
+- Organizacoes raiz externas passam a provisionar `tenant` explicito.
+- A relacao raiz `organization <-> tenant` ainda e proxima nesta fase, mas os conceitos continuam separados.
 
 ### Organization
 - `organization` continua representando a arvore operacional interna.
@@ -26,10 +27,12 @@ Este documento registra a evolucao da hierarquia de `Organization` para um model
 - `parent_organization_id`
 - `customer_organization_id`
 - `hierarchy_level`
+- A visibilidade continua descendente por subarvore.
 
 ### Market
-- `tenant_market` foi introduzido para representar a dimensao regional/comercial.
-- Nesta primeira fase, `market_id` em `organization` e `user_membership` e opcional.
+- `tenant_market` representa a dimensao regional/comercial do tenant.
+- `market_id` em `organization` e `user_membership` continua opcional.
+- Market nao substitui tenant nem organization; ele complementa o contexto.
 
 ### Membership
 - O usuario nao e mais a fonte principal de verdade para tenant e papel.
@@ -44,18 +47,19 @@ Este documento registra a evolucao da hierarquia de `Organization` para um model
 ## Regras de modelagem
 
 - `tenant != organization`
-- organizacao raiz nao deve ser tratada como sinonimo tecnico de tenant, embora exista relacao 1:1 para roots nesta fase
+- organizacao raiz nao deve ser tratada como sinonimo tecnico de tenant
 - `organization` preserva visibilidade por subarvore
 - `market` e opcional e nao quebra o modelo atual quando ausente
-- `tenant_type` segue existindo para compatibilidade e governanca, mas a fronteira real passa a ser `tenant`
+- `tenant_type` segue existindo para compatibilidade e governanca
+- `role` e `permission` sao resolvidos no contexto do membership
 
 ## Regras de cadastro
 
-- so `ADMIN + INTERNAL` pode criar uma organizacao raiz
-- criar raiz externa agora provisiona tambem um `tenant` explicito
+- so `ADMIN INTERNAL` pode criar uma organizacao raiz
+- criar raiz externa provisiona tambem um `tenant` explicito
 - `ADMIN` externo pode criar organizacoes filhas apenas dentro da propria subarvore
 - toda organizacao filha herda `tenant_id` do pai
-- `market_id` da organizacao filha herda do pai quando existir
+- `market_id` da organizacao filha pode ser herdado do pai quando aplicavel
 
 ## Regras de visibilidade
 
@@ -70,27 +74,28 @@ A visibilidade continua descendente por `organization`.
 
 - `AuthenticatedUser` agora carrega `membershipId`, `activeTenantId`, `activeOrganizationId` e `activeMarketId`
 - a aplicacao tenta resolver esse contexto via membership real
-- claims legadas de tenant no JWT seguem sendo apenas fallback/hint
-- servicos de users, tenant e portfolio passaram a separar melhor:
-- tenant boundary
-- organization scope
-- papel/permissao do contexto ativo
+- `POST /api/access/context/activate` permite trocar o membership default
+- `X-Access-Context` permite pedir um contexto especifico por request
+- claims legadas de tenant no JWT seguem sendo apenas fallback quando nao ha contexto resolvido localmente
+- servicos de users, tenant e portfolio passaram a separar melhor tenant boundary de organization scope
 
 ## Compatibilidade temporaria
 
 - `app_user.role`, `app_user.tenant_id` e `app_user.tenant_type` seguem presentes
 - salvar um `ManagedUser` sincroniza um membership default automaticamente
-- APIs de users continuam aceitando `organizationId` e `role` planos enquanto a administracao de memberships ainda nao foi exposta
-- a administracao de memberships e markets agora existe em `/api/access/*`, mas o contrato de users ainda nao foi migrado para retornar memberships como recurso principal
+- APIs de users continuam aceitando `organizationId` e `role` planos
+- a administracao de memberships e markets agora existe em `/api/access/*`
+- o contrato principal de `users` ainda nao foi migrado para usar memberships como recurso principal
 
 ## Migrations relevantes
 
 - `src/main/resources/db/migration/V6__add_organization_hierarchy.sql`
 - `src/main/resources/db/migration/V7__introduce_tenant_membership_and_market.sql`
+- `src/main/resources/db/migration/V8__allow_multiple_memberships_per_user.sql`
 
 ## Debitos ainda abertos
 
-- expor APIs de administracao de multiplos memberships por usuario
+- migrar a UX administrativa de users para memberships explicitos
 - popular `tenant_market` com mercados reais de negocio
 - remover dependencia funcional de `app_user.role` e `app_user.tenant_id`
-- revisar claims emitidas pelo Cognito para refletir melhor contexto ativo selecionavel
+- revisar claims emitidas pelo Cognito para refletir melhor o contexto ativo selecionavel

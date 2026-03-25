@@ -1,43 +1,57 @@
 # Open Gaps
 
-Ultima atualizacao: `2026-03-23`
+Ultima atualizacao: `2026-03-24`
 
-## Estabilizacao do runtime AWS do login proprio
-- Descricao: a correcao que impede o fallback indevido para `StubPublicAuthenticationGateway` ja esta em codigo, testada e publicada em imagem, mas a task `program-management-system:27` ainda nao estabilizou no ECS; ao fim do dia a task `:26` seguia atendendo o ALB em dev.
-- Impacto: enquanto a task corrigida nao assumir o trafego com estabilidade, a homologacao real do login proprio fica bloqueada e o ambiente de dev pode continuar respondendo com comportamento de `stub`.
-- Prioridade: P0
-- Area: integracao
-- Status: aberto
-
-## Homologacao real do login proprio com Cognito
-- Descricao: o frontend ja migrou para login proprio consumindo os endpoints publicos do backend, o app client ja aceita `ALLOW_USER_PASSWORD_AUTH` e o Cognito respondeu corretamente a `initiate-auth` direta; ainda falta validar ponta a ponta em runtime corrigido os fluxos de login, primeiro acesso, reset por codigo, restore de sessao e logout global.
-- Impacto: sem essa homologacao, ainda existe risco de divergencia entre o comportamento local, o runtime AWS e o app client real do Cognito.
-- Prioridade: P0
-- Area: integracao
-- Status: aberto
-
-## Remocao do fallback de id_token
-- Descricao: o `access_token` ja e a trilha principal e carrega claims de tenant; ainda falta decidir quando o fallback temporario de `id_token` pode ser removido com seguranca.
-- Impacto: complexidade extra no frontend e risco de comportamento diferente entre chamadas.
-- Prioridade: P0
-- Area: integracao
-- Status: aberto
-
-## Habilitacao operacional do app client para login proprio
-- Descricao: o app client ja recebeu `ALLOW_USER_PASSWORD_AUTH` e `ALLOW_ADMIN_USER_PASSWORD_AUTH`, mas ainda precisa ser homologado em uso real para refresh token e logout global na UI propria do PMS.
-- Impacto: a implementacao do frontend pode falhar em homologacao se ainda houver divergencia entre os flows habilitados e o comportamento real esperado no ambiente.
-- Prioridade: P0
-- Area: integracao
-- Status: aberto
-
-## Virada operacional do runtime AWS para documentos em S3
-- Descricao: o codigo ja suporta `S3` real e o frontend ja envia o binario ao presigned URL, mas o principal operacional atual nao possui `s3:CreateBucket` nem `iam:PutRolePolicy` para concluir bucket e permissao da task role no ambiente AWS.
-- Impacto: o runtime AWS segue preso ao provider `stub`, apesar de o fluxo real ja existir no codigo.
+## Adoção do modelo de membership no contrato principal de users
+- Descricao: o backend ja suporta multiplos memberships e possui API propria em `/api/access/*`, mas o contrato principal de `users` ainda permanece plano em `organizationId` e `role`.
+- Impacto: o modelo novo existe, mas parte importante da administracao ainda depende de compatibilidade legada.
 - Prioridade: P0
 - Area: backend
 - Status: aberto
 
-## Modelagem de entregavel do tipo FORM
+## Adoção do contexto ativo no frontend
+- Descricao: o backend ja suporta `POST /api/access/context/activate` e `X-Access-Context`, mas a UI ainda nao permite trocar e visualizar o contexto ativo de forma nativa.
+- Impacto: usuarios multi-contexto ainda operam principalmente no membership default.
+- Prioridade: P0
+- Area: frontend
+- Status: aberto
+
+## Gestao funcional de markets na UI
+- Descricao: `tenant_market` ja existe com CRUD no backend, mas ainda nao ha superficie funcional no frontend para administrar mercados.
+- Impacto: a dimensao multi-market existe tecnicamente, mas ainda nao esta operacional para negocio.
+- Prioridade: P0
+- Area: frontend
+- Status: aberto
+
+## Remocao progressiva do dual-write legado em user
+- Descricao: `app_user.role`, `app_user.tenant_id` e `app_user.tenant_type` ainda sao mantidos por compatibilidade.
+- Impacto: aumenta a complexidade e prolonga a necessidade de sincronizacao entre dois modelos.
+- Prioridade: P0
+- Area: arquitetura
+- Status: aberto
+
+## Claims do Cognito alinhadas ao novo contexto selecionavel
+- Descricao: o Cognito continua autenticando corretamente, mas os claims ainda refletem o modelo legado e nao representam plenamente a selecao dinamica de membership.
+- Impacto: os tokens continuam uteis para auth, mas nao expressam sozinhos o contexto contextual completo da aplicacao.
+- Prioridade: P1
+- Area: integracao
+- Status: aberto
+
+## Homologacao real do login proprio com Cognito
+- Descricao: o backend e o frontend ja suportam login proprio, primeiro acesso, reset por codigo, refresh e logout, mas a homologacao ponta a ponta ainda precisa continuar em runtime real.
+- Impacto: sem essa rodada final de integracao, ainda existe risco de divergencia entre ambiente local e ambiente AWS.
+- Prioridade: P1
+- Area: integracao
+- Status: aberto
+
+## Virada operacional do runtime AWS para documentos em S3
+- Descricao: o codigo ja suporta `S3` real e o frontend ja envia o binario ao presigned URL, mas a infraestrutura AWS ainda precisa ficar totalmente alinhada para abandonar o provider `stub`.
+- Impacto: parte do fluxo real ainda depende de homologacao operacional, nao de codigo.
+- Prioridade: P1
+- Area: backend
+- Status: aberto
+
+## Modelagem de deliverable do tipo FORM
 - Descricao: `FORM` existe no enum e no contrato de dominio, mas ainda nao tem shape persistente de perguntas, respostas e aprovacao.
 - Impacto: parte central do produto existe apenas como placeholder funcional.
 - Prioridade: P1
@@ -52,31 +66,10 @@ Ultima atualizacao: `2026-03-23`
 - Status: aberto
 
 ## Ownership detalhado das entidades do portfolio
-- Descricao: ownership de `Programa` esta implicito no owner organization, mas ownership operacional de `Projeto`, `Produto`, `Item`, `Entregavel` e `OpenIssue` ainda nao foi fechado como regra de negocio explicita.
+- Descricao: ownership de `Program` esta implicito no owner organization, mas ownership operacional de `Project`, `Product`, `Item`, `Deliverable` e `OpenIssue` ainda nao foi fechado como regra explicita.
 - Impacto: limita a evolucao de permissoes, auditoria de negocio e UX de responsabilidade.
 - Prioridade: P1
 - Area: negocio
-- Status: aberto
-
-## Visibilidade administrativa do status de verificacao de email
-- Descricao: a sessao autenticada ja enxerga `emailVerified`, mas o diretorio administrativo de usuarios ainda nao expoe o estado de verificacao de cada usuario gerenciado.
-- Impacto: administradores ainda descobrem a falta de verificacao apenas ao tentar `reset-access` ou via console do Cognito.
-- Prioridade: P1
-- Area: integracao
-- Status: aberto
-
-## principal=null em endpoints de ping
-- Descricao: ainda existe investigacao em aberto para casos em que `principal` aparece `null` em respostas de ping.
-- Impacto: ruido diagnostico e duvida sobre consistencia da autenticacao em alguns cenarios.
-- Prioridade: P1
-- Area: integracao
-- Status: aberto
-
-## UX hierarquica de organizacoes e portfolio herdado
-- Descricao: o backend ja entrega metadados hierarquicos completos, mas a UX ainda nao fechou como representar arvore, portfolio proprio e portfolio herdado da subarvore.
-- Impacto: risco de leitura confusa conforme a arvore crescer.
-- Prioridade: P1
-- Area: frontend
 - Status: aberto
 
 ## Paginacao, busca e escala de volume
@@ -87,8 +80,8 @@ Ultima atualizacao: `2026-03-23`
 - Status: aberto
 
 ## Protecao arquitetural profunda entre modulos
-- Descricao: guardrails basicos com ArchUnit ja existem, mas ainda nao ha cobertura profunda para todos os agrupamentos internos de `tenant`, `documents` e `projectmanagement`.
-- Impacto: a base esta protegida contra regressao estrutural obvia, mas nao contra toda forma de acoplamento fino.
+- Descricao: guardrails basicos com ArchUnit ja existem, mas ainda nao ha cobertura profunda para todos os agrupamentos internos de `access`, `tenant`, `documents` e `projectmanagement`.
+- Impacto: a base esta protegida contra regressao estrutural obvia, mas nao contra todo acoplamento fino.
 - Prioridade: P2
 - Area: arquitetura
 - Status: aberto

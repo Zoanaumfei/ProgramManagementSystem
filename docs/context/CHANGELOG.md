@@ -66,3 +66,4 @@ Ultima atualizacao: `2026-03-24`
 - O backend passou a aceitar `X-Access-Context` para trocar o contexto ativo por request sem alterar o token do Cognito.
 - Organizacoes raiz agora provisionam `tenant` explicito e o bootstrap/reset passou a limpar tambem as estruturas contextuais novas.
 - Fluxos de `users`, `portfolio` e `/api/auth/me` seguem compatíveis com campos legados durante a transicao.
+- A pasta `docs` foi realinhada ao modelo `User -> Membership -> Tenant / Organization / Market -> Role -> Permission`, incluindo contexto ativo e gaps atualizados.
