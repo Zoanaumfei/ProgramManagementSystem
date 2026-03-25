@@ -2,6 +2,7 @@ package com.oryzem.programmanagementsystem.platform.auth.api;
 
 import com.oryzem.programmanagementsystem.platform.authorization.AuthenticatedUser;
 import com.oryzem.programmanagementsystem.platform.authorization.AuthenticatedUserMapper;
+import com.oryzem.programmanagementsystem.platform.access.ActiveAccessContextDescriptorService;
 import com.oryzem.programmanagementsystem.platform.auth.AuthEmailVerificationService;
 import com.oryzem.programmanagementsystem.platform.auth.CognitoProperties;
 import com.oryzem.programmanagementsystem.platform.auth.CurrentUserEmailVerificationState;
@@ -36,16 +37,19 @@ public class AuthController {
 
     private final CognitoProperties cognitoProperties;
     private final AuthenticatedUserMapper authenticatedUserMapper;
+    private final ActiveAccessContextDescriptorService activeAccessContextDescriptorService;
     private final AuthEmailVerificationService authEmailVerificationService;
     private final PublicAuthenticationService publicAuthenticationService;
 
     public AuthController(
             CognitoProperties cognitoProperties,
             AuthenticatedUserMapper authenticatedUserMapper,
+            ActiveAccessContextDescriptorService activeAccessContextDescriptorService,
             AuthEmailVerificationService authEmailVerificationService,
             PublicAuthenticationService publicAuthenticationService) {
         this.cognitoProperties = cognitoProperties;
         this.authenticatedUserMapper = authenticatedUserMapper;
+        this.activeAccessContextDescriptorService = activeAccessContextDescriptorService;
         this.authEmailVerificationService = authEmailVerificationService;
         this.publicAuthenticationService = publicAuthenticationService;
     }
@@ -99,6 +103,11 @@ public class AuthController {
         JwtAuthenticationToken jwtAuthentication = (JwtAuthenticationToken) authentication;
         Jwt jwt = jwtAuthentication.getToken();
         AuthenticatedUser authenticatedUser = authenticatedUserMapper.from(authentication);
+        ActiveAccessContextDescriptorService.ActiveAccessContextLabels activeContextLabels =
+                activeAccessContextDescriptorService.describe(
+                        authenticatedUser.activeTenantId(),
+                        authenticatedUser.activeOrganizationId(),
+                        authenticatedUser.activeMarketId());
         CurrentUserEmailVerificationState emailVerificationState = authEmailVerificationService.describe(authentication);
 
         Map<String, Object> body = new LinkedHashMap<>();
@@ -115,8 +124,11 @@ public class AuthController {
         body.put("tenantId", authenticatedUser.tenantId());
         body.put("membershipId", authenticatedUser.membershipId());
         body.put("activeTenantId", authenticatedUser.activeTenantId());
+        body.put("activeTenantName", activeContextLabels.tenantName());
         body.put("activeOrganizationId", authenticatedUser.activeOrganizationId());
+        body.put("activeOrganizationName", activeContextLabels.organizationName());
         body.put("activeMarketId", authenticatedUser.activeMarketId());
+        body.put("activeMarketName", activeContextLabels.marketName());
         body.put("tenantType", authenticatedUser.tenantType() != null ? authenticatedUser.tenantType().name() : null);
         body.put("tenantIdClaim", firstNonBlank(
                 jwt.getClaimAsString(TENANT_ID_CLAIM),

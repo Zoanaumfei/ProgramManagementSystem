@@ -171,7 +171,8 @@ class AuthControllerSecurityTest {
     void meShouldRequireAuthentication() throws Exception {
         mockMvc.perform(get("/api/auth/me"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error").value("Unauthorized"));
+                .andExpect(jsonPath("$.error").value("Unauthorized"))
+                .andExpect(jsonPath("$.correlationId").isNotEmpty());
     }
 
     @Test
@@ -288,7 +289,8 @@ class AuthControllerSecurityTest {
     @Test
     void logoutShouldRequireAuthentication() throws Exception {
         mockMvc.perform(post("/api/auth/logout"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.correlationId").isNotEmpty());
     }
 
     @Test

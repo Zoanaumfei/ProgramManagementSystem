@@ -1,5 +1,6 @@
 package com.oryzem.programmanagementsystem.platform.auth;
 
+import com.oryzem.programmanagementsystem.platform.audit.RequestCorrelationContext;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -16,6 +17,13 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class AuthenticationLoggingFilter extends OncePerRequestFilter {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(AuthenticationLoggingFilter.class);
+    private static final String ACCESS_CONTEXT_HEADER = "X-Access-Context";
+
+    private final RequestCorrelationContext requestCorrelationContext;
+
+    public AuthenticationLoggingFilter(RequestCorrelationContext requestCorrelationContext) {
+        this.requestCorrelationContext = requestCorrelationContext;
+    }
 
     @Override
     protected void doFilterInternal(
@@ -26,6 +34,8 @@ public class AuthenticationLoggingFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String requestedAccessContext = request.getHeader(ACCESS_CONTEXT_HEADER);
+        String correlationId = requestCorrelationContext.getOrCreate();
         if (authentication instanceof JwtAuthenticationToken jwtAuthentication && authentication.isAuthenticated()) {
             String authorities = authentication.getAuthorities().stream()
                     .map(Object::toString)
@@ -33,13 +43,32 @@ public class AuthenticationLoggingFilter extends OncePerRequestFilter {
                     .collect(Collectors.joining(","));
 
             LOGGER.info(
-                    "Authenticated request. method={}, path={}, subject={}, username={}, authorities={}, status={}",
+                    "Authenticated request. method={}, path={}, subject={}, username={}, authorities={}, status={}, correlationId={}, accessContextPresent={}, accessContext={}",
                     request.getMethod(),
                     request.getRequestURI(),
                     jwtAuthentication.getToken().getSubject(),
                     authentication.getName(),
                     authorities,
-                    response.getStatus());
+                    response.getStatus(),
+                    correlationId,
+                    requestedAccessContext != null && !requestedAccessContext.isBlank(),
+                    sanitize(requestedAccessContext));
+        } else {
+            LOGGER.info(
+                    "Anonymous request. method={}, path={}, status={}, correlationId={}, accessContextPresent={}, accessContext={}",
+                    request.getMethod(),
+                    request.getRequestURI(),
+                    response.getStatus(),
+                    correlationId,
+                    requestedAccessContext != null && !requestedAccessContext.isBlank(),
+                    sanitize(requestedAccessContext));
         }
+    }
+
+    private String sanitize(String value) {
+        if (value == null || value.isBlank()) {
+            return "-";
+        }
+        return value.trim();
     }
 }

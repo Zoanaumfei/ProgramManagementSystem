@@ -75,6 +75,12 @@ public class AccessAdministrationController {
         return accessAdministrationService.activateMembership(actor, request);
     }
 
+    @GetMapping("/tenants")
+    public List<TenantSummaryResponse> listVisibleTenants(Authentication authentication) {
+        AuthenticatedUser actor = authenticatedUserMapper.from(authentication);
+        return accessAdministrationService.listVisibleTenants(actor);
+    }
+
     @GetMapping("/tenants/{tenantId}/markets")
     public List<TenantMarketResponse> listTenantMarkets(
             Authentication authentication,

@@ -10,17 +10,24 @@ Ultima atualizacao: `2026-03-24`
 - Status: aberto
 
 ## Adoção do contexto ativo no frontend
-- Descricao: a UI ja permite trocar e visualizar o contexto ativo no `AppShell`, mas ainda precisa de homologacao mais ampla e refinamento visual entre contexto request-scoped e default persistido.
-- Impacto: o fluxo principal existe, mas ainda ha risco de confusao operacional sem uma rodada final de UX e validacao manual.
+- Descricao: a UI ja permite trocar e visualizar o contexto ativo no `AppShell`, agora com invalidação seletiva de cache e observabilidade, mas ainda precisa de homologacao mais ampla entre perfis reais.
+- Impacto: o fluxo principal esta mais robusto, porem ainda ha risco residual sem rodada final de UX e validacao manual multi-tenant.
 - Prioridade: P0
 - Area: frontend
 - Status: aberto
 
 ## Gestao funcional de markets na UI
-- Descricao: a superficie administrativa de markets ja existe em `/workspace/markets`, mas ainda precisa de homologacao com dados reais, filtros adicionais e naming final de negocio.
+- Descricao: a superficie administrativa de markets ja existe em `/workspace/markets`, com tenant label explicito via `/api/access/tenants`, mas ainda precisa de homologacao com dados reais, filtros adicionais e naming final de negocio.
 - Impacto: a dimensao multi-market ja esta operacional na UI, porem ainda requer amadurecimento para escala e uso cotidiano.
 - Prioridade: P0
 - Area: frontend
+- Status: aberto
+
+## Homologacao operacional final do contexto ativo
+- Descricao: backend e frontend ja expõem `correlationId`, logs estruturados e checklist de validacao, mas ainda falta executar a homologacao guiada em ambiente alvo com usuarios multi-membership e multi-market.
+- Impacto: sem essa rodada final, permanece risco residual em troca de contexto persistente, membership inativado durante sessao e inativacao de market em uso.
+- Prioridade: P0
+- Area: operacao
 - Status: aberto
 
 ## Remocao progressiva do dual-write legado em user

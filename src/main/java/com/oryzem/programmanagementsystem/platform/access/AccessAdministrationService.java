@@ -29,6 +29,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +38,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @Transactional
 public class AccessAdministrationService {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(AccessAdministrationService.class);
 
     private final UserRepository userRepository;
     private final OrganizationLookup organizationLookup;
@@ -181,9 +185,28 @@ public class AccessAdministrationService {
             membershipRepository.save(membership);
         }
 
+        LOGGER.info(
+                "Access context switch requested. actorUserId={}, previousMembershipId={}, nextMembershipId={}, makeDefault={}, tenantId={}, organizationId={}, marketId={}",
+                actor.userId(),
+                actor.membershipId(),
+                membership.getId(),
+                request.makeDefault(),
+                membership.getTenantId(),
+                membership.getOrganizationId(),
+                membership.getMarketId());
+
         ManagedUser user = findRequiredUser(actor.userId());
         ResolvedMembershipContext context = accessContextService.resolveActiveContext(user, membership.getId())
                 .orElseThrow(() -> new IllegalArgumentException("Unable to resolve active access context for membership."));
+        LOGGER.info(
+                "Access context switch resolved. actorUserId={}, previousMembershipId={}, activeMembershipId={}, activeTenantId={}, activeOrganizationId={}, activeMarketId={}, makeDefault={}",
+                actor.userId(),
+                actor.membershipId(),
+                context.membershipId(),
+                context.activeTenantId(),
+                context.activeOrganizationId(),
+                context.activeMarketId(),
+                request.makeDefault());
         return new ActiveAccessContextResponse(
                 context.userId(),
                 context.membershipId(),
@@ -193,6 +216,21 @@ public class AccessAdministrationService {
                 context.tenantType(),
                 context.roles().stream().map(Enum::name).sorted().toList(),
                 context.permissions().stream().sorted().toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<com.oryzem.programmanagementsystem.platform.access.api.TenantSummaryResponse> listVisibleTenants(
+            AuthenticatedUser actor) {
+        return tenantRepository.findAllByOrderByNameAsc().stream()
+                .filter(tenant -> canViewTenant(actor, tenant))
+                .map(tenant -> new com.oryzem.programmanagementsystem.platform.access.api.TenantSummaryResponse(
+                        tenant.getId(),
+                        tenant.getName(),
+                        tenant.getCode(),
+                        tenant.getStatus().name(),
+                        tenant.getTenantType().name(),
+                        tenant.getRootOrganizationId()))
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -480,6 +518,15 @@ public class AccessAdministrationService {
         }
 
         throw new AccessDeniedException("Tenant scope mismatch for requested operation.");
+    }
+
+    private boolean canViewTenant(AuthenticatedUser actor, TenantEntity tenant) {
+        try {
+            assertTenantActionAllowed(actor, tenant, Action.VIEW);
+            return true;
+        } catch (AccessDeniedException exception) {
+            return false;
+        }
     }
 
     private void assertAllowed(AuthorizationDecision decision) {

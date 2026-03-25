@@ -111,7 +111,9 @@ class AccessAdministrationControllerTest {
         mockMvc.perform(get("/api/auth/me")
                         .with(tenantAUser()))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value("USR-EXT-A-MEM-001"))
                 .andExpect(jsonPath("$.activeTenantId").value("TEN-tenant-a"))
+                .andExpect(jsonPath("$.activeTenantName").value("Tenant A"))
                 .andExpect(jsonPath("$.activeOrganizationId").value("tenant-a"));
 
         mockMvc.perform(get("/api/auth/me")
@@ -206,6 +208,23 @@ class AccessAdministrationControllerTest {
                         .with(internalAdmin()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Market cannot be inactivated while referenced by an active membership."));
+    }
+
+    @Test
+    void shouldListVisibleTenantsForInternalAdmin() throws Exception {
+        mockMvc.perform(get("/api/access/tenants")
+                        .with(internalAdmin()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].id", hasItem("TEN-tenant-a")))
+                .andExpect(jsonPath("$[*].name", hasItem("Tenant A")));
+    }
+
+    @Test
+    void visibleTenantsShouldRequireAuthentication() throws Exception {
+        mockMvc.perform(get("/api/access/tenants"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").value("Unauthorized"))
+                .andExpect(jsonPath("$.correlationId").isNotEmpty());
     }
 
     @Test

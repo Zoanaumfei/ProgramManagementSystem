@@ -1,5 +1,6 @@
 package com.oryzem.programmanagementsystem.platform.auth;
 
+import com.oryzem.programmanagementsystem.platform.audit.RequestCorrelationContext;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -19,11 +20,16 @@ import tools.jackson.databind.ObjectMapper;
 public class JsonAccessDeniedHandler implements AccessDeniedHandler {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(JsonAccessDeniedHandler.class);
+    private static final String ACCESS_CONTEXT_HEADER = "X-Access-Context";
 
     private final ObjectMapper objectMapper;
+    private final RequestCorrelationContext requestCorrelationContext;
 
-    public JsonAccessDeniedHandler(ObjectMapper objectMapper) {
+    public JsonAccessDeniedHandler(
+            ObjectMapper objectMapper,
+            RequestCorrelationContext requestCorrelationContext) {
         this.objectMapper = objectMapper;
+        this.requestCorrelationContext = requestCorrelationContext;
     }
 
     @Override
@@ -34,13 +40,18 @@ public class JsonAccessDeniedHandler implements AccessDeniedHandler {
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String principalName = authentication != null ? authentication.getName() : "anonymous";
+        String requestedAccessContext = request.getHeader(ACCESS_CONTEXT_HEADER);
+        String correlationId = requestCorrelationContext.getOrCreate();
 
         LOGGER.warn(
-                "Access denied. method={}, path={}, principal={}, reason={}",
+                "Access denied. method={}, path={}, principal={}, reason={}, correlationId={}, accessContextPresent={}, accessContext={}",
                 request.getMethod(),
                 request.getRequestURI(),
                 principalName,
-                accessDeniedException.getMessage());
+                accessDeniedException.getMessage(),
+                correlationId,
+                requestedAccessContext != null && !requestedAccessContext.isBlank(),
+                sanitize(requestedAccessContext));
 
         response.setStatus(HttpStatus.FORBIDDEN.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
@@ -53,6 +64,14 @@ public class JsonAccessDeniedHandler implements AccessDeniedHandler {
         body.put("status", status.value());
         body.put("error", error);
         body.put("path", request.getRequestURI());
+        body.put("correlationId", requestCorrelationContext.getOrCreate());
         return body;
+    }
+
+    private String sanitize(String value) {
+        if (value == null || value.isBlank()) {
+            return "-";
+        }
+        return value.trim();
     }
 }

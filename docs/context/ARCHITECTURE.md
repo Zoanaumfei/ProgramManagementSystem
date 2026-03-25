@@ -56,6 +56,7 @@ Ultima atualizacao: `2026-03-24`
 
 ### `platform.audit`
 - Auditoria persistente e correlacao de requests.
+- `RequestCorrelationFilter` propaga `X-Correlation-Id` e apoia rastreio do fluxo de troca de contexto.
 
 ### `platform.tenant`
 - Organizacoes, hierarquia por subarvore, fronteira organizacional e purge operacional.
@@ -90,6 +91,12 @@ Ultima atualizacao: `2026-03-24`
 - `AuthenticatedUser` agora carrega identidade global e contexto ativo de membership.
 - `AuthenticatedUserMapper` tenta resolver membership real primeiro e cai para claims legadas apenas como fallback.
 - `GET /api/auth/me` ja expone o contexto ativo, sem remover os campos legados de compatibilidade.
+- `AuthenticationLoggingFilter`, `JsonAuthenticationEntryPoint` e `JsonAccessDeniedHandler` registram `correlationId`, presenca de `X-Access-Context` e falhas de autorizacao apos troca de contexto.
+
+## Observabilidade e cache
+- Context switch agora e rastreavel ponta a ponta por `correlationId`, `membershipId` anterior/novo e `makeDefault`.
+- O frontend centraliza logs estruturados em `src/lib/observability.js` para requests com e sem `X-Access-Context`.
+- A UI deixou de usar invalidador amplo no switch de contexto e passou a invalidar seletivamente dominios de `current-user`, `access`, `users`, `portfolio` e `organizations`.
 
 ## Compatibilidade incremental
 - `app_user.role`, `app_user.tenant_id` e `app_user.tenant_type` seguem persistidos temporariamente.

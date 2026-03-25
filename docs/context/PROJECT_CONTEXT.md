@@ -40,8 +40,10 @@ Ultima atualizacao: `2026-03-24`
 - O backend ja expoe:
 - `GET/POST/PUT/DELETE /api/access/users/{userId}/memberships`
 - `POST /api/access/context/activate`
+- `GET /api/access/tenants`
 - `GET/POST/PUT/DELETE /api/access/tenants/{tenantId}/markets`
 - `GET /api/auth/me` agora reflete contexto ativo real, expoe `userId` e aceita `X-Access-Context` para troca por request.
+- `GET /api/auth/me` tambem expone `activeTenantName`, `activeOrganizationName` e `activeMarketName` para labels confiaveis na UI.
 - O fluxo atual de `users` continua funcional sem quebra abrupta, com sincronizacao incremental entre modelo legado e membership default.
 - A hierarquia externa por customer/subarvore continua sendo a base de visibilidade operacional do portfolio.
 - O backend continua entregando os modulos de organizacoes, portfolio, users, operations e reports.
@@ -49,8 +51,11 @@ Ultima atualizacao: `2026-03-24`
 - O frontend agora tambem consome a trilha nova de acesso contextual:
 - seletor de contexto ativo no `AppShell`
 - administracao de memberships no workspace de users
+- listagem de tenants visiveis via `/api/access/tenants` para abastecer markets e memberships
 - superficie administrativa de markets em `/workspace/markets`
 - uso automatico de `X-Access-Context` para operar a sessao no membership selecionado
+- logs estruturados e `correlationId` para rastrear context switch e falhas de autorizacao relacionadas
+- invalidação seletiva de cache por dominio apos context switch
 
 ## Fluxos principais
 - `Tenant -> Organization -> Program -> Project -> Product -> Item -> Deliverable -> Document`
@@ -67,8 +72,9 @@ Ultima atualizacao: `2026-03-24`
 ## Proximos passos resumidos
 - Migrar o contrato principal de `users` para expor memberships como recurso de primeira classe.
 - Refinar a UX da trilha nova de memberships e reduzir dependencia visual do bloco legado de users.
-- Evoluir a superficie de `tenant_market` com filtros, busca e naming real de negocio.
+- Evoluir a superficie de `tenant_market` com filtros, busca e naming real de negocio, agora usando `GET /api/access/tenants` como fonte primaria de selecao de tenant.
 - Reduzir gradualmente a dependencia funcional de `app_user.role` e `app_user.tenant_id`.
+- Executar o checklist de homologacao multi-membership/multi-market e o plano de rollback funcional documentado.
 - Continuar a homologacao do fluxo de auth proprio e da operacao AWS para documentos em `S3` real.
 
 ## Navegacao
@@ -78,4 +84,5 @@ Ultima atualizacao: `2026-03-24`
 - [Arquitetura atual](./ARCHITECTURE.md)
 - [Decisoes ativas e temporarias](./DECISIONS.md)
 - [Gaps reais ainda abertos](./OPEN_GAPS.md)
+- [Checklist de homologacao e rollback](./HOMOLOGATION_CHECKLIST.md)
 - [Historico resumido](./CHANGELOG.md)

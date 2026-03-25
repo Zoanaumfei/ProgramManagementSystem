@@ -1,6 +1,7 @@
 package com.oryzem.programmanagementsystem.platform.auth;
 
 import com.oryzem.programmanagementsystem.platform.audit.RequestCorrelationFilter;
+import com.oryzem.programmanagementsystem.platform.audit.RequestCorrelationContext;
 import com.oryzem.programmanagementsystem.platform.auth.AuthenticationLoggingFilter;
 import com.oryzem.programmanagementsystem.platform.auth.CognitoAudienceValidator;
 import com.oryzem.programmanagementsystem.platform.auth.CognitoJwtAuthenticationConverter;
@@ -40,6 +41,7 @@ public class SecurityConfig {
             HttpSecurity http,
             JwtDecoder jwtDecoder,
             RequestCorrelationFilter requestCorrelationFilter,
+            RequestCorrelationContext requestCorrelationContext,
             AuthenticatedUserSynchronizationFilter authenticatedUserSynchronizationFilter,
             ObjectMapper objectMapper) throws Exception {
 
@@ -60,10 +62,10 @@ public class SecurityConfig {
                         .jwt(jwt -> jwt
                                 .decoder(jwtDecoder)
                                 .jwtAuthenticationConverter(new CognitoJwtAuthenticationConverter())))
-                .exceptionHandling(exceptionHandling(objectMapper))
+                .exceptionHandling(exceptionHandling(objectMapper, requestCorrelationContext))
                 .addFilterBefore(requestCorrelationFilter, BearerTokenAuthenticationFilter.class)
                 .addFilterAfter(authenticatedUserSynchronizationFilter, BearerTokenAuthenticationFilter.class)
-                .addFilterAfter(new AuthenticationLoggingFilter(), AuthenticatedUserSynchronizationFilter.class);
+                .addFilterAfter(new AuthenticationLoggingFilter(requestCorrelationContext), AuthenticatedUserSynchronizationFilter.class);
 
         return http.build();
     }
@@ -86,8 +88,8 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(cognitoProperties.allowedOrigins());
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "Origin"));
-        configuration.setExposedHeaders(List.of("Location"));
+        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "Origin", "X-Access-Context", "X-Correlation-Id"));
+        configuration.setExposedHeaders(List.of("Location", "X-Correlation-Id"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 
@@ -96,10 +98,12 @@ public class SecurityConfig {
         return source;
     }
 
-    private Customizer<ExceptionHandlingConfigurer<HttpSecurity>> exceptionHandling(ObjectMapper objectMapper) {
+    private Customizer<ExceptionHandlingConfigurer<HttpSecurity>> exceptionHandling(
+            ObjectMapper objectMapper,
+            RequestCorrelationContext requestCorrelationContext) {
         return exceptionHandling -> exceptionHandling
-                .authenticationEntryPoint(new JsonAuthenticationEntryPoint(objectMapper))
-                .accessDeniedHandler(new JsonAccessDeniedHandler(objectMapper));
+                .authenticationEntryPoint(new JsonAuthenticationEntryPoint(objectMapper, requestCorrelationContext))
+                .accessDeniedHandler(new JsonAccessDeniedHandler(objectMapper, requestCorrelationContext));
     }
 }
 

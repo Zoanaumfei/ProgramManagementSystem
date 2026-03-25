@@ -1,5 +1,6 @@
 package com.oryzem.programmanagementsystem.platform.auth;
 
+import com.oryzem.programmanagementsystem.platform.audit.RequestCorrelationContext;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -17,11 +18,16 @@ import tools.jackson.databind.ObjectMapper;
 public class JsonAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(JsonAuthenticationEntryPoint.class);
+    private static final String ACCESS_CONTEXT_HEADER = "X-Access-Context";
 
     private final ObjectMapper objectMapper;
+    private final RequestCorrelationContext requestCorrelationContext;
 
-    public JsonAuthenticationEntryPoint(ObjectMapper objectMapper) {
+    public JsonAuthenticationEntryPoint(
+            ObjectMapper objectMapper,
+            RequestCorrelationContext requestCorrelationContext) {
         this.objectMapper = objectMapper;
+        this.requestCorrelationContext = requestCorrelationContext;
     }
 
     @Override
@@ -29,12 +35,17 @@ public class JsonAuthenticationEntryPoint implements AuthenticationEntryPoint {
             HttpServletRequest request,
             HttpServletResponse response,
             AuthenticationException authException) throws IOException {
+        String requestedAccessContext = request.getHeader(ACCESS_CONTEXT_HEADER);
+        String correlationId = requestCorrelationContext.getOrCreate();
 
         LOGGER.warn(
-                "Authentication failed. method={}, path={}, reason={}",
+                "Authentication failed. method={}, path={}, reason={}, correlationId={}, accessContextPresent={}, accessContext={}",
                 request.getMethod(),
                 request.getRequestURI(),
-                authException.getMessage());
+                authException.getMessage(),
+                correlationId,
+                requestedAccessContext != null && !requestedAccessContext.isBlank(),
+                sanitize(requestedAccessContext));
 
         response.setStatus(HttpStatus.UNAUTHORIZED.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
@@ -47,6 +58,14 @@ public class JsonAuthenticationEntryPoint implements AuthenticationEntryPoint {
         body.put("status", status.value());
         body.put("error", error);
         body.put("path", request.getRequestURI());
+        body.put("correlationId", requestCorrelationContext.getOrCreate());
         return body;
+    }
+
+    private String sanitize(String value) {
+        if (value == null || value.isBlank()) {
+            return "-";
+        }
+        return value.trim();
     }
 }

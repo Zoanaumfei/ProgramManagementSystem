@@ -69,3 +69,9 @@ Ultima atualizacao: `2026-03-24`
 - A pasta `docs` foi realinhada ao modelo `User -> Membership -> Tenant / Organization / Market -> Role -> Permission`, incluindo contexto ativo e gaps atualizados.
 - O frontend passou a operar a trilha nova de acesso com seletor de contexto ativo no `AppShell`, administracao de memberships em `Users` e gestao de markets em `/workspace/markets`.
 - `/api/auth/me` passou a expor tambem `userId` para permitir que a UI resolva os memberships do proprio usuario sem heuristicas extras.
+- Entrou a fase 2 de consolidacao do Core de Acesso, com logs estruturados e `correlationId` no backend e frontend para troca de contexto, requests com/sem `X-Access-Context` e falhas `401/403` relacionadas.
+- O frontend deixou de usar invalidação ampla no context switch e passou a invalidar seletivamente os dominios de `current-user`, `access`, `users`, `portfolio` e `organizations`.
+- `GET /api/auth/me` passou a expor tambem `activeTenantName`, `activeOrganizationName` e `activeMarketName` para labels confiaveis na UI.
+- `GET /api/access/tenants` passou a ser a fonte explicita de tenant label no frontend, sem heuristica via organizacoes visiveis.
+- O bloco legado de `/api/users` foi reforcado como trilha de compatibilidade, com guardrail explicito para evitar uso como superficie primaria de telas novas.
+- Foi adicionado checklist de homologacao manual multi-membership/multi-market e plano funcional de rollback em `docs/context/HOMOLOGATION_CHECKLIST.md`.

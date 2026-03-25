@@ -4,6 +4,7 @@ Ultima atualizacao: `2026-03-24`
 
 ## Auth e erros
 - Backend protegido por Bearer JWT do Cognito.
+- `X-Correlation-Id` e aceito como header de entrada e devolvido nas respostas para rastreio ponta a ponta.
 - Endpoints publicos atuais:
 - `GET /public/ping`
 - `GET /public/auth/config`
@@ -19,7 +20,8 @@ Ultima atualizacao: `2026-03-24`
 - `403` e retornado quando a sessao autenticada nao possui permissao.
 - `409` e retornado para conflitos de negocio tratados.
 - `429` e retornado quando o Cognito aplica rate limit tratado pelo backend.
-- `404` e `500` retornam JSON com `correlationId`.
+- `401`, `403`, `404` e `500` retornam JSON com `correlationId`.
+- Requests autenticados e anonimos agora geram log estruturado com presenca/ausencia de `X-Access-Context`.
 
 ## Sessao e autorizacao
 ### `GET /public/auth/config`
@@ -59,11 +61,12 @@ Ultima atualizacao: `2026-03-24`
 - Uso: contexto autenticado atual.
 - Resposta atual inclui:
 - identidade: `subject`, `userId`, `username`, `email`, `emailVerified`, `emailVerificationRequired`, `tokenUse`
-- contexto novo: `membershipId`, `activeTenantId`, `activeOrganizationId`, `activeMarketId`, `roles`, `permissions`
+- contexto novo: `membershipId`, `activeTenantId`, `activeTenantName`, `activeOrganizationId`, `activeOrganizationName`, `activeMarketId`, `activeMarketName`, `roles`, `permissions`
 - compatibilidade: `tenantId`, `tenantType`, `tenantIdClaim`, `tenantTypeClaim`, `userStatusClaim`
 - diagnostico: `groups`, `scopes`, `authorities`, `timestamp`
 - Header opcional: `X-Access-Context`
 - Efeito do header: permite pedir um membership/contexto especifico por request sem trocar o default persistido.
+- Header de resposta: `X-Correlation-Id`
 
 ## Access
 ### `GET /api/access/users/{userId}/memberships`
@@ -89,6 +92,13 @@ Ultima atualizacao: `2026-03-24`
 - Request: `membershipId`, `makeDefault`.
 - Response: `ActiveAccessContextResponse`.
 - Observacao: com `makeDefault=true`, o membership passa a ser o contexto default resolvido pela aplicacao.
+- Observabilidade: backend registra `membershipId` anterior/novo, `makeDefault`, tenant, organization, market e `correlationId`.
+
+### `GET /api/access/tenants`
+- Uso: listar os tenants visiveis para o ator autenticado no contexto atual.
+- Response: lista de `TenantSummaryResponse`.
+- Campos principais: `id`, `name`, `code`, `status`, `tenantType`, `rootOrganizationId`.
+- Observacao: esta e a fonte explicita de label de tenant para o frontend; nao deve haver inferencia de tenant por organizacoes visiveis.
 
 ### `GET /api/access/tenants/{tenantId}/markets`
 - Uso: listar markets de um tenant.
@@ -193,6 +203,6 @@ Ultima atualizacao: `2026-03-24`
 - `DELETE /api/portfolio/deliverables/{deliverableId}/documents/{documentId}`
 
 ## Observacao de compatibilidade
-- Ainda nao existem endpoints publicos para administrar multiplos memberships por usuario.
+- `/api/users` continua existindo apenas como trilha de compatibilidade durante a migracao.
 - A primeira fase usa `user` legado como fonte de sincronizacao do membership default.
 - Claims legadas de tenant seguem aceitas como hint de resolucao de contexto, nao como verdade absoluta.
