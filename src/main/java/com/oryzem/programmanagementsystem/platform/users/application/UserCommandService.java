@@ -58,14 +58,20 @@ class UserCommandService {
         TenantType targetTenantType = accessService.resolveTenantTypeForOrganization(actor, organization.id());
 
         AuthorizationContext context = AuthorizationContext.builder(AppModule.USERS, Action.CREATE)
-                .resourceTenantId(organization.id())
+                .resourceTenantId(organization.tenantId())
                 .resourceTenantType(targetTenantType)
                 .targetRole(request.role())
                 .build();
 
         AuthorizationDecision decision = authorizationService.decide(actor, context);
         accessService.assertAllowed(decision);
-        accessService.enforceOrganizationScope(actor, organization.id(), targetTenantType, decision.crossTenant(), false);
+        accessService.enforceOrganizationScope(
+                actor,
+                organization.id(),
+                organization.tenantId(),
+                targetTenantType,
+                decision.crossTenant(),
+                false);
 
         String userId = "USR-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase();
         ManagedUser created = new ManagedUser(
@@ -109,7 +115,7 @@ class UserCommandService {
         accessService.assertOrganizationChangeAllowed(target, organization.id());
 
         AuthorizationContext context = AuthorizationContext.builder(AppModule.USERS, Action.EDIT)
-                .resourceTenantId(organization.id())
+                .resourceTenantId(organization.tenantId())
                 .resourceTenantType(targetTenantType)
                 .targetRole(request.role())
                 .targetUserId(target.id())
@@ -117,7 +123,13 @@ class UserCommandService {
 
         AuthorizationDecision decision = authorizationService.decide(actor, context);
         accessService.assertAllowed(decision);
-        accessService.enforceOrganizationScope(actor, organization.id(), targetTenantType, decision.crossTenant(), false);
+        accessService.enforceOrganizationScope(
+                actor,
+                organization.id(),
+                organization.tenantId(),
+                targetTenantType,
+                decision.crossTenant(),
+                false);
 
         ManagedUser updated = target.withUpdatedDetails(
                 accessService.normalizeDisplayName(request.displayName()),
@@ -134,16 +146,23 @@ class UserCommandService {
 
     void deleteUser(AuthenticatedUser actor, String userId) {
         ManagedUser target = accessService.findRequiredUser(userId);
+        OrganizationLookup.OrganizationView targetOrganization = organizationLookup.getRequired(target.tenantId());
         AuthorizationContext context = AuthorizationContext.builder(AppModule.USERS, Action.DELETE)
-                .resourceTenantId(target.tenantId())
-                .resourceTenantType(target.tenantType())
+                .resourceTenantId(targetOrganization.tenantId())
+                .resourceTenantType(targetOrganization.tenantType())
                 .targetRole(target.role())
                 .targetUserId(target.id())
                 .build();
 
         AuthorizationDecision decision = authorizationService.decide(actor, context);
         accessService.assertAllowed(decision);
-        accessService.enforceOrganizationScope(actor, target.tenantId(), target.tenantType(), decision.crossTenant(), false);
+        accessService.enforceOrganizationScope(
+                actor,
+                targetOrganization.id(),
+                targetOrganization.tenantId(),
+                targetOrganization.tenantType(),
+                decision.crossTenant(),
+                false);
 
         if (target.status() == UserStatus.INACTIVE) {
             return;
@@ -151,6 +170,12 @@ class UserCommandService {
 
         ManagedUser updated = userRepository.save(target.withStatus(UserStatus.INACTIVE));
         userIdentityGateway.disableUser(updated);
-        accessService.recordAudit(actor, target.tenantId(), "USER_INACTIVATE", updated.id(), null, decision.crossTenant());
+        accessService.recordAudit(
+                actor,
+                targetOrganization.tenantId(),
+                "USER_INACTIVATE",
+                updated.id(),
+                null,
+                decision.crossTenant());
     }
 }

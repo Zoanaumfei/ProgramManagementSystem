@@ -11,6 +11,10 @@ public interface OrganizationRepository extends JpaRepository<OrganizationEntity
 
     List<OrganizationEntity> findAllByParentOrganizationIdOrderByNameAsc(String parentOrganizationId);
 
+    List<OrganizationEntity> findAllByTenantIdOrderByNameAsc(String tenantId);
+
+    boolean existsByMarketId(String marketId);
+
     boolean existsByCodeIgnoreCase(String code);
 
     boolean existsByCodeIgnoreCaseAndIdNot(String code, String id);

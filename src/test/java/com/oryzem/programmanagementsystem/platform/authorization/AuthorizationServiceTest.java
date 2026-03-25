@@ -1,14 +1,19 @@
 package com.oryzem.programmanagementsystem.platform.authorization;
 
+import com.oryzem.programmanagementsystem.platform.access.AccessContextService;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 class AuthorizationServiceTest {
 
     private final AuthorizationService authorizationService =
-            new AuthorizationService(new AuthorizationMatrix(), new AuthenticatedUserMapper());
+            new AuthorizationService(
+                    new AuthorizationMatrix(),
+                    new AuthenticatedUserMapper(mock(AccessContextService.class), mock(ObjectProvider.class)));
 
     @Test
     void managerCannotDeleteMemberInUsersModule() {

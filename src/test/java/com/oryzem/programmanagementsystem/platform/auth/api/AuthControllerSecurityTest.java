@@ -7,6 +7,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
@@ -97,9 +98,7 @@ class AuthControllerSecurityTest {
                 .getResponse()
                 .getContentAsString();
 
-        String session = JSON.readTree(challengeResponse)
-                .get("session")
-                .asText();
+        String session = requiredText(JSON.readTree(challengeResponse), "session");
 
         mockMvc.perform(post("/public/auth/login/new-password")
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
@@ -153,9 +152,7 @@ class AuthControllerSecurityTest {
                 .getResponse()
                 .getContentAsString();
 
-        String refreshToken = JSON.readTree(authenticatedResponse)
-                .get("refreshToken")
-                .asText();
+        String refreshToken = requiredText(JSON.readTree(authenticatedResponse), "refreshToken");
 
         mockMvc.perform(post("/public/auth/refresh")
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
@@ -304,6 +301,14 @@ class AuthControllerSecurityTest {
                                 .authorities(new SimpleGrantedAuthority("ROLE_MEMBER"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("SIGNED_OUT"));
+    }
+
+    private static String requiredText(JsonNode response, String fieldName) {
+        return response.required(fieldName)
+                .stringValueOpt()
+                .filter(value -> !value.isBlank())
+                .orElseThrow(() -> new IllegalStateException(
+                        "Expected non-empty text field '%s' in response.".formatted(fieldName)));
     }
 }
 

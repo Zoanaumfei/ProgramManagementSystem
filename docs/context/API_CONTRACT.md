@@ -1,6 +1,6 @@
 # API Contract
 
-Ultima atualizacao: `2026-03-22`
+Ultima atualizacao: `2026-03-24`
 
 ## Auth e erros
 - Backend protegido por Bearer JWT do Cognito.
@@ -20,14 +20,6 @@ Ultima atualizacao: `2026-03-22`
 - `409` e retornado para conflitos de negocio tratados.
 - `429` e retornado quando o Cognito aplica rate limit tratado pelo backend.
 - `404` e `500` retornam JSON com `correlationId`.
-- Corpo padrao de erro tratado:
-- `timestamp`
-- `status`
-- `error`
-- `message` para erros tratados pelo `ApiExceptionHandler`
-- `path`
-- `correlationId` quando disponivel
-- `401` e `403` retornam JSON curto com `timestamp`, `status`, `error` e `path`.
 
 ## Sessao e autorizacao
 ### `GET /public/auth/config`
@@ -64,29 +56,56 @@ Ultima atualizacao: `2026-03-22`
 - Response: mesmo payload de autenticacao com `status=AUTHENTICATED`.
 
 ### `GET /api/auth/me`
-- Uso: contexto da sessao autenticada.
+- Uso: contexto autenticado atual.
 - Resposta atual inclui:
-- `subject`, `username`, `email`, `emailVerified`, `emailVerificationRequired`, `tokenUse`
-- `tenantId`, `tenantType`
-- `tenantIdClaim`, `tenantTypeClaim`, `userStatusClaim`
-- `roles`, `groups`, `scopes`, `authorities`, `timestamp`
+- identidade: `subject`, `username`, `email`, `emailVerified`, `emailVerificationRequired`, `tokenUse`
+- contexto novo: `membershipId`, `activeTenantId`, `activeOrganizationId`, `activeMarketId`, `roles`, `permissions`
+- compatibilidade: `tenantId`, `tenantType`, `tenantIdClaim`, `tenantTypeClaim`, `userStatusClaim`
+- diagnostico: `groups`, `scopes`, `authorities`, `timestamp`
+- Header opcional: `X-Access-Context`
+- Efeito do header: permite pedir um membership/contexto especifico por request sem trocar o default persistido.
 
-### `GET /api/auth/email-verification`
-- Uso: ler o estado atual da verificacao do email do usuario autenticado.
-- Resposta: `email`, `emailVerified`, `emailVerificationRequired`, `status`, `attributeName`, `deliveryMedium`, `destination`.
+## Access
+### `GET /api/access/users/{userId}/memberships`
+- Uso: listar memberships visiveis de um usuario.
+- Response: lista de `MembershipResponse`.
 
-### `POST /api/auth/email-verification/code`
-- Uso: solicitar codigo de verificacao do atributo `email` para o usuario autenticado.
-- Response: `email`, `emailVerified`, `emailVerificationRequired`, `status=CODE_SENT`, `attributeName`, `deliveryMedium`, `destination`.
+### `POST /api/access/users/{userId}/memberships`
+- Uso: criar um membership adicional para um usuario existente.
+- Request: `tenantId`, `organizationId`, `marketId`, `status`, `defaultMembership`, `roles[]`.
+- Response: `201 Created` com `MembershipResponse`.
 
-### `POST /api/auth/email-verification/confirm`
-- Request: `code`
-- Uso: confirmar o codigo de verificacao do atributo `email` para o usuario autenticado.
-- Response: `email`, `emailVerified`, `emailVerificationRequired`, `status=VERIFIED`, `attributeName`
+### `PUT /api/access/users/{userId}/memberships/{membershipId}`
+- Uso: atualizar tenant/contexto/roles/status de um membership existente.
+- Request: mesmo shape de criacao.
+- Response: `MembershipResponse`.
 
-### `POST /api/auth/logout`
-- Uso: invalidar a sessao Cognito atual a partir do `access_token` autenticado.
-- Response: `status=SIGNED_OUT`
+### `DELETE /api/access/users/{userId}/memberships/{membershipId}`
+- Uso: inativar um membership.
+- Response: `MembershipResponse`.
+
+### `POST /api/access/context/activate`
+- Uso: trocar explicitamente o contexto ativo do proprio usuario.
+- Request: `membershipId`, `makeDefault`.
+- Response: `ActiveAccessContextResponse`.
+- Observacao: com `makeDefault=true`, o membership passa a ser o contexto default resolvido pela aplicacao.
+
+### `GET /api/access/tenants/{tenantId}/markets`
+- Uso: listar markets de um tenant.
+- Response: lista de `TenantMarketResponse`.
+
+### `POST /api/access/tenants/{tenantId}/markets`
+- Uso: criar market explicito em um tenant.
+- Request: `code`, `name`, `status`, `currencyCode`, `languageCode`, `timezone`.
+- Response: `201 Created` com `TenantMarketResponse`.
+
+### `PUT /api/access/tenants/{tenantId}/markets/{marketId}`
+- Uso: atualizar market.
+- Response: `TenantMarketResponse`.
+
+### `DELETE /api/access/tenants/{tenantId}/markets/{marketId}`
+- Uso: inativar market.
+- Response: `TenantMarketResponse`.
 
 ### `GET /api/authz/check`
 - Uso: diagnostico e validacao da matriz de autorizacao.
@@ -97,7 +116,7 @@ Ultima atualizacao: `2026-03-22`
 ### `GET /api/portfolio/organizations`
 - Filtros: `status`, `setupStatus`, `customerOrganizationId`, `parentOrganizationId`, `hierarchyLevel`, `search`.
 - Resposta: lista de `OrganizationResponse`.
-- Campos principais: `id`, `name`, `code`, `tenantType`, `parentOrganizationId`, `customerOrganizationId`, `hierarchyLevel`, `childrenCount`, `hasChildren`, `status`, `setupStatus`, `userSummary`, `programSummary`, `canInactivate`, `inactivationBlockedReason`, `createdAt`, `updatedAt`.
+- Campos principais: `id`, `name`, `code`, `tenantId`, `marketId`, `tenantType`, `parentOrganizationId`, `customerOrganizationId`, `hierarchyLevel`, `childrenCount`, `hasChildren`, `status`, `setupStatus`, `userSummary`, `programSummary`, `canInactivate`, `inactivationBlockedReason`, `createdAt`, `updatedAt`.
 
 ### `GET /api/portfolio/organizations/{organizationId}`
 - Uso: detalhe administrativo de organizacao.
@@ -105,7 +124,7 @@ Ultima atualizacao: `2026-03-22`
 
 ### `POST /api/portfolio/organizations`
 - Request: `name`, `code`, `parentOrganizationId`, `status`.
-- Observacao: `parentOrganizationId=null` cria customer raiz e exige `ADMIN INTERNAL`.
+- Observacao: `parentOrganizationId=null` cria tenant/organizacao raiz e exige `ADMIN INTERNAL`.
 - Response: `OrganizationResponse`.
 
 ### `PUT /api/portfolio/organizations/{organizationId}`
@@ -129,6 +148,7 @@ Ultima atualizacao: `2026-03-22`
 ### `POST /api/users`
 - Request: `displayName`, `email`, `role`, `organizationId`.
 - Response: `201 Created` com `UserSummaryResponse`.
+- Observacao: o contrato ainda recebe um papel unico e uma organizacao principal; internamente isso sincroniza o membership default durante a transicao.
 
 ### `PUT /api/users/{userId}`
 - Request: `displayName`, `email`, `role`, `organizationId`.
@@ -143,7 +163,6 @@ Ultima atualizacao: `2026-03-22`
 ### `POST /api/users/{userId}/purge`
 - Query params sensiveis: `supportOverride`, `justification`.
 - Response: `userId`, `action`, `performedAt`, `status`.
-- Observacao: `reset-access` retorna `409` quando o usuario ainda nao possui canal de recovery verificado no Cognito e `429` quando o Cognito throttla a operacao.
 
 ### `UserSummaryResponse`
 - `id`, `displayName`, `email`, `role`, `organizationId`, `organizationName`, `status`, `createdAt`, `inviteResentAt`, `accessResetAt`
@@ -152,16 +171,12 @@ Ultima atualizacao: `2026-03-22`
 ### Milestone templates
 - `GET /api/portfolio/milestone-templates`
 - `POST /api/portfolio/milestone-templates`
-- Request principal: `name`, `description`, `status`, `items[]`.
 
 ### Programs
 - `GET /api/portfolio/programs`
 - Filtro: `ownerOrganizationId`
-- Resposta resumida: `ProgramSummaryResponse`
 - `POST /api/portfolio/programs`
-- Request principal: `name`, `code`, `description`, `ownerOrganizationId`, `plannedStartDate`, `plannedEndDate`, `participants[]`, `initialProject`
 - `GET /api/portfolio/programs/{programId}`
-- Resposta detalhada agregada: participantes, projetos, milestones, produtos, itens, entregaveis, documentos e open issues.
 
 ### Camadas de criacao
 - `POST /api/portfolio/programs/{programId}/projects`
@@ -172,68 +187,12 @@ Ultima atualizacao: `2026-03-22`
 
 ### Documentos de entregavel
 - `GET /api/portfolio/deliverables/{deliverableId}/documents`
-- Response: lista de `DeliverableDocumentResponse`
 - `POST /api/portfolio/deliverables/{deliverableId}/documents/upload-url`
-- Request: `PrepareDeliverableDocumentUploadRequest`
-- Response atual: `document`, `uploadUrl`, `expiresAt`, `requiredHeaders`
-- Implementacao atual do backend assina um `PUT` para `uploadUrl`; o frontend precisa enviar o binario com `requiredHeaders` antes de chamar `complete`.
 - `POST /api/portfolio/deliverables/{deliverableId}/documents/{documentId}/complete`
-- Response: `DeliverableDocumentResponse`
 - `POST /api/portfolio/deliverables/{deliverableId}/documents/{documentId}/download-url`
-- Response atual: `documentId`, `downloadUrl`, `expiresAt`
 - `DELETE /api/portfolio/deliverables/{deliverableId}/documents/{documentId}`
-- Response: `DeliverableDocumentResponse`
 
-### Requests principais do portfolio
-- `CreateProjectRequest`: `name`, `code`, `description`, `plannedStartDate`, `plannedEndDate`, `milestoneTemplateId`, `status`
-- `CreateProductRequest`: `name`, `code`, `description`, `status`
-- `CreateItemRequest`: `name`, `code`, `description`, `status`
-- `CreateDeliverableRequest`: `name`, `description`, `type`, `status`, `plannedDate`, `dueDate`
-- `CreateOpenIssueRequest`: `title`, `description`, `severity`, `status`, `openedAt`
-- `PrepareDeliverableDocumentUploadRequest`: `fileName`, `contentType`, `fileSize`
-- `DeliverableDocumentResponse`: `id`, `deliverableId`, `fileName`, `contentType`, `fileSize`, `status`, `uploadedAt`, `createdAt`, `updatedAt`
-
-## Operations
-- `GET /api/operations`
-- `POST /api/operations`
-- `PUT /api/operations/{operationId}`
-- `DELETE /api/operations/{operationId}`
-- `POST /api/operations/{operationId}/submit`
-- `POST /api/operations/{operationId}/approve`
-- `POST /api/operations/{operationId}/reject`
-- `POST /api/operations/{operationId}/reopen`
-- `POST /api/operations/{operationId}/reprocess`
-- `CreateOperationRequest`: `title`, `description`, `tenantId`, `tenantType`
-- `UpdateOperationRequest`: `title`, `description`
-
-## Reports
-- `GET /api/reports/summary`
-- `GET /api/reports/operations`
-- `GET /api/reports/operations/export`
-- Parametros relevantes: `tenantId`, `status`, `includeSensitiveData`, `maskedView`, `supportOverride`, `justification`
-
-## Enums expostos de forma relevante
-- `Role`: `ADMIN`, `MANAGER`, `MEMBER`, `SUPPORT`, `AUDITOR`
-- `TenantType`: `INTERNAL`, `EXTERNAL`
-- `UserStatus`: `INVITED`, `ACTIVE`, `INACTIVE`
-- `OrganizationStatus`: `ACTIVE`, `INACTIVE`
-- `OrganizationSetupStatus`: `COMPLETED`, `INCOMPLETED`
-- `ProgramStatus`: `DRAFT`, `ACTIVE`, `PAUSED`, `CLOSED`, `CANCELED`
-- `ParticipationRole`: `CLIENT`, `SUPPLIER`, `INTERNAL`, `PARTNER`
-- `ParticipationStatus`: `ACTIVE`, `INACTIVE`
-- `ProjectStatus`: `DRAFT`, `ACTIVE`, `PAUSED`, `COMPLETED`, `CANCELED`
-- `ProductStatus`: `ACTIVE`, `INACTIVE`
-- `ItemStatus`: `ACTIVE`, `INACTIVE`
-- `DeliverableType`: `DOCUMENT`, `FORM`
-- `DeliverableStatus`: `PENDING`, `IN_PROGRESS`, `SUBMITTED`, `APPROVED`, `REJECTED`, `CANCELED`
-- `DeliverableDocumentStatus`: `PENDING_UPLOAD`, `AVAILABLE`, `DELETED`
-- `MilestoneTemplateStatus`: `ACTIVE`, `INACTIVE`
-- `ProjectMilestoneStatus`: `PLANNED`, `COMPLETED`, `CANCELED`
-- `OpenIssueStatus`: `OPEN`, `IN_PROGRESS`, `RESOLVED`, `CLOSED`, `CANCELED`
-- `OpenIssueSeverity`: `LOW`, `MEDIUM`, `HIGH`, `CRITICAL`
-- `OperationStatus`: `DRAFT`, `SUBMITTED`, `APPROVED`, `REJECTED`, `RETURNED`, `REPROCESSING`
-
-## Paginacao e busca
-- Nao ha paginacao no contrato atual.
-- Busca textual esta presente apenas em `GET /api/portfolio/organizations` via `search`.
-- Crescimento de volume e paginação futura permanecem em `OPEN_GAPS.md`.
+## Observacao de compatibilidade
+- Ainda nao existem endpoints publicos para administrar multiplos memberships por usuario.
+- A primeira fase usa `user` legado como fonte de sincronizacao do membership default.
+- Claims legadas de tenant seguem aceitas como hint de resolucao de contexto, nao como verdade absoluta.

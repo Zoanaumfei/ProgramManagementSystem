@@ -47,7 +47,7 @@ class OrganizationAccessService {
     }
 
     Set<String> visibleOrganizationIds(AuthenticatedUser actor) {
-        if (actor == null || actor.tenantId() == null || actor.tenantId().isBlank()) {
+        if (actor == null || actor.organizationId() == null || actor.organizationId().isBlank()) {
             return Set.of();
         }
 
@@ -59,10 +59,10 @@ class OrganizationAccessService {
         }
 
         if (actor.tenantType() == TenantType.EXTERNAL && actor.hasRole(Role.SUPPORT)) {
-            return Set.of(actor.tenantId());
+            return Set.of(actor.organizationId());
         }
 
-        return organizationDirectoryService.collectSubtreeIds(actor.tenantId());
+        return organizationDirectoryService.collectSubtreeIds(actor.organizationId());
     }
 
     OrganizationEntity findPortfolioOrganization(String organizationId) {
@@ -82,7 +82,7 @@ class OrganizationAccessService {
 
     void assertCanAccessOrganization(AuthenticatedUser actor, OrganizationEntity organization, Action action) {
         AuthorizationContext context = AuthorizationContext.builder(AppModule.TENANT, action)
-                .resourceTenantId(organization.getId())
+                .resourceTenantId(organization.getTenantId())
                 .resourceTenantType(organization.getTenantType())
                 .build();
         assertAllowed(authorizationService.decide(actor, context));

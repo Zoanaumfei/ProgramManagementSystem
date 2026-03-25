@@ -1,11 +1,15 @@
 package com.oryzem.programmanagementsystem.platform.authorization;
 
+import com.oryzem.programmanagementsystem.platform.access.AccessContextService;
+import com.oryzem.programmanagementsystem.platform.access.ResolvedMembershipContext;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -17,6 +21,17 @@ public class AuthenticatedUserMapper {
     private static final String TENANT_TYPE_CLAIM = "tenant_type";
     private static final String CUSTOM_TENANT_ID_CLAIM = "custom:tenant_id";
     private static final String CUSTOM_TENANT_TYPE_CLAIM = "custom:tenant_type";
+    private static final String ACCESS_CONTEXT_HEADER = "X-Access-Context";
+
+    private final AccessContextService accessContextService;
+    private final ObjectProvider<HttpServletRequest> httpServletRequestProvider;
+
+    public AuthenticatedUserMapper(
+            AccessContextService accessContextService,
+            ObjectProvider<HttpServletRequest> httpServletRequestProvider) {
+        this.accessContextService = accessContextService;
+        this.httpServletRequestProvider = httpServletRequestProvider;
+    }
 
     public AuthenticatedUser from(Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken jwtAuthentication)) {
@@ -24,6 +39,34 @@ public class AuthenticatedUserMapper {
         }
 
         Jwt jwt = jwtAuthentication.getToken();
+        String username = firstNonBlank(
+                jwt.getClaimAsString(USERNAME_CLAIM),
+                jwt.getClaimAsString(ACCESS_TOKEN_USERNAME_CLAIM),
+                authentication.getName());
+        String requestHeaderHint = Optional.ofNullable(httpServletRequestProvider.getIfAvailable())
+                .map(request -> request.getHeader(ACCESS_CONTEXT_HEADER))
+                .orElse(null);
+
+        Optional<ResolvedMembershipContext> resolvedContext = accessContextService.resolveActiveContext(
+                jwt.getSubject(),
+                username,
+                jwt.getClaimAsString("email"),
+                requestHeaderHint);
+        if (resolvedContext.isPresent()) {
+            ResolvedMembershipContext membershipContext = resolvedContext.get();
+            return new AuthenticatedUser(
+                    jwt.getSubject(),
+                    username,
+                    membershipContext.roles(),
+                    membershipContext.permissions(),
+                    membershipContext.userId(),
+                    membershipContext.membershipId(),
+                    membershipContext.activeTenantId(),
+                    membershipContext.activeOrganizationId(),
+                    membershipContext.activeMarketId(),
+                    membershipContext.tenantType());
+        }
+
         Set<Role> roles = authentication.getAuthorities().stream()
                 .map(authority -> Role.fromAuthority(authority.getAuthority()))
                 .flatMap(Optional::stream)
@@ -31,10 +74,7 @@ public class AuthenticatedUserMapper {
 
         return new AuthenticatedUser(
                 jwt.getSubject(),
-                firstNonBlank(
-                        jwt.getClaimAsString(USERNAME_CLAIM),
-                        jwt.getClaimAsString(ACCESS_TOKEN_USERNAME_CLAIM),
-                        authentication.getName()),
+                username,
                 roles,
                 firstNonBlank(jwt.getClaimAsString(TENANT_ID_CLAIM), jwt.getClaimAsString(CUSTOM_TENANT_ID_CLAIM)),
                 TenantType.fromClaim(firstNonBlank(

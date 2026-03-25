@@ -9,6 +9,8 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.time.Instant;
 
@@ -50,6 +52,9 @@ public class UserEntity {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    @Column(name = "updated_at", nullable = false)
+    private Instant updatedAt;
+
     @Column(name = "invite_resent_at")
     private Instant inviteResentAt;
 
@@ -82,6 +87,7 @@ public class UserEntity {
         this.tenantType = tenantType;
         this.status = status;
         this.createdAt = createdAt;
+        this.updatedAt = createdAt;
         this.inviteResentAt = inviteResentAt;
         this.accessResetAt = accessResetAt;
     }
@@ -116,6 +122,21 @@ public class UserEntity {
                 createdAt,
                 inviteResentAt,
                 accessResetAt);
+    }
+
+    @PrePersist
+    void onCreate() {
+        if (createdAt == null) {
+            createdAt = Instant.now();
+        }
+        if (updatedAt == null) {
+            updatedAt = createdAt;
+        }
+    }
+
+    @PreUpdate
+    void onUpdate() {
+        updatedAt = Instant.now();
     }
 }
 

@@ -1,6 +1,7 @@
 package com.oryzem.programmanagementsystem.platform.users.infrastructure;
 
 import com.oryzem.programmanagementsystem.platform.authorization.Role;
+import com.oryzem.programmanagementsystem.platform.access.AccessContextService;
 import com.oryzem.programmanagementsystem.platform.users.domain.ManagedUser;
 import com.oryzem.programmanagementsystem.platform.users.domain.UserRepository;
 import com.oryzem.programmanagementsystem.platform.users.domain.UserStatus;
@@ -16,9 +17,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class JpaUserRepository implements UserRepository {
 
     private final SpringDataUserJpaRepository delegate;
+    private final AccessContextService accessContextService;
 
-    public JpaUserRepository(SpringDataUserJpaRepository delegate) {
+    public JpaUserRepository(SpringDataUserJpaRepository delegate, AccessContextService accessContextService) {
         this.delegate = delegate;
+        this.accessContextService = accessContextService;
     }
 
     @Override
@@ -73,16 +76,23 @@ public class JpaUserRepository implements UserRepository {
 
     @Override
     public ManagedUser save(ManagedUser user) {
-        return delegate.save(UserEntity.fromDomain(user)).toDomain();
+        ManagedUser saved = delegate.save(UserEntity.fromDomain(user)).toDomain();
+        accessContextService.synchronizeDefaultMembership(saved);
+        return saved;
     }
 
     @Override
     public void deleteById(String userId) {
+        accessContextService.deleteMembershipsForUser(userId);
         delegate.deleteById(userId);
     }
 
     @Override
     public void deleteAll() {
+        delegate.findAll().stream()
+                .map(UserEntity::toDomain)
+                .map(ManagedUser::id)
+                .forEach(accessContextService::deleteMembershipsForUser);
         delegate.deleteAll();
     }
 }

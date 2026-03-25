@@ -7,6 +7,7 @@ import com.oryzem.programmanagementsystem.modules.projectmanagement.PortfolioRes
 import com.oryzem.programmanagementsystem.modules.operations.OperationRecord;
 import com.oryzem.programmanagementsystem.modules.operations.OperationRepository;
 import com.oryzem.programmanagementsystem.modules.operations.OperationStatus;
+import com.oryzem.programmanagementsystem.platform.access.AccessContextResetService;
 import com.oryzem.programmanagementsystem.platform.tenant.OrganizationBootstrapPort;
 import com.oryzem.programmanagementsystem.platform.users.domain.ManagedUser;
 import com.oryzem.programmanagementsystem.platform.users.domain.UserIdentityGateway;
@@ -37,6 +38,7 @@ public class BootstrapDataService {
     private final OperationRepository operationRepository;
     private final AuditTrailService auditTrailService;
     private final PortfolioResetPort portfolioResetPort;
+    private final AccessContextResetService accessContextResetService;
     private final OrganizationBootstrapPort organizationBootstrapPort;
     private final UserIdentityGateway userIdentityGateway;
     private final BootstrapProperties bootstrapProperties;
@@ -46,6 +48,7 @@ public class BootstrapDataService {
             OperationRepository operationRepository,
             AuditTrailService auditTrailService,
             PortfolioResetPort portfolioResetPort,
+            AccessContextResetService accessContextResetService,
             OrganizationBootstrapPort organizationBootstrapPort,
             UserIdentityGateway userIdentityGateway,
             BootstrapProperties bootstrapProperties) {
@@ -53,6 +56,7 @@ public class BootstrapDataService {
         this.operationRepository = operationRepository;
         this.auditTrailService = auditTrailService;
         this.portfolioResetPort = portfolioResetPort;
+        this.accessContextResetService = accessContextResetService;
         this.organizationBootstrapPort = organizationBootstrapPort;
         this.userIdentityGateway = userIdentityGateway;
         this.bootstrapProperties = bootstrapProperties;
@@ -79,6 +83,7 @@ public class BootstrapDataService {
         operationRepository.deleteAll();
         userRepository.deleteAll();
         portfolioResetPort.clearAll();
+        accessContextResetService.clearTenantStructures();
         ensureInternalCoreOrganization();
         if (bootstrapProperties.seedData()) {
             seedUsers();

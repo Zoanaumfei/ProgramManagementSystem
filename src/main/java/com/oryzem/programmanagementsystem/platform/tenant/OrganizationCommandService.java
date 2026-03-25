@@ -5,6 +5,8 @@ import com.oryzem.programmanagementsystem.platform.authorization.AppModule;
 import com.oryzem.programmanagementsystem.platform.authorization.AuthenticatedUser;
 import com.oryzem.programmanagementsystem.platform.authorization.AuthorizationContext;
 import com.oryzem.programmanagementsystem.platform.authorization.AuthorizationService;
+import com.oryzem.programmanagementsystem.platform.authorization.TenantType;
+import com.oryzem.programmanagementsystem.platform.access.TenantProvisioningService;
 import java.util.Locale;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +21,7 @@ class OrganizationCommandService {
     private final OrganizationSnapshotService snapshotService;
     private final TenantUserQueryPort tenantUserQueryPort;
     private final TenantProjectPortfolioPort tenantProjectPortfolioPort;
+    private final TenantProvisioningService tenantProvisioningService;
 
     OrganizationCommandService(
             OrganizationRepository organizationRepository,
@@ -26,13 +29,15 @@ class OrganizationCommandService {
             OrganizationAccessService accessService,
             OrganizationSnapshotService snapshotService,
             TenantUserQueryPort tenantUserQueryPort,
-            TenantProjectPortfolioPort tenantProjectPortfolioPort) {
+            TenantProjectPortfolioPort tenantProjectPortfolioPort,
+            TenantProvisioningService tenantProvisioningService) {
         this.organizationRepository = organizationRepository;
         this.authorizationService = authorizationService;
         this.accessService = accessService;
         this.snapshotService = snapshotService;
         this.tenantUserQueryPort = tenantUserQueryPort;
         this.tenantProjectPortfolioPort = tenantProjectPortfolioPort;
+        this.tenantProvisioningService = tenantProvisioningService;
     }
 
     OrganizationResponse createOrganization(CreateOrganizationRequest request, AuthenticatedUser actor) {
@@ -48,7 +53,19 @@ class OrganizationCommandService {
                     actor,
                     AuthorizationContext.builder(AppModule.TENANT, Action.CREATE).build()));
             accessService.assertCanCreateRootCustomer(actor);
+            String organizationId = PortfolioIds.newId("ORG");
+            String tenantId = tenantProvisioningService.tenantIdForRootOrganization(organizationId);
+            tenantProvisioningService.ensureTenantForRootOrganization(
+                    organizationId,
+                    normalizeName(request.name()),
+                    normalizedCode,
+                    TenantType.EXTERNAL,
+                    defaultValue(request.status(), OrganizationStatus.ACTIVE) == OrganizationStatus.ACTIVE,
+                    null,
+                    null);
             organization = OrganizationEntity.createRootExternal(
+                    organizationId,
+                    tenantId,
                     actor.username(),
                     normalizeName(request.name()),
                     normalizedCode,
@@ -59,13 +76,25 @@ class OrganizationCommandService {
             accessService.assertCanCreateChildOrganization(actor, parentOrganization);
             accessService.assertOrganizationCanOwnChildren(parentOrganization);
             organization = OrganizationEntity.createChild(
+                    PortfolioIds.newId("ORG"),
                     actor.username(),
                     normalizeName(request.name()),
                     normalizedCode,
                     defaultValue(request.status(), OrganizationStatus.ACTIVE),
                     parentOrganization);
         }
-        return snapshotService.toResponse(organizationRepository.save(organization));
+        OrganizationEntity saved = organizationRepository.save(organization);
+        if (saved.getParentOrganization() == null) {
+            tenantProvisioningService.ensureTenantForRootOrganization(
+                    saved.getId(),
+                    saved.getName(),
+                    saved.getCode(),
+                    saved.getTenantType(),
+                    saved.getStatus() == OrganizationStatus.ACTIVE,
+                    saved.getCreatedAt(),
+                    saved.getUpdatedAt());
+        }
+        return snapshotService.toResponse(saved);
     }
 
     OrganizationResponse updateOrganization(

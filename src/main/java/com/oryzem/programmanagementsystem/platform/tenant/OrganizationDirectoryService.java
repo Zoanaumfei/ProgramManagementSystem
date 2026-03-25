@@ -1,6 +1,7 @@
 package com.oryzem.programmanagementsystem.platform.tenant;
 
 import com.oryzem.programmanagementsystem.platform.authorization.TenantType;
+import com.oryzem.programmanagementsystem.platform.access.TenantProvisioningService;
 import java.util.ArrayDeque;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -16,12 +17,15 @@ public class OrganizationDirectoryService implements OrganizationLookup, Organiz
 
     private final OrganizationRepository organizationRepository;
     private final TenantUserQueryPort tenantUserQueryPort;
+    private final TenantProvisioningService tenantProvisioningService;
 
     public OrganizationDirectoryService(
             OrganizationRepository organizationRepository,
-            TenantUserQueryPort tenantUserQueryPort) {
+            TenantUserQueryPort tenantUserQueryPort,
+            TenantProvisioningService tenantProvisioningService) {
         this.organizationRepository = organizationRepository;
         this.tenantUserQueryPort = tenantUserQueryPort;
+        this.tenantProvisioningService = tenantProvisioningService;
     }
 
     @Override
@@ -91,8 +95,19 @@ public class OrganizationDirectoryService implements OrganizationLookup, Organiz
             boolean active) {
         return findById(organizationId).orElseGet(() -> {
             OrganizationEntity organization;
+            String tenantId = tenantProvisioningService.tenantIdForRootOrganization(organizationId);
             if (tenantType == TenantType.INTERNAL) {
+                tenantProvisioningService.ensureTenantForRootOrganization(
+                        organizationId,
+                        name.trim(),
+                        code.trim().toUpperCase(),
+                        TenantType.INTERNAL,
+                        active,
+                        null,
+                        null);
                 organization = OrganizationEntity.createRootInternal(
+                        organizationId,
+                        tenantId,
                         actor,
                         name.trim(),
                         code.trim().toUpperCase(),
@@ -101,26 +116,47 @@ public class OrganizationDirectoryService implements OrganizationLookup, Organiz
                 OrganizationEntity parentOrganization = organizationRepository.findById(parentOrganizationId)
                         .orElseThrow(() -> new IllegalArgumentException("Organization not found: " + parentOrganizationId));
                 organization = OrganizationEntity.createChild(
+                        organizationId,
                         actor,
                         name.trim(),
                         code.trim().toUpperCase(),
                         active ? OrganizationStatus.ACTIVE : OrganizationStatus.INACTIVE,
                         parentOrganization);
             } else {
+                tenantProvisioningService.ensureTenantForRootOrganization(
+                        organizationId,
+                        name.trim(),
+                        code.trim().toUpperCase(),
+                        TenantType.EXTERNAL,
+                        active,
+                        null,
+                        null);
                 organization = OrganizationEntity.createRootExternal(
+                        organizationId,
+                        tenantId,
                         actor,
                         name.trim(),
                         code.trim().toUpperCase(),
                         active ? OrganizationStatus.ACTIVE : OrganizationStatus.INACTIVE);
             }
 
-            organization.setId(organizationId);
             if (organization.getTenantType() == TenantType.EXTERNAL
                     && organization.getParentOrganization() == null
                     && organization.getCustomerOrganization() == organization) {
                 organization.setCustomerOrganization(organization);
             }
-            return toEntry(organizationRepository.save(organization));
+            OrganizationEntity saved = organizationRepository.save(organization);
+            if (saved.getParentOrganization() == null) {
+                tenantProvisioningService.ensureTenantForRootOrganization(
+                        saved.getId(),
+                        saved.getName(),
+                        saved.getCode(),
+                        saved.getTenantType(),
+                        saved.getStatus() == OrganizationStatus.ACTIVE,
+                        saved.getCreatedAt(),
+                        saved.getUpdatedAt());
+            }
+            return toEntry(saved);
         });
     }
 
@@ -129,6 +165,8 @@ public class OrganizationDirectoryService implements OrganizationLookup, Organiz
                 organization.getId(),
                 organization.getName(),
                 organization.getCode(),
+                organization.getTenantId(),
+                organization.getMarketId(),
                 organization.getTenantType(),
                 organization.getStatus() == OrganizationStatus.ACTIVE,
                 organization.getParentOrganization() != null ? organization.getParentOrganization().getId() : null,

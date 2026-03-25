@@ -112,6 +112,10 @@ public class AuthController {
         body.put("emailVerificationRequired", emailVerificationState.emailVerificationRequired());
         body.put("tokenUse", jwt.getClaimAsString("token_use"));
         body.put("tenantId", authenticatedUser.tenantId());
+        body.put("membershipId", authenticatedUser.membershipId());
+        body.put("activeTenantId", authenticatedUser.activeTenantId());
+        body.put("activeOrganizationId", authenticatedUser.activeOrganizationId());
+        body.put("activeMarketId", authenticatedUser.activeMarketId());
         body.put("tenantType", authenticatedUser.tenantType() != null ? authenticatedUser.tenantType().name() : null);
         body.put("tenantIdClaim", firstNonBlank(
                 jwt.getClaimAsString(TENANT_ID_CLAIM),
@@ -121,6 +125,7 @@ public class AuthController {
                 jwt.getClaimAsString(CUSTOM_TENANT_TYPE_CLAIM)));
         body.put("userStatusClaim", jwt.getClaimAsString(CUSTOM_USER_STATUS_CLAIM));
         body.put("roles", authenticatedUser.roles().stream().map(Enum::name).sorted().toList());
+        body.put("permissions", authenticatedUser.permissions().stream().sorted().toList());
         body.put("groups", defaultList(jwt.getClaimAsStringList(GROUPS_CLAIM)));
         body.put("scopes", scopes(jwt.getClaimAsString("scope")));
         body.put("authorities", jwtAuthentication.getAuthorities().stream()

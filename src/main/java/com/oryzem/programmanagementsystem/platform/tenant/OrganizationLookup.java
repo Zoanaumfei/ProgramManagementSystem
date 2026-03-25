@@ -28,6 +28,8 @@ public interface OrganizationLookup {
             String id,
             String name,
             String code,
+            String tenantId,
+            String marketId,
             TenantType tenantType,
             boolean active,
             String parentOrganizationId,

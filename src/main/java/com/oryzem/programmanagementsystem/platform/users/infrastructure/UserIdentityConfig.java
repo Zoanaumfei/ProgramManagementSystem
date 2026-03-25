@@ -23,7 +23,7 @@ class UserIdentityConfig {
 
         return CognitoIdentityProviderClient.builder()
                 .region(Region.of(properties.region()))
-                .credentialsProvider(DefaultCredentialsProvider.create())
+                .credentialsProvider(DefaultCredentialsProvider.builder().build())
                 .build();
     }
 

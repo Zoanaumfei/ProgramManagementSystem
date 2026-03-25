@@ -33,13 +33,14 @@ class PortfolioDocumentStorageConfig {
         }
 
         Region region = Region.of(properties.region());
+        DefaultCredentialsProvider credentialsProvider = DefaultCredentialsProvider.builder().build();
         S3Presigner presigner = S3Presigner.builder()
                 .region(region)
-                .credentialsProvider(DefaultCredentialsProvider.create())
+                .credentialsProvider(credentialsProvider)
                 .build();
         S3Client s3Client = S3Client.builder()
                 .region(region)
-                .credentialsProvider(DefaultCredentialsProvider.create())
+                .credentialsProvider(credentialsProvider)
                 .build();
 
         return new S3PortfolioDocumentStorageGateway(properties, presigner, s3Client);

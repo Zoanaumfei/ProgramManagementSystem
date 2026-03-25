@@ -1,6 +1,6 @@
 # Decisions
 
-Ultima atualizacao: `2026-03-22`
+Ultima atualizacao: `2026-03-24`
 
 ## Cognito como autenticacao oficial
 - Decisao: o backend nao implementa login por senha local e valida apenas JWT emitido pelo Cognito.
@@ -11,7 +11,7 @@ Ultima atualizacao: `2026-03-22`
 ## Hosted UI em retirada gradual
 - Decisao: manter o Cognito como IdP, mas preparar o frontend para sair do Hosted UI e usar login proprio consumindo endpoints publicos do backend.
 - Motivo: controlar melhor os fluxos `NEW_PASSWORD_REQUIRED`, `PASSWORD_RESET_REQUIRED`, verificacao de email e logout, evitando UX confusa como o envio de dois codigos no reset.
-- Impacto: backend agora expone endpoints publicos de auth e o Hosted UI passa a ser trilha temporaria ate o cutover completo do frontend e a estabilizacao do runtime AWS que ainda precisa assumir a task corrigida de login proprio.
+- Impacto: backend agora expone endpoints publicos de auth e o Hosted UI passa a ser trilha temporaria ate o cutover completo do frontend.
 - Status: TEMPORARIA
 
 ## Monolito modular em vez de microservicos agora
@@ -20,41 +20,47 @@ Ultima atualizacao: `2026-03-22`
 - Impacto: fronteiras sao protegidas por pacotes e portas internas, nao por rede.
 - Status: ATIVA
 
-## Tenant e modelado por Organizacao
-- Decisao: `tenant` representa uma empresa e e modelado por `Organizacao`.
-- Motivo: o dominio real do produto e multiempresa, nao multi-tenant abstrato.
-- Impacto: usuarios, portfolio e visibilidade passam a depender da hierarquia organizacional.
+## Tenant explicito e separado de Organization
+- Decisao: `tenant` passa a existir explicitamente como fronteira SaaS; `organization` deixa de ser a representacao tecnica do tenant.
+- Motivo: o modelo anterior misturava isolamento SaaS com hierarquia operacional, o que dificultava multi-contexto, multi-market e autorizacao contextual.
+- Impacto: `organization` agora pertence a `tenant`, `market` e opcional, e a hierarquia continua focada em estrutura de negocio.
 - Status: ATIVA
 
+## Membership-first para contexto de acesso
+- Decisao: `user_membership` e o novo centro de verdade para contexto de acesso.
+- Motivo: um mesmo usuario precisa poder atuar em mais de um tenant/organizacao/market com papeis diferentes.
+- Impacto: `role`, `tenant` e escopo ativo deixam de ser responsabilidade principal de `user`; a aplicacao resolve o contexto a partir do membership.
+- Status: ATIVA
+
+## Contexto ativo selecionavel explicitamente
+- Decisao: o contexto ativo pode ser trocado pela aplicacao sem depender de novas claims emitidas pelo Cognito.
+- Motivo: o backend e stateless, mas o usuario precisa conseguir alternar entre memberships reais.
+- Impacto: o sistema suporta `POST /api/access/context/activate` para trocar o membership default e tambem aceita `X-Access-Context` como override por request.
+- Status: ATIVA
+
+## Compatibilidade temporaria com user legado
+- Decisao: manter `app_user.role`, `app_user.tenant_id` e `app_user.tenant_type` durante a transicao.
+- Motivo: evitar quebra abrupta de fluxos existentes, claims legadas, bootstrap e APIs ainda planas.
+- Impacto: existe dual-write para membership default e fallback de leitura de claims legadas enquanto o restante da aplicacao migra.
+- Status: TEMPORARIA
+
 ## Customer raiz so por ADMIN INTERNAL
-- Decisao: `ADMIN INTERNAL` cria customer raiz; `ADMIN` externo cria apenas descendentes na propria subarvore.
+- Decisao: `ADMIN INTERNAL` cria tenant/organizacao raiz; `ADMIN` externo cria apenas descendentes na propria subarvore.
 - Motivo: separar governanca de plataforma da administracao operacional de clientes e fornecedores.
 - Impacto: a API de organizacoes trata create root e create child com regras diferentes.
 - Status: ATIVA
 
 ## Contrato de users orientado a organizationId
-- Decisao: o contrato principal de usuarios usa `organizationId` e `organizationName`.
-- Motivo: refletir o modelo de negocio real e esconder detalhes tecnicos de tenant da UX principal.
-- Impacto: `tenant_id` e `tenant_type` ficam apenas como compatibilidade interna.
+- Decisao: o contrato principal de usuarios continua usando `organizationId` e `organizationName`.
+- Motivo: refletir a operacao diaria da UX sem expor toda a complexidade contextual do backend na primeira fase.
+- Impacto: `tenantId` legado segue aceito em alguns filtros e auditoria, mas o escopo funcional passa a considerar `organizationId` e membership ativo.
 - Status: ATIVA
-
-## Fallback temporario de id_token no frontend
-- Decisao: o frontend tenta `access_token` primeiro e pode repetir uma vez com `id_token` em caso de `403`.
-- Motivo: reduzir bloqueio de integracao enquanto a trilha real de claims/autorizacao e homologada ponta a ponta.
-- Impacto: existe codigo temporario no frontend que precisara ser removido quando a trilha principal estiver estavel.
-- Status: TEMPORARIA
 
 ## Storage de documentos configuravel por provider
 - Decisao: usar provider configuravel para documentos, com `stub` em local/testes e S3 como alvo definitivo.
 - Motivo: permitir evolucao do contrato sem bloquear o produto enquanto o bucket final nao esta pronto.
 - Impacto: o fluxo de documentos ja existe no contrato, mas a homologacao em S3 real permanece aberta.
 - Status: TEMPORARIA
-
-## Portfolio opera apenas sobre organizacoes EXTERNAL
-- Decisao: estruturas `INTERNAL` ficam fora do diretorio funcional do portfolio.
-- Motivo: separar governanca da plataforma do portfolio operacional dos clientes.
-- Impacto: `internal-core` nao aparece como owner de programa nem como organizacao funcional do portfolio.
-- Status: ATIVA
 
 ## Purge como excecao operacional explicita
 - Decisao: purge de usuario e purge-subtree de organizacao existem como operacoes separadas de inativacao logica.

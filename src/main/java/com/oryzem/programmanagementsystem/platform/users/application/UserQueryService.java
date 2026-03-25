@@ -31,10 +31,11 @@ class UserQueryService {
             String organizationId,
             boolean supportOverride,
             String justification) {
-        String effectiveTenantId = accessService.resolveListTenantId(actor, organizationId, supportOverride, justification);
+        String effectiveOrganizationId = accessService.resolveListOrganizationId(actor, organizationId, supportOverride, justification);
+        String effectiveTenantId = accessService.resolveBoundaryTenantId(effectiveOrganizationId, actor);
         AuthorizationContext context = AuthorizationContext.builder(AppModule.USERS, Action.VIEW)
                 .resourceTenantId(effectiveTenantId)
-                .resourceTenantType(accessService.resolveListTenantType(actor, effectiveTenantId))
+                .resourceTenantType(accessService.resolveListTenantType(actor, effectiveOrganizationId))
                 .auditTrailEnabled(accessService.shouldAuditView(actor, effectiveTenantId, supportOverride, justification))
                 .supportOverride(supportOverride)
                 .justification(justification)
@@ -47,7 +48,7 @@ class UserQueryService {
             accessService.recordAudit(actor, effectiveTenantId, "USERS_VIEW", null, justification, decision.crossTenant());
         }
 
-        return accessService.selectUsersForScope(actor, effectiveTenantId, supportOverride, justification).stream()
+        return accessService.selectUsersForScope(actor, effectiveOrganizationId, supportOverride, justification).stream()
                 .map(user -> UserSummaryResponse.from(user, accessService.resolveOrganizationName(user.tenantId())))
                 .toList();
     }

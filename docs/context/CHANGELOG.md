@@ -1,6 +1,6 @@
 # Changelog
 
-Ultima atualizacao: `2026-03-23`
+Ultima atualizacao: `2026-03-24`
 
 ## 2026-03-07
 - Base inicial de autenticacao, autorizacao, persistencia e modulos `users`, `operations` e `reports`.
@@ -49,22 +49,20 @@ Ultima atualizacao: `2026-03-23`
 - DTOs, servicos, repositorios e integracao de identidade de `users` foram movidos fisicamente para pastas coerentes com seus packages.
 - O contrato de tenant permaneceu em `platform.tenant.OrganizationLookup`, mantendo `users` desacoplado da implementacao concreta de diretorio organizacional.
 - O fluxo de documentos foi preparado para `S3` real sem mudar o contrato HTTP: upload assinado, `complete`, listagem e download assinado.
-- O frontend deixou de assumir `stub` e passou a enviar o binario real para o presigned URL antes de confirmar o documento.
-- Scripts e task definition do ECS passaram a prever bucket, prefixo e policy minima de documentos para a virada operacional em AWS.
-- A homologacao final em AWS ficou bloqueada no principal operacional atual por falta de `s3:CreateBucket` e `iam:PutRolePolicy`.
-- O fluxo correto de verificacao explicita de email no Cognito foi introduzido para usuarios autenticados, sem marcar `email_verified=true` no provisionamento administrativo.
-- `/api/auth/me` passou a refletir `emailVerified` e `emailVerificationRequired`.
-- O frontend passou a orientar o usuario autenticado a enviar/confirmar o codigo de verificacao dentro do workspace antes de depender de recovery/reset.
-- `reset-access` deixou de mascarar falhas do Cognito como `500` generico e agora retorna conflito de negocio claro quando o usuario ainda nao verificou o email, alem de `429` para throttling tratado.
-- O backend ficou pronto para migracao do frontend para login proprio com Cognito, com endpoints publicos de `login`, `new-password`, `password-reset`, `refresh` e `logout`, sem introduzir senha local.
-- A policy operacional versionada do Cognito foi ampliada para cobrir os novos fluxos administrativos de auth (`AdminInitiateAuth`, `AdminRespondToAuthChallenge`, `GlobalSignOut`).
-- A versao com os endpoints publicos de auth foi publicada no ECS de dev em `program-management-system:24`.
 
 ## 2026-03-23
 - O app client do Cognito em dev foi alinhado para `ALLOW_USER_PASSWORD_AUTH`, alem dos flows administrativos ja habilitados.
-- Uma chamada direta `initiate-auth` contra o Cognito confirmou que login com email+senha funciona no app client real, descartando problema de credencial do usuario no caso homologado.
-- Foi identificado que o backend ainda podia selecionar `StubPublicAuthenticationGateway` mesmo com `APP_SECURITY_IDENTITY_PROVIDER=cognito`, o que explicava respostas de autenticacao incompatíveis com o Cognito real.
-- `PublicAuthenticationConfig` foi corrigido para amarrar explicitamente `cognito` ao provider `cognito` e `stub` apenas ao provider `stub` ou ausente.
-- Entrou teste de regressao em `PublicAuthenticationConfigTest` para garantir a selecao correta do gateway de auth por provider.
-- A imagem `oryzem-backend-dev:custom-login-20260323-0053` foi publicada e a task definition `program-management-system:27` foi registrada.
-- O rollout da task `:27` ainda nao estabilizou no ECS; ao fim do dia a task `:26` seguia atendendo o ALB, mantendo a homologacao real do login proprio em aberto.
+- Foi identificado e corrigido o binding incorreto do provider de autenticacao publica para o gateway `cognito`.
+- Entrou teste de regressao em `PublicAuthenticationConfigTest` para garantir a selecao correta do gateway por provider.
+
+## 2026-03-24
+- Entrou a migration `V7__introduce_tenant_membership_and_market.sql`.
+- Entrou a migration `V8__allow_multiple_memberships_per_user.sql` para remover a restricao indevida que limitava memberships adicionais.
+- `tenant`, `tenant_market`, `user_membership`, `membership_role`, `app_permission` e `role_permission` passaram a existir explicitamente.
+- `organization` passou a carregar `tenant_id` explicito e `market_id` opcional sem perder a hierarquia por subarvore.
+- `AuthenticatedUser` e `AuthenticatedUserMapper` passaram a suportar `membershipId`, `activeTenantId`, `activeOrganizationId`, `activeMarketId`, `roles` e `permissions`.
+- `AccessContextService` passou a resolver o contexto ativo a partir de membership e a sincronizar um membership default a partir do modelo legado.
+- Entraram as APIs `/api/access/users/{userId}/memberships`, `/api/access/context/activate` e `/api/access/tenants/{tenantId}/markets`.
+- O backend passou a aceitar `X-Access-Context` para trocar o contexto ativo por request sem alterar o token do Cognito.
+- Organizacoes raiz agora provisionam `tenant` explicito e o bootstrap/reset passou a limpar tambem as estruturas contextuais novas.
+- Fluxos de `users`, `portfolio` e `/api/auth/me` seguem compatíveis com campos legados durante a transicao.

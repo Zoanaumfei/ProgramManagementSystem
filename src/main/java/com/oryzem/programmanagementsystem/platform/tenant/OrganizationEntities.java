@@ -25,6 +25,8 @@ class OrganizationEntity extends JpaPortfolioAuditableEntity {
     private String code;
     private OrganizationStatus status;
     private TenantType tenantType;
+    private String tenantId;
+    private String marketId;
     private OrganizationEntity parentOrganization;
     private OrganizationEntity customerOrganization;
     private Integer hierarchyLevel;
@@ -32,42 +34,59 @@ class OrganizationEntity extends JpaPortfolioAuditableEntity {
     protected OrganizationEntity() {
     }
 
-    static OrganizationEntity createRootExternal(String actor, String name, String code, OrganizationStatus status) {
+    static OrganizationEntity createRootExternal(
+            String organizationId,
+            String tenantId,
+            String actor,
+            String name,
+            String code,
+            OrganizationStatus status) {
         OrganizationEntity organization = new OrganizationEntity();
-        organization.initialize(PortfolioIds.newId("ORG"), actor);
+        organization.initialize(organizationId, actor);
         organization.name = name;
         organization.code = code;
         organization.status = status;
         organization.tenantType = TenantType.EXTERNAL;
+        organization.tenantId = tenantId;
         organization.hierarchyLevel = 0;
         organization.customerOrganization = organization;
         return organization;
     }
 
-    static OrganizationEntity createRootInternal(String actor, String name, String code, OrganizationStatus status) {
+    static OrganizationEntity createRootInternal(
+            String organizationId,
+            String tenantId,
+            String actor,
+            String name,
+            String code,
+            OrganizationStatus status) {
         OrganizationEntity organization = new OrganizationEntity();
-        organization.initialize(PortfolioIds.newId("ORG"), actor);
+        organization.initialize(organizationId, actor);
         organization.name = name;
         organization.code = code;
         organization.status = status;
         organization.tenantType = TenantType.INTERNAL;
+        organization.tenantId = tenantId;
         organization.hierarchyLevel = 0;
         organization.customerOrganization = null;
         return organization;
     }
 
     static OrganizationEntity createChild(
+            String organizationId,
             String actor,
             String name,
             String code,
             OrganizationStatus status,
             OrganizationEntity parentOrganization) {
         OrganizationEntity organization = new OrganizationEntity();
-        organization.initialize(PortfolioIds.newId("ORG"), actor);
+        organization.initialize(organizationId, actor);
         organization.name = name;
         organization.code = code;
         organization.status = status;
         organization.tenantType = TenantType.EXTERNAL;
+        organization.tenantId = parentOrganization.getTenantId();
+        organization.marketId = parentOrganization.getMarketId();
         organization.parentOrganization = parentOrganization;
         organization.customerOrganization = parentOrganization.getCustomerOrganization() != null
                 ? parentOrganization.getCustomerOrganization()
@@ -125,6 +144,24 @@ class OrganizationEntity extends JpaPortfolioAuditableEntity {
 
     protected void setTenantType(TenantType tenantType) {
         this.tenantType = tenantType;
+    }
+
+    @Column(name = "tenant_id", length = 64, nullable = false)
+    public String getTenantId() {
+        return tenantId;
+    }
+
+    protected void setTenantId(String tenantId) {
+        this.tenantId = tenantId;
+    }
+
+    @Column(name = "market_id", length = 96)
+    public String getMarketId() {
+        return marketId;
+    }
+
+    protected void setMarketId(String marketId) {
+        this.marketId = marketId;
     }
 
     @ManyToOne(fetch = FetchType.LAZY)

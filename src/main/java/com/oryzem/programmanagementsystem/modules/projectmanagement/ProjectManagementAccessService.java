@@ -64,7 +64,8 @@ class ProjectManagementAccessService {
     void assertCanViewPortfolio(AuthenticatedUser actor, String organizationId) {
         AuthorizationContext.Builder contextBuilder = AuthorizationContext.builder(AppModule.PORTFOLIO, Action.VIEW);
         if (organizationId != null && !organizationId.isBlank()) {
-            contextBuilder.resourceTenantId(organizationId).resourceTenantType(TenantType.EXTERNAL);
+            OrganizationLookup.OrganizationView organization = findOrganization(organizationId);
+            contextBuilder.resourceTenantId(organization.tenantId()).resourceTenantType(organization.tenantType());
         }
         assertAllowed(authorizationService.decide(actor, contextBuilder.build()));
         assertCanOperateOnVisiblePortfolio(actor, organizationId);
@@ -132,7 +133,7 @@ class ProjectManagementAccessService {
     }
 
     private Set<String> visibleOrganizationIds(AuthenticatedUser actor) {
-        if (actor == null || actor.tenantId() == null || actor.tenantId().isBlank()) {
+        if (actor == null || actor.organizationId() == null || actor.organizationId().isBlank()) {
             return Set.of();
         }
 
@@ -144,10 +145,10 @@ class ProjectManagementAccessService {
         }
 
         if (actor.tenantType() == TenantType.EXTERNAL && actor.hasRole(Role.SUPPORT)) {
-            return Set.of(actor.tenantId());
+            return Set.of(actor.organizationId());
         }
 
-        return organizationLookup.collectSubtreeIds(actor.tenantId());
+        return organizationLookup.collectSubtreeIds(actor.organizationId());
     }
 
     private boolean canViewAllOrganizations(AuthenticatedUser actor) {
@@ -163,7 +164,8 @@ class ProjectManagementAccessService {
     private void assertCanMutatePortfolio(AuthenticatedUser actor, String organizationId, Action action) {
         AuthorizationContext.Builder contextBuilder = AuthorizationContext.builder(AppModule.PORTFOLIO, action);
         if (organizationId != null && !organizationId.isBlank()) {
-            contextBuilder.resourceTenantId(organizationId).resourceTenantType(TenantType.EXTERNAL);
+            OrganizationLookup.OrganizationView organization = findOrganization(organizationId);
+            contextBuilder.resourceTenantId(organization.tenantId()).resourceTenantType(organization.tenantType());
         }
         assertAllowed(authorizationService.decide(actor, contextBuilder.build()));
         assertCanOperateOnVisiblePortfolio(actor, organizationId);

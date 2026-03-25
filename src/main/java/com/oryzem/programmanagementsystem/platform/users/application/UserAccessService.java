@@ -96,6 +96,7 @@ class UserAccessService {
 
     void enforceOrganizationScope(
             AuthenticatedUser actor,
+            String targetOrganizationId,
             String targetTenantId,
             TenantType targetTenantType,
             boolean crossTenantAllowed,
@@ -108,28 +109,28 @@ class UserAccessService {
             if (crossTenantAllowed && supportOverride) {
                 return;
             }
-            if (actor.tenantId() != null && actor.tenantId().equals(targetTenantId)) {
+            if (actor.organizationId() != null && actor.organizationId().equals(targetOrganizationId)) {
                 return;
             }
             throw new AccessDeniedException("Tenant scope mismatch for requested operation.");
         }
 
         if (actor.tenantType() == TenantType.EXTERNAL && actor.hasRole(Role.SUPPORT)) {
-            if (actor.tenantId() == null || !actor.tenantId().equals(targetTenantId)) {
+            if (actor.organizationId() == null || !actor.organizationId().equals(targetOrganizationId)) {
                 throw new AccessDeniedException("Tenant scope mismatch for requested operation.");
             }
             return;
         }
 
         if (actor.hasRole(Role.ADMIN) && actor.tenantType() == TenantType.EXTERNAL) {
-            Set<String> manageableOrganizationIds = organizationLookup.collectSubtreeIds(actor.tenantId());
-            if (!manageableOrganizationIds.contains(targetTenantId)) {
+            Set<String> manageableOrganizationIds = organizationLookup.collectSubtreeIds(actor.organizationId());
+            if (!manageableOrganizationIds.contains(targetOrganizationId)) {
                 throw new AccessDeniedException("Tenant scope mismatch for requested operation.");
             }
             return;
         }
 
-        if (actor.tenantId() != null && !actor.tenantId().equals(targetTenantId)) {
+        if (actor.organizationId() != null && !actor.organizationId().equals(targetOrganizationId)) {
             throw new AccessDeniedException("Tenant scope mismatch for requested operation.");
         }
 
@@ -138,15 +139,15 @@ class UserAccessService {
         }
     }
 
-    String resolveListTenantId(
+    String resolveListOrganizationId(
             AuthenticatedUser actor,
-            String tenantId,
+            String organizationId,
             boolean supportOverride,
             String justification) {
-        if (tenantId != null && !tenantId.isBlank()) {
-            String requestedTenantId = tenantId.trim();
-            enforceListScope(actor, requestedTenantId);
-            return requestedTenantId;
+        if (organizationId != null && !organizationId.isBlank()) {
+            String requestedOrganizationId = organizationId.trim();
+            enforceListScope(actor, requestedOrganizationId);
+            return requestedOrganizationId;
         }
 
         if (actor.hasRole(Role.ADMIN) && actor.tenantType() == TenantType.INTERNAL) {
@@ -165,15 +166,25 @@ class UserAccessService {
             return null;
         }
 
-        return actor.tenantId();
+        return actor.organizationId();
     }
 
-    TenantType resolveListTenantType(AuthenticatedUser actor, String effectiveTenantId) {
-        if (effectiveTenantId == null) {
+    String resolveBoundaryTenantId(String organizationId, AuthenticatedUser actor) {
+        if (organizationId == null || organizationId.isBlank()) {
+            return actor.tenantId();
+        }
+
+        return organizationLookup.findById(organizationId)
+                .map(OrganizationLookup.OrganizationView::tenantId)
+                .orElse(actor.tenantId());
+    }
+
+    TenantType resolveListTenantType(AuthenticatedUser actor, String effectiveOrganizationId) {
+        if (effectiveOrganizationId == null) {
             return null;
         }
 
-        return organizationLookup.findById(effectiveTenantId)
+        return organizationLookup.findById(effectiveOrganizationId)
                 .map(OrganizationLookup.OrganizationView::tenantType)
                 .orElse(actor.tenantType());
     }
@@ -181,7 +192,7 @@ class UserAccessService {
     TenantType resolveTenantTypeForOrganization(AuthenticatedUser actor, String organizationId) {
         return organizationLookup.findById(organizationId)
                 .map(OrganizationLookup.OrganizationView::tenantType)
-                .or(() -> actor.tenantId() != null && actor.tenantId().equals(organizationId)
+                .or(() -> actor.organizationId() != null && actor.organizationId().equals(organizationId)
                         ? java.util.Optional.ofNullable(actor.tenantType())
                         : java.util.Optional.empty())
                 .orElse(TenantType.EXTERNAL);
@@ -236,10 +247,10 @@ class UserAccessService {
 
     List<ManagedUser> selectUsersForScope(
             AuthenticatedUser actor,
-            String effectiveTenantId,
+            String effectiveOrganizationId,
             boolean supportOverride,
             String justification) {
-        if (effectiveTenantId == null) {
+        if (effectiveOrganizationId == null) {
             if (actor.hasRole(Role.ADMIN) && actor.tenantType() == TenantType.INTERNAL) {
                 return userRepository.findAll();
             }
@@ -253,14 +264,14 @@ class UserAccessService {
             }
         }
 
-        if (effectiveTenantId != null) {
-            return userRepository.findByTenantId(effectiveTenantId);
+        if (effectiveOrganizationId != null) {
+            return userRepository.findByTenantId(effectiveOrganizationId);
         }
 
         if (actor.hasRole(Role.ADMIN)
                 && actor.tenantType() == TenantType.EXTERNAL
-                && actor.tenantId() != null) {
-            Set<String> visibleOrganizationIds = organizationLookup.collectSubtreeIds(actor.tenantId());
+                && actor.organizationId() != null) {
+            Set<String> visibleOrganizationIds = organizationLookup.collectSubtreeIds(actor.organizationId());
             return userRepository.findAll().stream()
                     .filter(user -> visibleOrganizationIds.contains(user.tenantId()))
                     .toList();
@@ -275,21 +286,21 @@ class UserAccessService {
         }
 
         if (actor.hasRole(Role.SUPPORT) && actor.tenantType() == TenantType.INTERNAL) {
-            if (actor.tenantId() != null && actor.tenantId().equals(requestedTenantId)) {
+            if (actor.organizationId() != null && actor.organizationId().equals(requestedTenantId)) {
                 return;
             }
             return;
         }
 
         if (actor.hasRole(Role.ADMIN) && actor.tenantType() == TenantType.EXTERNAL) {
-            if (actor.tenantId() != null
-                    && organizationLookup.isSameOrDescendant(actor.tenantId(), requestedTenantId)) {
+            if (actor.organizationId() != null
+                    && organizationLookup.isSameOrDescendant(actor.organizationId(), requestedTenantId)) {
                 return;
             }
             throw new AccessDeniedException("Tenant scope mismatch for requested operation.");
         }
 
-        if (actor.tenantId() == null || !actor.tenantId().equals(requestedTenantId)) {
+        if (actor.organizationId() == null || !actor.organizationId().equals(requestedTenantId)) {
             throw new AccessDeniedException("Tenant scope mismatch for requested operation.");
         }
     }

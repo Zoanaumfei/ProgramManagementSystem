@@ -5,6 +5,7 @@ import com.oryzem.programmanagementsystem.platform.authorization.Role;
 import com.oryzem.programmanagementsystem.platform.authorization.TenantType;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.PortfolioResetPort;
 import com.oryzem.programmanagementsystem.modules.operations.OperationRepository;
+import com.oryzem.programmanagementsystem.platform.access.AccessContextResetService;
 import com.oryzem.programmanagementsystem.platform.tenant.OrganizationBootstrapPort;
 import com.oryzem.programmanagementsystem.platform.tenant.OrganizationLookup;
 import com.oryzem.programmanagementsystem.platform.users.domain.ManagedUser;
@@ -33,6 +34,9 @@ class BootstrapDataServiceTest {
 
     @Autowired
     private PortfolioResetPort portfolioResetPort;
+
+    @Autowired
+    private AccessContextResetService accessContextResetService;
 
     @Autowired
     private OrganizationBootstrapPort organizationBootstrapPort;
@@ -97,6 +101,7 @@ class BootstrapDataServiceTest {
                 operationRepository,
                 auditTrailService,
                 portfolioResetPort,
+                accessContextResetService,
                 organizationBootstrapPort,
                 userIdentityGateway,
                 properties);
@@ -126,6 +131,7 @@ class BootstrapDataServiceTest {
                 operationRepository,
                 auditTrailService,
                 portfolioResetPort,
+                accessContextResetService,
                 organizationBootstrapPort,
                 userIdentityGateway,
                 new BootstrapProperties(
@@ -178,6 +184,7 @@ class BootstrapDataServiceTest {
                 operationRepository,
                 auditTrailService,
                 portfolioResetPort,
+                accessContextResetService,
                 organizationBootstrapPort,
                 userIdentityGateway,
                 new BootstrapProperties(
@@ -202,6 +209,7 @@ class BootstrapDataServiceTest {
                 operationRepository,
                 auditTrailService,
                 portfolioResetPort,
+                accessContextResetService,
                 organizationBootstrapPort,
                 userIdentityGateway,
                 properties);

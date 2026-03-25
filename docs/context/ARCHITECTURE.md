@@ -1,20 +1,44 @@
 # Architecture
 
-Ultima atualizacao: `2026-03-22`
+Ultima atualizacao: `2026-03-24`
 
 ## Visao geral
 - Sistema atual: um unico backend Spring Boot e um unico frontend React.
 - Estilo arquitetural do backend: monolito modular.
 - Regra central: preservar 1 deploy e 1 aplicacao, preparando a base para eventual extracao futura sem virar microservicos agora.
-- Baseline atual: a arquitetura modular presente esta aceita como suficiente; as proximas iteracoes devem voltar o foco para produto.
+- Baseline atual: a arquitetura segue modular, mas a modelagem de acesso deixou de tratar `user` como centro de tenant e papel.
 
 ## Stack oficial
 - Backend: Java 21, Spring Boot 4, Maven, Spring Security, Spring Data JPA, Flyway.
 - Banco principal: PostgreSQL 17.6 no RDS.
 - Testes: H2 em modo compatibilidade PostgreSQL, Spring Boot Test, Spring Security Test.
 - Frontend: React, JavaScript, Vite, React Router, react-oidc-context, React Query, zod.
-- Auth: Amazon Cognito + JWT; Hosted UI ainda existe na trilha atual, mas o backend ja prepara login proprio brokerado.
+- Auth: Amazon Cognito + JWT; o Cognito continua sendo a fonte de autenticacao, enquanto a aplicacao resolve o contexto de acesso.
 - AWS: ECS/Fargate, ALB, ECR, RDS, Secrets Manager, Lambda de Pre Token Generation.
+
+## Modelo SaaS atual
+### Identidade global
+- `User` representa a identidade global da pessoa.
+- Campos globais continuam em `app_user`: `id`, `identity_subject`, `identity_username`, `email`, `display_name`, `status`, `created_at`.
+- Campos legados `role`, `tenant_id` e `tenant_type` ainda existem apenas para compatibilidade incremental.
+
+### Contexto de acesso
+- `Membership` e o novo vinculo contextual de acesso.
+- Cada `user_membership` responde por `tenant`, `organization`, `market`, status e papel(is) ativos.
+- O contexto autenticado agora suporta `membershipId`, `activeTenantId`, `activeOrganizationId`, `activeMarketId`, `roles` e `permissions`.
+- A aplicacao resolve esse contexto em `platform.access.AccessContextService`.
+- A selecao explicita do contexto pode acontecer por troca do membership default ou por header request-scoped `X-Access-Context`.
+
+### Fronteira SaaS
+- `tenant` e a fronteira SaaS explicita.
+- `organization` pertence a um `tenant` e pode opcionalmente apontar para um `market`.
+- `tenant_market` introduz a dimensao regional/comercial sem acoplar isso ao `user`.
+- `organization` continua suportando hierarquia e visibilidade por subarvore.
+
+### Autorizacao
+- `app_role`, `app_permission`, `membership_role` e `role_permission` preparam a autorizacao contextual.
+- O Cognito nao e usado como modelo completo de autorizacao; JWT autentica, a aplicacao autoriza.
+- O contexto ativo pode ser resolvido por subject, username, email e hint de contexto.
 
 ## Monolito modular atual
 ### `app`
@@ -26,14 +50,18 @@ Ultima atualizacao: `2026-03-22`
 ### `platform.authorization`
 - Matriz de autorizacao, contexto, decisao e `/api/authz/check`.
 
+### `platform.access`
+- Tenant explicito, market, membership, papeis contextuais, permissoes e resolucao do contexto autenticado.
+- Agora tambem abriga a administracao de memberships e markets via `/api/access/*`.
+
 ### `platform.audit`
 - Auditoria persistente e correlacao de requests.
 
 ### `platform.tenant`
-- Organizacoes, hierarquia por customer/subarvore, consulta de tenant e purge operacional.
+- Organizacoes, hierarquia por subarvore, fronteira organizacional e purge operacional.
 
 ### `platform.users`
-- Administracao de usuarios, sincronizacao com identidade e reconciliacao de sessao.
+- Administracao de usuarios, sincronizacao com identidade e compatibilidade incremental com o modelo legado.
 - Estrutura interna atual: `api`, `application`, `domain` e `infrastructure`.
 
 ### `platform.documents`
@@ -50,39 +78,28 @@ Ultima atualizacao: `2026-03-22`
 
 ## Fronteiras importantes entre modulos
 - `OrganizationLookup` pertence a `platform.tenant`.
+- `OrganizationBoundaryResolver` existe para leituras leves de tenant/market/tipo da organizacao sem puxar servicos de diretorio mais pesados.
 - `OrganizationBootstrapPort` permite ao bootstrap semear organizacoes sem acoplar no `OrganizationDirectoryService`.
 - `platform.tenant` consulta usuarios por `TenantUserQueryPort` e `TenantUserPurgePort`.
-- `modules.reports` le usuarios e operacoes por `ReportUserQueryPort` e `ReportOperationQueryPort`.
-- `modules.projectmanagement` consulta tenant e purge/reset por portas explicitas, sem depender diretamente da infraestrutura de `tenant`.
-- `PortfolioResetPort` permite ao bootstrap limpar `projectmanagement` sem depender do servico concreto.
-- `platform.documents` expoe `PortfolioDocumentStorageGateway` para o portfolio sem vazar JPA de outro modulo.
+- `platform.access` consulta usuarios via `UserRepository`, mas nao depende do diretorio completo de tenant para resolver o contexto.
+- `modules.projectmanagement` consulta tenant e purge/reset por portas explicitas, sem depender diretamente da infraestrutura concreta.
+- `PortfolioResetPort` e `AccessContextResetService` permitem resetar dados funcionais e contextuais durante bootstrap/testes.
 
-## Runtime atual de dev AWS
-- Regiao: `sa-east-1`
-- Cognito user pool: `sa-east-1_aA4I3tEmF`
-- Cognito app client: `rv7hk9nkugspb3i4p269sv828`
-- Hosted UI: `https://sa-east-1aa4i3temf.auth.sa-east-1.amazoncognito.com`
-- RDS: `program-management-system-db`
-- ECS cluster: `program-management-system-cluster`
-- ECS service: `program-management-system-service`
-- Task definition validada: `program-management-system:24`
-- ALB DNS atual: `program-management-system-alb-1082436660.sa-east-1.elb.amazonaws.com`
-- Secret do banco: `program-management-system/rds/master`
-- Lambda de token: `program-management-system-cognito-pre-token`
+## Runtime atual de seguranca
+- O backend opera como OAuth2 Resource Server stateless.
+- `AuthenticatedUser` agora carrega identidade global e contexto ativo de membership.
+- `AuthenticatedUserMapper` tenta resolver membership real primeiro e cai para claims legadas apenas como fallback.
+- `GET /api/auth/me` ja expone o contexto ativo, sem remover os campos legados de compatibilidade.
 
-## Observacoes tecnicas vigentes
-- O backend opera como OAuth2 Resource Server stateless; nao existe login por senha local, apenas broker Cognito para a trilha de login proprio.
-- A autorizacao final e feita na aplicacao, nao apenas nas claims.
-- O provider de documentos continua em `stub` no runtime atual; S3 real ainda nao foi fechado.
-- `ResourceNotFoundException` agora mora em `platform.shared`, e nao mais em `app`.
-- `PortfolioOrganizationService` e `UserManagementService` ja foram quebrados em servicos menores por responsabilidade.
-- `platform.users` ja nao depende diretamente de implementacao de tenant; a consulta de organizacao segue via `platform.tenant.OrganizationLookup`.
-- `app.bootstrap.BootstrapDataService` ainda usa `UserRepository` e `OperationRepository`, mas isso foi aceito como wiring de bootstrap por consumir contratos dos modulos, nao implementacoes concretas.
-- Guardrails com ArchUnit agora protegem fronteiras basicas e evitam regressao estrutural obvia.
+## Compatibilidade incremental
+- `app_user.role`, `app_user.tenant_id` e `app_user.tenant_type` seguem persistidos temporariamente.
+- `JpaUserRepository` faz dual-write para `user_membership` e `membership_role` ao salvar usuarios legados.
+- Claims antigas de tenant no Cognito ainda sao lidas como hint de contexto, nao mais como unica fonte de verdade.
+- Fluxos de usuarios, portfolio e bootstrap seguem funcionando sem exigir migracao abrupta do frontend.
 
 ## Referencias relacionadas
 - [Resumo compartilhado](./PROJECT_CONTEXT.md)
 - [Regras de negocio](./BUSINESS_RULES.md)
 - [Decisoes](./DECISIONS.md)
 - [Gaps abertos](./OPEN_GAPS.md)
-- [Detalhe do refactor modular](../../MODULAR_MONOLITH_REFACTOR.md)
+- [Hierarquia organizacional](../organization-hierarchy.md)

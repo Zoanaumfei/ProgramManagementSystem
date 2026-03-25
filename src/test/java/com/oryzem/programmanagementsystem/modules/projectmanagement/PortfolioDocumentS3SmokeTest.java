@@ -220,7 +220,7 @@ class PortfolioDocumentS3SmokeTest {
         HttpRequest.Builder requestBuilder = HttpRequest.newBuilder(URI.create(preparedUpload.get("uploadUrl").asText()))
                 .PUT(HttpRequest.BodyPublishers.ofByteArray(content));
         JsonNode requiredHeaders = preparedUpload.get("requiredHeaders");
-        requiredHeaders.fields().forEachRemaining(header -> requestBuilder.header(header.getKey(), header.getValue().asText()));
+        requiredHeaders.properties().forEach(header -> requestBuilder.header(header.getKey(), header.getValue().textValue()));
 
         HttpResponse<String> response = httpClient.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
         Assertions.assertThat(response.statusCode()).isIn(200, 201);
