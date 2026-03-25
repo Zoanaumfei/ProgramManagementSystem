@@ -104,34 +104,42 @@ public class AccessContextService {
             return;
         }
 
-        String tenantId = organizationBoundaryResolver.findBoundary(organizationId)
-                .map(OrganizationBoundaryResolver.OrganizationBoundaryView::tenantId)
-                .orElseGet(() -> "TEN-" + organizationId);
+        membershipRepository.findByUserIdAndDefaultMembershipTrue(user.id())
+                .ifPresentOrElse(
+                        membership -> synchronizeNonDestructive(user, membership),
+                        () -> synchronizeLegacyDefaultMembership(user));
+    }
+
+    @Transactional
+    public void synchronizeLegacyDefaultMembership(ManagedUser user) {
+        if (user == null || user.id() == null || user.id().isBlank()) {
+            return;
+        }
+
+        String organizationId = user.tenantId();
+        if (organizationId == null || organizationId.isBlank()) {
+            return;
+        }
+
+        var now = java.time.Instant.now();
         UserMembershipEntity membership = membershipRepository.findByUserIdAndDefaultMembershipTrue(user.id())
                 .orElseGet(() -> UserMembershipEntity.createDefault(
                         "MBR-" + user.id(),
                         user.id(),
-                        tenantId,
+                        resolveTenantId(organizationId),
                         organizationId,
                         null,
                         toMembershipStatus(user.status()),
                         user.createdAt(),
-                        user.createdAt()));
+                        now));
         membership.synchronizeDefaultContext(
-                tenantId,
+                resolveTenantId(organizationId),
                 organizationId,
                 null,
                 toMembershipStatus(user.status()),
-                user.createdAt());
+                now);
         membershipRepository.save(membership);
-
-        membershipRoleRepository.deleteByMembershipId(membership.getId());
-        if (user.role() != null) {
-            membershipRoleRepository.save(MembershipRoleEntity.create(
-                    "MBRROLE-" + membership.getId() + "-" + user.role().name(),
-                    membership.getId(),
-                    user.role().name()));
-        }
+        replaceLegacyCompatibilityRoles(membership.getId(), user.role());
     }
 
     @Transactional
@@ -143,6 +151,21 @@ public class AccessContextService {
         membershipRepository.findByUserIdOrderByDefaultMembershipDescJoinedAtAsc(userId)
                 .forEach(membership -> membershipRoleRepository.deleteByMembershipId(membership.getId()));
         membershipRepository.deleteByUserId(userId);
+    }
+
+    public ManagedUser hydrateLegacyCompatibilityView(ManagedUser user) {
+        if (user == null) {
+            return null;
+        }
+
+        return resolveActiveContext(user, null)
+                .map(context -> user.withUpdatedDetails(
+                        user.displayName(),
+                        user.email(),
+                        preferredLegacyRole(context.roles(), user.role()),
+                        context.activeOrganizationId() != null ? context.activeOrganizationId() : user.tenantId(),
+                        context.tenantType() != null ? context.tenantType() : user.tenantType()))
+                .orElse(user);
     }
 
     private Optional<ManagedUser> resolveUser(String identitySubject, String identityUsername, String email) {
@@ -184,6 +207,53 @@ public class AccessContextService {
 
     private MembershipStatus toMembershipStatus(UserStatus status) {
         return status == UserStatus.INACTIVE ? MembershipStatus.INACTIVE : MembershipStatus.ACTIVE;
+    }
+
+    private void synchronizeNonDestructive(ManagedUser user, UserMembershipEntity membership) {
+        var now = java.time.Instant.now();
+        String resolvedOrganizationId = hasText(membership.getOrganizationId()) ? membership.getOrganizationId() : user.tenantId();
+        String resolvedTenantId = hasText(membership.getTenantId()) ? membership.getTenantId() : resolveTenantId(resolvedOrganizationId);
+        membership.synchronizeDefaultContext(
+                resolvedTenantId,
+                resolvedOrganizationId,
+                membership.getMarketId(),
+                toMembershipStatus(user.status()),
+                now);
+        membershipRepository.save(membership);
+
+        if (membershipRoleRepository.findByMembershipId(membership.getId()).isEmpty() && user.role() != null) {
+            membershipRoleRepository.save(MembershipRoleEntity.create(
+                    "MBRROLE-" + membership.getId() + "-" + user.role().name(),
+                    membership.getId(),
+                    user.role().name()));
+        }
+    }
+
+    private void replaceLegacyCompatibilityRoles(String membershipId, Role role) {
+        membershipRoleRepository.deleteByMembershipId(membershipId);
+        if (role != null) {
+            membershipRoleRepository.save(MembershipRoleEntity.create(
+                    "MBRROLE-" + membershipId + "-" + role.name(),
+                    membershipId,
+                    role.name()));
+        }
+    }
+
+    private String resolveTenantId(String organizationId) {
+        return organizationBoundaryResolver.findBoundary(organizationId)
+                .map(OrganizationBoundaryResolver.OrganizationBoundaryView::tenantId)
+                .orElseGet(() -> "TEN-" + organizationId);
+    }
+
+    private Role preferredLegacyRole(Set<Role> roles, Role fallback) {
+        if (roles == null || roles.isEmpty()) {
+            return fallback;
+        }
+        List<Role> precedence = List.of(Role.ADMIN, Role.SUPPORT, Role.MANAGER, Role.AUDITOR, Role.MEMBER);
+        return precedence.stream()
+                .filter(roles::contains)
+                .findFirst()
+                .orElse(fallback != null ? fallback : roles.stream().sorted().findFirst().orElse(null));
     }
 
     private Optional<Role> toRole(String roleCode) {

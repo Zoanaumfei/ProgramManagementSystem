@@ -16,6 +16,7 @@ import com.oryzem.programmanagementsystem.platform.authorization.AuthorizationDe
 import com.oryzem.programmanagementsystem.platform.authorization.AuthorizationService;
 import com.oryzem.programmanagementsystem.platform.authorization.Role;
 import com.oryzem.programmanagementsystem.platform.authorization.TenantType;
+import com.oryzem.programmanagementsystem.platform.audit.AccessAdoptionTelemetryService;
 import com.oryzem.programmanagementsystem.platform.tenant.OrganizationLookup;
 import com.oryzem.programmanagementsystem.platform.users.domain.ManagedUser;
 import com.oryzem.programmanagementsystem.platform.users.domain.UserNotFoundException;
@@ -50,6 +51,7 @@ public class AccessAdministrationService {
     private final SpringDataUserMembershipJpaRepository membershipRepository;
     private final SpringDataMembershipRoleJpaRepository membershipRoleRepository;
     private final SpringDataRolePermissionJpaRepository rolePermissionRepository;
+    private final AccessAdoptionTelemetryService telemetryService;
 
     public AccessAdministrationService(
             UserRepository userRepository,
@@ -60,7 +62,8 @@ public class AccessAdministrationService {
             SpringDataTenantMarketJpaRepository tenantMarketRepository,
             SpringDataUserMembershipJpaRepository membershipRepository,
             SpringDataMembershipRoleJpaRepository membershipRoleRepository,
-            SpringDataRolePermissionJpaRepository rolePermissionRepository) {
+            SpringDataRolePermissionJpaRepository rolePermissionRepository,
+            AccessAdoptionTelemetryService telemetryService) {
         this.userRepository = userRepository;
         this.organizationLookup = organizationLookup;
         this.accessContextService = accessContextService;
@@ -70,15 +73,23 @@ public class AccessAdministrationService {
         this.membershipRepository = membershipRepository;
         this.membershipRoleRepository = membershipRoleRepository;
         this.rolePermissionRepository = rolePermissionRepository;
+        this.telemetryService = telemetryService;
     }
 
     @Transactional(readOnly = true)
     public List<MembershipResponse> listMemberships(AuthenticatedUser actor, String userId) {
         findRequiredUser(userId);
-        return membershipRepository.findByUserIdOrderByDefaultMembershipDescJoinedAtAsc(userId).stream()
+        List<MembershipResponse> memberships = membershipRepository.findByUserIdOrderByDefaultMembershipDescJoinedAtAsc(userId).stream()
                 .filter(membership -> canViewMembership(actor, membership))
                 .map(this::toMembershipResponse)
                 .toList();
+        String targetTenantId = memberships.stream()
+                .map(MembershipResponse::tenantId)
+                .filter(tenantId -> tenantId != null && !tenantId.isBlank())
+                .findFirst()
+                .orElse(actor.tenantId());
+        telemetryService.recordMembershipUsersUsage(actor, "list", targetTenantId, userId);
+        return memberships;
     }
 
     public MembershipResponse createMembership(
@@ -107,6 +118,7 @@ public class AccessAdministrationService {
                 now,
                 now));
         replaceRoles(saved.getId(), request.roles());
+        telemetryService.recordMembershipUsersUsage(actor, "create", scope.tenant().getId(), saved.getId());
         return toMembershipResponse(saved);
     }
 
@@ -134,6 +146,7 @@ public class AccessAdministrationService {
                 Instant.now());
         UserMembershipEntity saved = membershipRepository.save(existing);
         replaceRoles(saved.getId(), request.roles());
+        telemetryService.recordMembershipUsersUsage(actor, "update", scope.tenant().getId(), saved.getId());
         return toMembershipResponse(saved);
     }
 
@@ -163,6 +176,7 @@ public class AccessAdministrationService {
                         membershipRepository.save(membership);
                     });
         }
+        telemetryService.recordMembershipUsersUsage(actor, "delete", scope.tenant().getId(), saved.getId());
         return toMembershipResponse(saved);
     }
 

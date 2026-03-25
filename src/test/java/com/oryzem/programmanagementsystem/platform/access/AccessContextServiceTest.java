@@ -13,8 +13,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest(classes = com.oryzem.programmanagementsystem.app.ProgramManagementSystemApplication.class)
+@Transactional
 class AccessContextServiceTest {
 
     @Autowired
@@ -129,5 +131,94 @@ class AccessContextServiceTest {
         Assertions.assertThat(hintedContext.activeTenantId()).isEqualTo("TEN-tenant-b");
         Assertions.assertThat(hintedContext.roles()).containsExactly(Role.SUPPORT);
         Assertions.assertThat(hintedContext.membershipId()).isEqualTo("MBR-" + saved.id() + "-tenant-b");
+    }
+
+    @Test
+    void shouldPreserveMembershipManagedContextDuringNonLegacyUserSaves() {
+        ManagedUser saved = userRepository.save(new ManagedUser(
+                "USR-MBR-003",
+                "compat.user@oryzem.com",
+                null,
+                "Compatibility User",
+                "compat.user@oryzem.com",
+                Role.MEMBER,
+                "tenant-a",
+                TenantType.EXTERNAL,
+                UserStatus.ACTIVE,
+                Instant.parse("2026-03-24T21:10:00Z"),
+                null,
+                null));
+
+        UserMembershipEntity membership = membershipRepository.findByUserIdAndDefaultMembershipTrue(saved.id()).orElseThrow();
+        membership.updateContext(
+                "TEN-tenant-b",
+                "tenant-b",
+                null,
+                MembershipStatus.ACTIVE,
+                true,
+                Instant.parse("2026-03-24T21:11:00Z"));
+        membershipRepository.save(membership);
+        membershipRoleRepository.deleteByMembershipId(membership.getId());
+        membershipRoleRepository.save(MembershipRoleEntity.create(
+                "MBRROLE-" + saved.id() + "-ADMIN",
+                membership.getId(),
+                Role.ADMIN.name()));
+        membershipRoleRepository.save(MembershipRoleEntity.create(
+                "MBRROLE-" + saved.id() + "-SUPPORT",
+                membership.getId(),
+                Role.SUPPORT.name()));
+
+        userRepository.save(saved.withIdentitySubject("subject-membership-003"));
+
+        ManagedUser hydrated = userRepository.findById(saved.id()).orElseThrow();
+        ResolvedMembershipContext context = accessContextService.resolveActiveContext(
+                        "subject-membership-003",
+                        "compat.user@oryzem.com",
+                        "compat.user@oryzem.com",
+                        null)
+                .orElseThrow();
+
+        Assertions.assertThat(hydrated.tenantId()).isEqualTo("tenant-b");
+        Assertions.assertThat(hydrated.role()).isEqualTo(Role.ADMIN);
+        Assertions.assertThat(context.activeOrganizationId()).isEqualTo("tenant-b");
+        Assertions.assertThat(context.roles()).containsExactlyInAnyOrder(Role.ADMIN, Role.SUPPORT);
+    }
+
+    @Test
+    void shouldForceLegacyCompatibilitySyncWhenExplicitlyRequested() {
+        ManagedUser saved = userRepository.save(new ManagedUser(
+                "USR-MBR-004",
+                "legacy.sync@oryzem.com",
+                "subject-membership-004",
+                "Legacy Sync",
+                "legacy.sync@oryzem.com",
+                Role.MEMBER,
+                "tenant-a",
+                TenantType.EXTERNAL,
+                UserStatus.ACTIVE,
+                Instant.parse("2026-03-24T21:15:00Z"),
+                null,
+                null));
+
+        accessContextService.synchronizeLegacyDefaultMembership(saved.withUpdatedDetails(
+                saved.displayName(),
+                saved.email(),
+                Role.ADMIN,
+                "tenant-b",
+                TenantType.EXTERNAL));
+
+        ManagedUser hydrated = userRepository.findById(saved.id()).orElseThrow();
+        ResolvedMembershipContext context = accessContextService.resolveActiveContext(
+                        "subject-membership-004",
+                        "legacy.sync@oryzem.com",
+                        "legacy.sync@oryzem.com",
+                        null)
+                .orElseThrow();
+
+        Assertions.assertThat(hydrated.tenantId()).isEqualTo("tenant-b");
+        Assertions.assertThat(hydrated.role()).isEqualTo(Role.ADMIN);
+        Assertions.assertThat(context.activeTenantId()).isEqualTo("TEN-tenant-b");
+        Assertions.assertThat(context.activeOrganizationId()).isEqualTo("tenant-b");
+        Assertions.assertThat(context.roles()).containsExactly(Role.ADMIN);
     }
 }

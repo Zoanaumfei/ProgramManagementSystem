@@ -1,6 +1,6 @@
 # Architecture
 
-Ultima atualizacao: `2026-03-24`
+Ultima atualizacao: `2026-03-25`
 
 ## Visao geral
 - Sistema atual: um unico backend Spring Boot e um unico frontend React.
@@ -57,6 +57,7 @@ Ultima atualizacao: `2026-03-24`
 ### `platform.audit`
 - Auditoria persistente e correlacao de requests.
 - `RequestCorrelationFilter` propaga `X-Correlation-Id` e apoia rastreio do fluxo de troca de contexto.
+- `AccessAdoptionTelemetryService` mede adocao do legado de `/api/users` versus a trilha `membership-first`, com tags por `tenant`, `actor_role` e `operation`.
 
 ### `platform.tenant`
 - Organizacoes, hierarquia por subarvore, fronteira organizacional e purge operacional.
@@ -97,12 +98,25 @@ Ultima atualizacao: `2026-03-24`
 - Context switch agora e rastreavel ponta a ponta por `correlationId`, `membershipId` anterior/novo e `makeDefault`.
 - O frontend centraliza logs estruturados em `src/lib/observability.js` para requests com e sem `X-Access-Context`.
 - A UI deixou de usar invalidador amplo no switch de contexto e passou a invalidar seletivamente dominios de `current-user`, `access`, `users`, `portfolio` e `organizations`.
+- O backend passou a emitir telemetria de convivio do legado por:
+- contadores `pms.access.adoption.api.usage`
+- contadores `pms.access.adoption.api.blocked`
+- auditoria persistente com eventos `LEGACY_USERS_API_USAGE`, `MEMBERSHIP_USERS_API_USAGE` e `LEGACY_USERS_API_BLOCKED`
+- painel operacional em `GET /api/access/legacy-users/adoption-report`
 
 ## Compatibilidade incremental
 - `app_user.role`, `app_user.tenant_id` e `app_user.tenant_type` seguem persistidos temporariamente.
-- `JpaUserRepository` faz dual-write para `user_membership` e `membership_role` ao salvar usuarios legados.
+- `JpaUserRepository` passou a hidratar leituras de `ManagedUser` preferindo o membership default/contexto resolvido, reduzindo o uso de `app_user.role` e `app_user.tenant_id` como fonte primaria de leitura.
+- O dual-write legado foi reduzido:
+- salvamentos genericos de usuario agora sincronizam status e membership default sem sobrescrever roles/contexto ja gerenciados por membership-first
+- a sincronizacao forte de `role + organization` ficou restrita ao fluxo legado explicito de create/update em `/api/users`
 - Claims antigas de tenant no Cognito ainda sao lidas como hint de contexto, nao mais como unica fonte de verdade.
 - Fluxos de usuarios, portfolio e bootstrap seguem funcionando sem exigir migracao abrupta do frontend.
+- A trilha legada de `/api/users` agora e governada por feature flags:
+- `app.features.users-legacy.ui-enabled`
+- `app.features.users-legacy.read-enabled`
+- `app.features.users-legacy.write-enabled`
+- Os estagios operacionais suportados sao `ONLY_WARNING`, `READ_ONLY` e `OFF_BY_DEFAULT`.
 
 ## Referencias relacionadas
 - [Resumo compartilhado](./PROJECT_CONTEXT.md)

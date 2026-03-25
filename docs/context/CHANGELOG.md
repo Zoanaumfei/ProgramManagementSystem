@@ -1,6 +1,6 @@
 # Changelog
 
-Ultima atualizacao: `2026-03-24`
+Ultima atualizacao: `2026-03-25`
 
 ## 2026-03-07
 - Base inicial de autenticacao, autorizacao, persistencia e modulos `users`, `operations` e `reports`.
@@ -75,3 +75,19 @@ Ultima atualizacao: `2026-03-24`
 - `GET /api/access/tenants` passou a ser a fonte explicita de tenant label no frontend, sem heuristica via organizacoes visiveis.
 - O bloco legado de `/api/users` foi reforcado como trilha de compatibilidade, com guardrail explicito para evitar uso como superficie primaria de telas novas.
 - Foi adicionado checklist de homologacao manual multi-membership/multi-market e plano funcional de rollback em `docs/context/HOMOLOGATION_CHECKLIST.md`.
+
+## 2026-03-25
+- Entrou a estrategia backend de deprecacao progressiva de `/api/users`, controlada por feature flags `users-legacy`.
+- O legado agora publica headers de deprecacao e opera por estagios `ONLY_WARNING`, `READ_ONLY` e `OFF_BY_DEFAULT`.
+- `GET /api/access/legacy-users/deprecation-status` passou a expor o estado efetivo das flags por ambiente.
+- `GET /api/access/legacy-users/adoption-report` passou a consolidar adocao do legado versus `membership-first`, com totais, share percentual, tendencia semanal, quebrando por operacao, perfil e tenants ainda dependentes.
+- O backend passou a registrar telemetria Micrometer e auditoria persistente para `/api/users` e `/api/access/users/{userId}/memberships`.
+- Entraram testes de integracao cobrindo os estados `ONLY_WARNING`, `READ_ONLY` e `OFF_BY_DEFAULT`, alem de um guardrail para evitar novas rotas backend em `/api/users`.
+- Foram definidos defaults por profile:
+- `dev` e `homolog`: legado visivel com leitura e escrita liberadas.
+- `prod`: legado oculto por padrao na flag de UI, mantendo leitura e escrita liberadas enquanto o desligamento nao avanca.
+- Entrou o runbook operacional `docs/context/LEGACY_USERS_DEPRECATION_RUNBOOK.md` para rollout, sinais de alerta e rollback.
+- Comecou a fase de reducao do dual-write legado de `app_user.role` e `app_user.tenant_id`.
+- Leituras do repositorio de usuarios agora preferem o contexto resolvido por membership default.
+- Salvamentos nao-legados de usuario deixaram de sobrescrever roles/contexto de membership ja administrados pela trilha membership-first.
+- A sincronizacao forte do legacy shape ficou restrita ao create/update explicito de `/api/users`.

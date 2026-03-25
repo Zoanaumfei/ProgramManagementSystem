@@ -1,6 +1,6 @@
 # Frontend Backend Alignment
 
-Ultima atualizacao: `2026-03-24`
+Ultima atualizacao: `2026-03-25`
 
 ## Backend ja entrega
 - `/api/auth/me`, `/api/authz/check`, `/api/users`, `/api/operations`, `/api/reports` e `/api/portfolio` protegidos por JWT do Cognito.
@@ -13,6 +13,9 @@ Ultima atualizacao: `2026-03-24`
 - `POST /api/access/context/activate`
 - `GET /api/access/tenants`
 - `GET/POST/PUT/DELETE /api/access/tenants/{tenantId}/markets`
+- APIs operacionais de deprecacao:
+- `GET /api/access/legacy-users/deprecation-status`
+- `GET /api/access/legacy-users/adoption-report`
 - Hierarquia de organizacoes por customer/subarvore.
 - Portfolio agregado com milestones, projetos, produtos, itens, entregaveis, documentos e open issues.
 
@@ -49,15 +52,18 @@ Ultima atualizacao: `2026-03-24`
 - O `access_token` continua sendo a trilha principal; o fallback de `id_token` ainda precisa ser removido com seguranca.
 - A visualizacao de organizacoes ainda e majoritariamente em lista enriquecida; a arvore visual completa continua pendente.
 - O bloco legado de `/api/users` continua disponivel, mas esta marcado como `compatibilidade` e nao deve ser usado como trilha primaria para novas telas administrativas.
+- O backend agora envia headers de deprecacao no legado e pode reduzir o contrato para `READ_ONLY` ou `OFF_BY_DEFAULT` por feature flag, sem remocao imediata de codigo.
 
 ## Pendencias de integracao
 - Homologar ponta a ponta a trilha nova de memberships no workspace administrativo.
 - Homologar ponta a ponta o seletor de contexto ativo com troca entre tenant, organization e market.
 - Homologar ponta a ponta a superficie administrativa de markets por tenant.
 - Refinar a sinalizacao visual do bloco legado de `/api/users` como compatibilidade.
+- Consumir `GET /api/access/legacy-users/deprecation-status` para governar rollout visual por ambiente quando a UI entrar na fase de ocultacao controlada.
 - Continuar a homologacao do fluxo de auth proprio com Cognito real.
 - Aplicar bucket + policy IAM no runtime AWS para virar documentos de `stub` para `S3` real.
 - Executar o checklist manual de homologacao e rollback descrito em `docs/context/HOMOLOGATION_CHECKLIST.md`.
+- Usar `GET /api/access/legacy-users/adoption-report` como base do painel de acompanhamento da migracao.
 
 ## Roteiro manual sugerido agora
 - Criar ou localizar um usuario com mais de um membership.

@@ -1,6 +1,6 @@
 # API Contract
 
-Ultima atualizacao: `2026-03-24`
+Ultima atualizacao: `2026-03-25`
 
 ## Auth e erros
 - Backend protegido por Bearer JWT do Cognito.
@@ -154,28 +154,51 @@ Ultima atualizacao: `2026-03-24`
 ### `GET /api/users`
 - Filtros: `organizationId`, `tenantId` legado, `supportOverride`, `justification`.
 - Response: lista de `UserSummaryResponse`.
+- Deprecacao: endpoint legado. Responses bem-sucedidas devolvem `Deprecation: true`, `Warning`, `X-Legacy-Users-Stage`, `X-Legacy-Users-UI-Enabled`, `X-Legacy-Users-Read-Enabled` e `X-Legacy-Users-Write-Enabled`.
+- Flag gate: quando `users_legacy_read_enabled=false`, retorna `404` com `currentStage`, `operation` e `replacementPath`.
 
 ### `POST /api/users`
 - Request: `displayName`, `email`, `role`, `organizationId`.
 - Response: `201 Created` com `UserSummaryResponse`.
 - Observacao: o contrato ainda recebe um papel unico e uma organizacao principal; internamente isso sincroniza o membership default durante a transicao.
+- Flag gate: quando `users_legacy_write_enabled=false`, retorna `409` com `currentStage`, `operation` e `replacementPath`.
 
 ### `PUT /api/users/{userId}`
 - Request: `displayName`, `email`, `role`, `organizationId`.
 - Response: `UserSummaryResponse`.
+- Flag gate: quando `users_legacy_write_enabled=false`, retorna `409`.
 
 ### `DELETE /api/users/{userId}`
 - Efeito: inativacao logica.
 - Response: `204 No Content`.
+- Flag gate: quando `users_legacy_write_enabled=false`, retorna `409`.
 
 ### `POST /api/users/{userId}/resend-invite`
 ### `POST /api/users/{userId}/reset-access`
 ### `POST /api/users/{userId}/purge`
 - Query params sensiveis: `supportOverride`, `justification`.
 - Response: `userId`, `action`, `performedAt`, `status`.
+- Flag gate: quando `users_legacy_write_enabled=false`, retorna `409`.
 
 ### `UserSummaryResponse`
 - `id`, `displayName`, `email`, `role`, `organizationId`, `organizationName`, `status`, `createdAt`, `inviteResentAt`, `accessResetAt`
+
+## Deprecacao do legado de users
+### `GET /api/access/legacy-users/deprecation-status`
+- Uso: consultar flags efetivas e estagio atual do desligamento progressivo.
+- Acesso: `ADMIN` ou `SUPPORT` internos.
+- Response: `usersLegacyUiEnabled`, `usersLegacyReadEnabled`, `usersLegacyWriteEnabled`, `currentStage`, `legacyPath`, `replacementPath`, `generatedAt`.
+
+### `GET /api/access/legacy-users/adoption-report`
+- Uso: painel operacional para acompanhar adocao do fluxo `membership-first`.
+- Acesso: `ADMIN` ou `SUPPORT` internos.
+- Query param: `trailingDays` com minimo efetivo de `7`.
+- Response:
+- totais: `legacyOperations`, `membershipOperations`, `legacySharePercent`, `membershipSharePercent`
+- quebras: `operationBreakdown`, `roleBreakdown`, `weeklyTrend`
+- dependencias: `tenantsStillDependentOnLegacy`
+- flags efetivas: `currentStage`, `usersLegacyUiEnabled`, `usersLegacyReadEnabled`, `usersLegacyWriteEnabled`
+- Os dados sao construidos a partir de auditoria persistente e contadores Micrometer por `tenant`, `actor_role`, `operation` e `api_family`.
 
 ## Portfolio
 ### Milestone templates
@@ -206,3 +229,10 @@ Ultima atualizacao: `2026-03-24`
 - `/api/users` continua existindo apenas como trilha de compatibilidade durante a migracao.
 - A primeira fase usa `user` legado como fonte de sincronizacao do membership default.
 - Claims legadas de tenant seguem aceitas como hint de resolucao de contexto, nao como verdade absoluta.
+- Feature flags do backend:
+- `app.features.users-legacy.ui-enabled`
+- `app.features.users-legacy.read-enabled`
+- `app.features.users-legacy.write-enabled`
+- Defaults por profile:
+- `dev` e `homolog`: legado visivel, leitura liberada, escrita liberada.
+- `prod`: legado oculto por padrao na flag de UI, mas leitura/escrita continuam liberadas ate avancarmos para `READ_ONLY` ou `OFF_BY_DEFAULT`.

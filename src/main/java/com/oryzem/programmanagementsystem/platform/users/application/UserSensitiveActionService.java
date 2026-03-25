@@ -6,6 +6,7 @@ import com.oryzem.programmanagementsystem.platform.authorization.AuthenticatedUs
 import com.oryzem.programmanagementsystem.platform.authorization.AuthorizationContext;
 import com.oryzem.programmanagementsystem.platform.authorization.AuthorizationDecision;
 import com.oryzem.programmanagementsystem.platform.authorization.AuthorizationService;
+import com.oryzem.programmanagementsystem.platform.audit.AccessAdoptionTelemetryService;
 import com.oryzem.programmanagementsystem.platform.tenant.OrganizationLookup;
 import com.oryzem.programmanagementsystem.platform.users.api.UserActionResponse;
 import com.oryzem.programmanagementsystem.platform.users.domain.ManagedUser;
@@ -24,18 +25,21 @@ class UserSensitiveActionService {
     private final UserAccessService accessService;
     private final UserIdentityGateway userIdentityGateway;
     private final OrganizationLookup organizationLookup;
+    private final AccessAdoptionTelemetryService telemetryService;
 
     UserSensitiveActionService(
             UserRepository userRepository,
             AuthorizationService authorizationService,
             UserAccessService accessService,
             UserIdentityGateway userIdentityGateway,
-            OrganizationLookup organizationLookup) {
+            OrganizationLookup organizationLookup,
+            AccessAdoptionTelemetryService telemetryService) {
         this.userRepository = userRepository;
         this.authorizationService = authorizationService;
         this.accessService = accessService;
         this.userIdentityGateway = userIdentityGateway;
         this.organizationLookup = organizationLookup;
+        this.telemetryService = telemetryService;
     }
 
     UserActionResponse resendInvite(
@@ -102,6 +106,7 @@ class UserSensitiveActionService {
                 target.id(),
                 justification,
                 decision.crossTenant());
+        telemetryService.recordLegacyUsersUsage(actor, action.name(), targetOrganization.tenantId(), target.id());
 
         return new UserActionResponse(target.id(), action.name(), performedAt, "OK");
     }
