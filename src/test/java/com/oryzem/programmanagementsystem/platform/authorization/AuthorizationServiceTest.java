@@ -7,13 +7,25 @@ import org.springframework.beans.factory.ObjectProvider;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class AuthorizationServiceTest {
 
+    private final AccessContextService accessContextService = mock(AccessContextService.class);
     private final AuthorizationService authorizationService =
             new AuthorizationService(
                     new AuthorizationMatrix(),
-                    new AuthenticatedUserMapper(mock(AccessContextService.class), mock(ObjectProvider.class)));
+                    new AuthenticatedUserMapper(accessContextService, mock(ObjectProvider.class)),
+                    accessContextService);
+
+    AuthorizationServiceTest() {
+        when(accessContextService.canonicalTenantId("tenant-a")).thenReturn("TEN-tenant-a");
+        when(accessContextService.canonicalTenantId("tenant-b")).thenReturn("TEN-tenant-b");
+        when(accessContextService.canonicalTenantId("internal-core")).thenReturn("TEN-internal-core");
+        when(accessContextService.canonicalTenantId("TEN-tenant-a")).thenReturn("TEN-tenant-a");
+        when(accessContextService.canonicalTenantId("TEN-tenant-b")).thenReturn("TEN-tenant-b");
+        when(accessContextService.canonicalTenantId("TEN-internal-core")).thenReturn("TEN-internal-core");
+    }
 
     @Test
     void managerCannotDeleteMemberInUsersModule() {

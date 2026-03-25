@@ -1,238 +1,110 @@
 # API Contract
 
-Ultima atualizacao: `2026-03-25`
+## Supported endpoints
+- `GET /api/auth/me`
+- `POST /api/access/context/activate`
+- `GET /api/access/users`
+- `POST /api/access/users`
+- `PUT /api/access/users/{userId}`
+- `DELETE /api/access/users/{userId}`
+- `POST /api/access/users/{userId}/resend-invite`
+- `POST /api/access/users/{userId}/reset-access`
+- `POST /api/access/users/{userId}/purge`
+- `GET /api/access/users/{userId}/memberships`
+- `POST /api/access/users/{userId}/memberships`
+- `PUT /api/access/users/{userId}/memberships/{membershipId}`
+- `DELETE /api/access/users/{userId}/memberships/{membershipId}`
+- `GET /api/access/tenants`
+- `GET /api/access/tenants/{tenantId}/markets`
+- `POST /api/access/tenants/{tenantId}/markets`
+- `PUT /api/access/tenants/{tenantId}/markets/{marketId}`
+- `DELETE /api/access/tenants/{tenantId}/markets/{marketId}`
 
-## Auth e erros
-- Backend protegido por Bearer JWT do Cognito.
-- `X-Correlation-Id` e aceito como header de entrada e devolvido nas respostas para rastreio ponta a ponta.
-- Endpoints publicos atuais:
-- `GET /public/ping`
-- `GET /public/auth/config`
-- `POST /public/auth/login`
-- `POST /public/auth/login/new-password`
-- `POST /public/auth/password-reset/code`
-- `POST /public/auth/password-reset/confirm`
-- `POST /public/auth/refresh`
-- `GET /actuator/health`
-- `GET /actuator/health/liveness`
-- `GET /actuator/health/readiness`
-- `401` e retornado sem token valido.
-- `403` e retornado quando a sessao autenticada nao possui permissao.
-- `409` e retornado para conflitos de negocio tratados.
-- `429` e retornado quando o Cognito aplica rate limit tratado pelo backend.
-- `401`, `403`, `404` e `500` retornam JSON com `correlationId`.
-- Requests autenticados e anonimos agora geram log estruturado com presenca/ausencia de `X-Access-Context`.
+## Auth me
+`GET /api/auth/me` returns the authenticated identity plus resolved access context.
 
-## Sessao e autorizacao
-### `GET /public/auth/config`
-- Uso: bootstrap do frontend.
-- Resposta: `provider`, `mode=custom-login-ready`, `issuerUri`, `jwkSetUri`, `appClientId`, `timestamp`.
+Fields:
+- `subject`
+- `username`
+- `email`
+- `emailVerified`
+- `emailVerificationRequired`
+- `tokenUse`
+- `userId`
+- `membershipId`
+- `activeTenantId`
+- `activeTenantName`
+- `activeOrganizationId`
+- `activeOrganizationName`
+- `activeMarketId`
+- `activeMarketName`
+- `tenantType`
+- `roles`
+- `permissions`
+- `groups`
+- `scopes`
+- `authorities`
+- `timestamp`
 
-### `POST /public/auth/login`
-- Request: `username`, `password`
-- Uso: login programatico do frontend contra Cognito, sem Hosted UI.
-- Response:
-- `status=AUTHENTICATED` com `accessToken`, `idToken`, `refreshToken`, `expiresIn`, `tokenType`
-- `status=NEW_PASSWORD_REQUIRED` com `challengeName=NEW_PASSWORD_REQUIRED` e `session`
-- `status=PASSWORD_RESET_REQUIRED` quando o usuario precisa concluir reset por codigo
-- `401` para credenciais invalidas
+Legacy claim echo fields were removed. The access context is always resolved from local membership data.
 
-### `POST /public/auth/login/new-password`
-- Request: `username`, `session`, `newPassword`
-- Uso: concluir o desafio `NEW_PASSWORD_REQUIRED`.
-- Response: mesmo payload de autenticacao com `status=AUTHENTICATED`.
+## User account admin
+`/api/access/users` manages the global user account plus the default access assignment used by the administrative flow.
 
-### `POST /public/auth/password-reset/code`
-- Request: `username`
-- Uso: solicitar codigo de reset de senha para login proprio ou self-service.
-- Response: `status=CODE_SENT`, `username`, `deliveryMedium`, `destination`.
+Request shape for create/update:
+```json
+{
+  "displayName": "Jane Doe",
+  "email": "jane@customer.com",
+  "role": "ADMIN",
+  "organizationId": "tenant-a"
+}
+```
 
-### `POST /public/auth/password-reset/confirm`
-- Request: `username`, `code`, `newPassword`
-- Uso: confirmar o codigo de reset recebido por email.
-- Response: `status=PASSWORD_RESET_CONFIRMED`, `username`.
+Response shape:
+```json
+{
+  "id": "USR-...",
+  "displayName": "Jane Doe",
+  "email": "jane@customer.com",
+  "role": "ADMIN",
+  "organizationId": "tenant-a",
+  "organizationName": "Tenant A",
+  "status": "INVITED",
+  "createdAt": "...",
+  "inviteResentAt": null,
+  "accessResetAt": null
+}
+```
 
-### `POST /public/auth/refresh`
-- Request: `username`, `refreshToken`
-- Uso: renovar sessao no frontend proprio sem Hosted UI.
-- Response: mesmo payload de autenticacao com `status=AUTHENTICATED`.
+Important:
+- effective authorization is not read from `app_user`
+- role and organization shown here are resolved and persisted through membership handling
+- the membership APIs remain the source of truth for contextual access
+- this endpoint is still a combined account-plus-initial-membership bootstrap surface; a future split to a pure `user_account` contract is still pending
 
-### `GET /api/auth/me`
-- Uso: contexto autenticado atual.
-- Resposta atual inclui:
-- identidade: `subject`, `userId`, `username`, `email`, `emailVerified`, `emailVerificationRequired`, `tokenUse`
-- contexto novo: `membershipId`, `activeTenantId`, `activeTenantName`, `activeOrganizationId`, `activeOrganizationName`, `activeMarketId`, `activeMarketName`, `roles`, `permissions`
-- compatibilidade: `tenantId`, `tenantType`, `tenantIdClaim`, `tenantTypeClaim`, `userStatusClaim`
-- diagnostico: `groups`, `scopes`, `authorities`, `timestamp`
-- Header opcional: `X-Access-Context`
-- Efeito do header: permite pedir um membership/contexto especifico por request sem trocar o default persistido.
-- Header de resposta: `X-Correlation-Id`
+## Membership admin
+Membership is the first-class access resource.
 
-## Access
-### `GET /api/access/users/{userId}/memberships`
-- Uso: listar memberships visiveis de um usuario.
-- Response: lista de `MembershipResponse`.
+`MembershipResponse` includes:
+- `id`
+- `userId`
+- `tenantId`
+- `tenantName`
+- `organizationId`
+- `organizationName`
+- `marketId`
+- `marketName`
+- `status`
+- `defaultMembership`
+- `joinedAt`
+- `updatedAt`
+- `roles`
+- `permissions`
 
-### `POST /api/access/users/{userId}/memberships`
-- Uso: criar um membership adicional para um usuario existente.
-- Request: `tenantId`, `organizationId`, `marketId`, `status`, `defaultMembership`, `roles[]`.
-- Response: `201 Created` com `MembershipResponse`.
+## Markets
+Markets are tenant-scoped and can be inactivated only when not referenced by active memberships or organizations.
 
-### `PUT /api/access/users/{userId}/memberships/{membershipId}`
-- Uso: atualizar tenant/contexto/roles/status de um membership existente.
-- Request: mesmo shape de criacao.
-- Response: `MembershipResponse`.
-
-### `DELETE /api/access/users/{userId}/memberships/{membershipId}`
-- Uso: inativar um membership.
-- Response: `MembershipResponse`.
-
-### `POST /api/access/context/activate`
-- Uso: trocar explicitamente o contexto ativo do proprio usuario.
-- Request: `membershipId`, `makeDefault`.
-- Response: `ActiveAccessContextResponse`.
-- Observacao: com `makeDefault=true`, o membership passa a ser o contexto default resolvido pela aplicacao.
-- Observabilidade: backend registra `membershipId` anterior/novo, `makeDefault`, tenant, organization, market e `correlationId`.
-
-### `GET /api/access/tenants`
-- Uso: listar os tenants visiveis para o ator autenticado no contexto atual.
-- Response: lista de `TenantSummaryResponse`.
-- Campos principais: `id`, `name`, `code`, `status`, `tenantType`, `rootOrganizationId`.
-- Observacao: esta e a fonte explicita de label de tenant para o frontend; nao deve haver inferencia de tenant por organizacoes visiveis.
-
-### `GET /api/access/tenants/{tenantId}/markets`
-- Uso: listar markets de um tenant.
-- Response: lista de `TenantMarketResponse`.
-
-### `POST /api/access/tenants/{tenantId}/markets`
-- Uso: criar market explicito em um tenant.
-- Request: `code`, `name`, `status`, `currencyCode`, `languageCode`, `timezone`.
-- Response: `201 Created` com `TenantMarketResponse`.
-
-### `PUT /api/access/tenants/{tenantId}/markets/{marketId}`
-- Uso: atualizar market.
-- Response: `TenantMarketResponse`.
-
-### `DELETE /api/access/tenants/{tenantId}/markets/{marketId}`
-- Uso: inativar market.
-- Response: `TenantMarketResponse`.
-
-### `GET /api/authz/check`
-- Uso: diagnostico e validacao da matriz de autorizacao.
-- Parametros principais: `module`, `action`, `resourceTenantId`, `resourceTenantType`, `targetRole`, `supportOverride`, `justification`.
-- Resposta: `allowed`, `reason`, `restrictions`, `auditRequired`, `maskedViewRequired`, `crossTenant`, `timestamp`.
-
-## Organizacoes
-### `GET /api/portfolio/organizations`
-- Filtros: `status`, `setupStatus`, `customerOrganizationId`, `parentOrganizationId`, `hierarchyLevel`, `search`.
-- Resposta: lista de `OrganizationResponse`.
-- Campos principais: `id`, `name`, `code`, `tenantId`, `marketId`, `tenantType`, `parentOrganizationId`, `customerOrganizationId`, `hierarchyLevel`, `childrenCount`, `hasChildren`, `status`, `setupStatus`, `userSummary`, `programSummary`, `canInactivate`, `inactivationBlockedReason`, `createdAt`, `updatedAt`.
-
-### `GET /api/portfolio/organizations/{organizationId}`
-- Uso: detalhe administrativo de organizacao.
-- Resposta: mesmo shape de `OrganizationResponse`.
-
-### `POST /api/portfolio/organizations`
-- Request: `name`, `code`, `parentOrganizationId`, `status`.
-- Observacao: `parentOrganizationId=null` cria tenant/organizacao raiz e exige `ADMIN INTERNAL`.
-- Response: `OrganizationResponse`.
-
-### `PUT /api/portfolio/organizations/{organizationId}`
-- Request: `name`, `code`.
-- Response: `OrganizationResponse`.
-
-### `DELETE /api/portfolio/organizations/{organizationId}`
-- Sem body.
-- Efeito: inativacao logica.
-- Response: `OrganizationResponse`.
-
-### `POST /api/portfolio/organizations/{organizationId}/purge-subtree`
-- Query params: `supportOverride`, `justification`.
-- Response: `organizationId`, `action`, `performedAt`, `status`, `purgedOrganizations`, `purgedPrograms`, `purgedUsers`, `purgedDocuments`.
-
-## Users
-### `GET /api/users`
-- Filtros: `organizationId`, `tenantId` legado, `supportOverride`, `justification`.
-- Response: lista de `UserSummaryResponse`.
-- Deprecacao: endpoint legado. Responses bem-sucedidas devolvem `Deprecation: true`, `Warning`, `X-Legacy-Users-Stage`, `X-Legacy-Users-UI-Enabled`, `X-Legacy-Users-Read-Enabled` e `X-Legacy-Users-Write-Enabled`.
-- Flag gate: quando `users_legacy_read_enabled=false`, retorna `404` com `currentStage`, `operation` e `replacementPath`.
-
-### `POST /api/users`
-- Request: `displayName`, `email`, `role`, `organizationId`.
-- Response: `201 Created` com `UserSummaryResponse`.
-- Observacao: o contrato ainda recebe um papel unico e uma organizacao principal; internamente isso sincroniza o membership default durante a transicao.
-- Flag gate: quando `users_legacy_write_enabled=false`, retorna `409` com `currentStage`, `operation` e `replacementPath`.
-
-### `PUT /api/users/{userId}`
-- Request: `displayName`, `email`, `role`, `organizationId`.
-- Response: `UserSummaryResponse`.
-- Flag gate: quando `users_legacy_write_enabled=false`, retorna `409`.
-
-### `DELETE /api/users/{userId}`
-- Efeito: inativacao logica.
-- Response: `204 No Content`.
-- Flag gate: quando `users_legacy_write_enabled=false`, retorna `409`.
-
-### `POST /api/users/{userId}/resend-invite`
-### `POST /api/users/{userId}/reset-access`
-### `POST /api/users/{userId}/purge`
-- Query params sensiveis: `supportOverride`, `justification`.
-- Response: `userId`, `action`, `performedAt`, `status`.
-- Flag gate: quando `users_legacy_write_enabled=false`, retorna `409`.
-
-### `UserSummaryResponse`
-- `id`, `displayName`, `email`, `role`, `organizationId`, `organizationName`, `status`, `createdAt`, `inviteResentAt`, `accessResetAt`
-
-## Deprecacao do legado de users
-### `GET /api/access/legacy-users/deprecation-status`
-- Uso: consultar flags efetivas e estagio atual do desligamento progressivo.
-- Acesso: `ADMIN` ou `SUPPORT` internos.
-- Response: `usersLegacyUiEnabled`, `usersLegacyReadEnabled`, `usersLegacyWriteEnabled`, `currentStage`, `legacyPath`, `replacementPath`, `generatedAt`.
-
-### `GET /api/access/legacy-users/adoption-report`
-- Uso: painel operacional para acompanhar adocao do fluxo `membership-first`.
-- Acesso: `ADMIN` ou `SUPPORT` internos.
-- Query param: `trailingDays` com minimo efetivo de `7`.
-- Response:
-- totais: `legacyOperations`, `membershipOperations`, `legacySharePercent`, `membershipSharePercent`
-- quebras: `operationBreakdown`, `roleBreakdown`, `weeklyTrend`
-- dependencias: `tenantsStillDependentOnLegacy`
-- flags efetivas: `currentStage`, `usersLegacyUiEnabled`, `usersLegacyReadEnabled`, `usersLegacyWriteEnabled`
-- Os dados sao construidos a partir de auditoria persistente e contadores Micrometer por `tenant`, `actor_role`, `operation` e `api_family`.
-
-## Portfolio
-### Milestone templates
-- `GET /api/portfolio/milestone-templates`
-- `POST /api/portfolio/milestone-templates`
-
-### Programs
-- `GET /api/portfolio/programs`
-- Filtro: `ownerOrganizationId`
-- `POST /api/portfolio/programs`
-- `GET /api/portfolio/programs/{programId}`
-
-### Camadas de criacao
-- `POST /api/portfolio/programs/{programId}/projects`
-- `POST /api/portfolio/projects/{projectId}/products`
-- `POST /api/portfolio/products/{productId}/items`
-- `POST /api/portfolio/items/{itemId}/deliverables`
-- `POST /api/portfolio/programs/{programId}/open-issues`
-
-### Documentos de entregavel
-- `GET /api/portfolio/deliverables/{deliverableId}/documents`
-- `POST /api/portfolio/deliverables/{deliverableId}/documents/upload-url`
-- `POST /api/portfolio/deliverables/{deliverableId}/documents/{documentId}/complete`
-- `POST /api/portfolio/deliverables/{deliverableId}/documents/{documentId}/download-url`
-- `DELETE /api/portfolio/deliverables/{deliverableId}/documents/{documentId}`
-
-## Observacao de compatibilidade
-- `/api/users` continua existindo apenas como trilha de compatibilidade durante a migracao.
-- A primeira fase usa `user` legado como fonte de sincronizacao do membership default.
-- Claims legadas de tenant seguem aceitas como hint de resolucao de contexto, nao como verdade absoluta.
-- Feature flags do backend:
-- `app.features.users-legacy.ui-enabled`
-- `app.features.users-legacy.read-enabled`
-- `app.features.users-legacy.write-enabled`
-- Defaults por profile:
-- `dev` e `homolog`: legado visivel, leitura liberada, escrita liberada.
-- `prod`: legado oculto por padrao na flag de UI, mas leitura/escrita continuam liberadas ate avancarmos para `READ_ONLY` ou `OFF_BY_DEFAULT`.
+## Pending contract cleanup
+- `POST /api/access/users` and `PUT /api/access/users/{userId}` still accept `role` and `organizationId` to bootstrap the default membership
+- the long-term target is to keep user-account lifecycle and membership assignment as separate API contracts

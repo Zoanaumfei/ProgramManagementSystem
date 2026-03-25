@@ -6,7 +6,6 @@ import com.oryzem.programmanagementsystem.platform.auth.AuthenticationFailedExce
 import com.oryzem.programmanagementsystem.platform.shared.ConflictException;
 import com.oryzem.programmanagementsystem.platform.shared.RateLimitExceededException;
 import com.oryzem.programmanagementsystem.platform.shared.ResourceNotFoundException;
-import com.oryzem.programmanagementsystem.platform.users.deprecation.LegacyUsersOperationDisabledException;
 import com.oryzem.programmanagementsystem.platform.users.domain.UserNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
@@ -65,23 +64,6 @@ public class ApiExceptionHandler {
             HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(errorBody(request, HttpStatus.NOT_FOUND, "Not Found", exception.getMessage(), null));
-    }
-
-    @ExceptionHandler(LegacyUsersOperationDisabledException.class)
-    public ResponseEntity<Map<String, Object>> handleLegacyUsersOperationDisabled(
-            LegacyUsersOperationDisabledException exception,
-            HttpServletRequest request) {
-        Map<String, Object> extras = new LinkedHashMap<>();
-        extras.put("currentStage", exception.stage().name());
-        extras.put("operation", exception.operation());
-        extras.put("replacementPath", "/api/access/users/{userId}/memberships");
-        return ResponseEntity.status(exception.status())
-                .body(errorBody(
-                        request,
-                        exception.status(),
-                        exception.status().getReasonPhrase(),
-                        exception.getMessage(),
-                        extras));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

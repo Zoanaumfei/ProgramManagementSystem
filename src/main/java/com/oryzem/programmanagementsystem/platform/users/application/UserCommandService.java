@@ -6,9 +6,10 @@ import com.oryzem.programmanagementsystem.platform.authorization.AuthenticatedUs
 import com.oryzem.programmanagementsystem.platform.authorization.AuthorizationContext;
 import com.oryzem.programmanagementsystem.platform.authorization.AuthorizationDecision;
 import com.oryzem.programmanagementsystem.platform.authorization.AuthorizationService;
+import com.oryzem.programmanagementsystem.platform.authorization.Role;
 import com.oryzem.programmanagementsystem.platform.authorization.TenantType;
 import com.oryzem.programmanagementsystem.platform.access.AccessContextService;
-import com.oryzem.programmanagementsystem.platform.audit.AccessAdoptionTelemetryService;
+import com.oryzem.programmanagementsystem.platform.access.ResolvedMembershipContext;
 import com.oryzem.programmanagementsystem.platform.tenant.OrganizationLookup;
 import com.oryzem.programmanagementsystem.platform.users.api.CreateUserRequest;
 import com.oryzem.programmanagementsystem.platform.users.api.UpdateUserRequest;
@@ -31,7 +32,6 @@ class UserCommandService {
     private final UserAccessService accessService;
     private final UserIdentityGateway userIdentityGateway;
     private final OrganizationLookup organizationLookup;
-    private final AccessAdoptionTelemetryService telemetryService;
     private final AccessContextService accessContextService;
 
     UserCommandService(
@@ -40,14 +40,12 @@ class UserCommandService {
             UserAccessService accessService,
             UserIdentityGateway userIdentityGateway,
             OrganizationLookup organizationLookup,
-            AccessAdoptionTelemetryService telemetryService,
             AccessContextService accessContextService) {
         this.userRepository = userRepository;
         this.authorizationService = authorizationService;
         this.accessService = accessService;
         this.userIdentityGateway = userIdentityGateway;
         this.organizationLookup = organizationLookup;
-        this.telemetryService = telemetryService;
         this.accessContextService = accessContextService;
     }
 
@@ -97,11 +95,17 @@ class UserCommandService {
                 null);
 
         ManagedUser saved = userRepository.save(created);
-        accessContextService.synchronizeLegacyDefaultMembership(saved);
+        accessContextService.upsertDefaultMembership(
+                saved.id(),
+                organization.tenantId(),
+                organization.id(),
+                null,
+                saved.status(),
+                java.util.Set.of(request.role()),
+                saved.createdAt());
         userIdentityGateway.createUser(saved);
         accessService.recordAudit(actor, organization.id(), "USER_CREATE", saved.id(), null, decision.crossTenant());
-        telemetryService.recordLegacyUsersUsage(actor, "create", organization.tenantId(), saved.id());
-        return UserSummaryResponse.from(saved, organization.name());
+        return accessService.toSummary(saved);
     }
 
     UserSummaryResponse updateUser(AuthenticatedUser actor, String userId, UpdateUserRequest request) {
@@ -149,20 +153,28 @@ class UserCommandService {
                 targetTenantType);
 
         ManagedUser saved = userRepository.save(updated);
-        accessContextService.synchronizeLegacyDefaultMembership(saved);
+        accessContextService.upsertDefaultMembership(
+                saved.id(),
+                organization.tenantId(),
+                organization.id(),
+                null,
+                saved.status(),
+                java.util.Set.of(request.role()),
+                saved.createdAt());
         userIdentityGateway.updateUser(target, saved);
         accessService.recordAudit(actor, organization.id(), "USER_UPDATE", saved.id(), null, decision.crossTenant());
-        telemetryService.recordLegacyUsersUsage(actor, "update", organization.tenantId(), saved.id());
-        return UserSummaryResponse.from(saved, organization.name());
+        return accessService.toSummary(saved);
     }
 
     void deleteUser(AuthenticatedUser actor, String userId) {
         ManagedUser target = accessService.findRequiredUser(userId);
-        OrganizationLookup.OrganizationView targetOrganization = organizationLookup.getRequired(target.tenantId());
+        ResolvedMembershipContext targetContext = accessService.resolveRequiredUserContext(target);
+        OrganizationLookup.OrganizationView targetOrganization =
+                organizationLookup.getRequired(targetContext.activeOrganizationId());
         AuthorizationContext context = AuthorizationContext.builder(AppModule.USERS, Action.DELETE)
                 .resourceTenantId(targetOrganization.tenantId())
                 .resourceTenantType(targetOrganization.tenantType())
-                .targetRole(target.role())
+                .targetRole(accessService.resolvePrimaryRole(target))
                 .targetUserId(target.id())
                 .build();
 
@@ -189,6 +201,5 @@ class UserCommandService {
                 updated.id(),
                 null,
                 decision.crossTenant());
-        telemetryService.recordLegacyUsersUsage(actor, "delete", targetOrganization.tenantId(), updated.id());
     }
 }

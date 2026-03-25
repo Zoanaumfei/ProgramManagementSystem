@@ -47,14 +47,13 @@ class ReportControllerSecurityTest {
     void memberShouldViewOwnTenantSummary() throws Exception {
         mockMvc.perform(get("/api/reports/summary")
                         .with(jwt().jwt(jwt -> jwt
-                                        .claim("sub", "member-123")
-                                        .claim("cognito:username", "member")
-                                        .claim("tenant_id", "tenant-a")
-                                        .claim("tenant_type", "EXTERNAL"))
+                                        .claim("sub", "member.a@tenant.com-sub")
+                                        .claim("cognito:username", "member.a@tenant.com")
+                                        .claim("email", "member.a@tenant.com"))
                                 .authorities(new SimpleGrantedAuthority("ROLE_MEMBER"))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.tenantId").value("tenant-a"))
-                .andExpect(jsonPath("$.totalUsers").value(3))
+                .andExpect(jsonPath("$.tenantId").value("TEN-tenant-a"))
+                .andExpect(jsonPath("$.totalUsers").value(4))
                 .andExpect(jsonPath("$.totalOperations").value(3))
                 .andExpect(jsonPath("$.usersByRole.ADMIN").value(1))
                 .andExpect(jsonPath("$.usersByRole.MANAGER").value(1))
@@ -64,17 +63,16 @@ class ReportControllerSecurityTest {
     @Test
     void supportShouldViewCrossTenantSummaryWithOverrideAndJustification() throws Exception {
         MvcResult result = mockMvc.perform(get("/api/reports/summary")
-                        .param("tenantId", "tenant-b")
+                        .param("tenantId", "TEN-tenant-b")
                         .param("supportOverride", "true")
                         .param("justification", "Supplier escalation")
                         .with(jwt().jwt(jwt -> jwt
-                                        .claim("sub", "support-123")
-                                        .claim("cognito:username", "support")
-                                        .claim("tenant_id", "internal-core")
-                                        .claim("tenant_type", "INTERNAL"))
+                                        .claim("sub", "support@oryzem.com-sub")
+                                        .claim("cognito:username", "support@oryzem.com")
+                                        .claim("email", "support@oryzem.com"))
                                 .authorities(new SimpleGrantedAuthority("ROLE_SUPPORT"))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.tenantId").value("tenant-b"))
+                .andExpect(jsonPath("$.tenantId").value("TEN-tenant-b"))
                 .andExpect(jsonPath("$.totalUsers").value(4))
                 .andExpect(jsonPath("$.totalOperations").value(2))
                 .andReturn();
@@ -90,21 +88,20 @@ class ReportControllerSecurityTest {
                         event -> event.crossTenant(),
                         event -> event.sourceModule(),
                         event -> event.correlationId())
-                .containsExactly("REPORT_SUMMARY_VIEW", "tenant-b", true, "REPORTS", correlationId);
+                .containsExactly("REPORT_SUMMARY_VIEW", "TEN-tenant-b", true, "REPORTS", correlationId);
     }
 
     @Test
     void supportShouldNotExportSensitiveReportWithoutMaskedView() throws Exception {
         mockMvc.perform(get("/api/reports/operations/export")
-                        .param("tenantId", "tenant-b")
+                        .param("tenantId", "TEN-tenant-b")
                         .param("includeSensitiveData", "true")
                         .param("supportOverride", "true")
                         .param("justification", "Supplier escalation")
                         .with(jwt().jwt(jwt -> jwt
-                                        .claim("sub", "support-123")
-                                        .claim("cognito:username", "support")
-                                        .claim("tenant_id", "internal-core")
-                                        .claim("tenant_type", "INTERNAL"))
+                                        .claim("sub", "support@oryzem.com-sub")
+                                        .claim("cognito:username", "support@oryzem.com")
+                                        .claim("email", "support@oryzem.com"))
                                 .authorities(new SimpleGrantedAuthority("ROLE_SUPPORT"))))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.message").value("Sensitive data requires masked access."));
@@ -116,13 +113,12 @@ class ReportControllerSecurityTest {
                         .param("includeSensitiveData", "true")
                         .param("maskedView", "true")
                         .with(jwt().jwt(jwt -> jwt
-                                        .claim("sub", "auditor-123")
-                                        .claim("cognito:username", "auditor")
-                                        .claim("tenant_id", "tenant-b")
-                                        .claim("tenant_type", "EXTERNAL"))
+                                        .claim("sub", "auditor.b@tenant.com-sub")
+                                        .claim("cognito:username", "auditor.b@tenant.com")
+                                        .claim("email", "auditor.b@tenant.com"))
                                 .authorities(new SimpleGrantedAuthority("ROLE_AUDITOR"))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.tenantId").value("tenant-b"))
+                .andExpect(jsonPath("$.tenantId").value("TEN-tenant-b"))
                 .andExpect(jsonPath("$.masked").value(true))
                 .andExpect(jsonPath("$.items[0].description").value("[MASKED]"))
                 .andExpect(jsonPath("$.items[0].createdBy").value(org.hamcrest.Matchers.containsString("***")));

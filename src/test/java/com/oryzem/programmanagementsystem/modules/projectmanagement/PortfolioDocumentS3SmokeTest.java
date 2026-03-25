@@ -289,7 +289,7 @@ class PortfolioDocumentS3SmokeTest {
             org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor actor,
             String organizationId,
             String email) throws Exception {
-        String response = mockMvc.perform(post("/api/users")
+        String response = mockMvc.perform(post("/api/access/users")
                         .with(actor)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -334,9 +334,18 @@ class PortfolioDocumentS3SmokeTest {
             String tenantId,
             String tenantType,
             String role) {
+        String resolvedUsername = switch (username) {
+            case "internal-admin" -> "admin@oryzem.com";
+            case "internal-support" -> "support@oryzem.com";
+            case "root-admin" -> "root.admin@golden-flow.com";
+            case "child-admin" -> "child.admin@golden-flow.com";
+            case "isolated-admin" -> "isolated.admin@golden-flow.com";
+            default -> username;
+        };
         return jwt().jwt(jwt -> jwt
-                        .claim("sub", username + "-123")
-                        .claim("cognito:username", username)
+                        .claim("sub", resolvedUsername + "-123")
+                        .claim("cognito:username", resolvedUsername)
+                        .claim("email", resolvedUsername)
                         .claim("tenant_id", tenantId)
                         .claim("tenant_type", tenantType))
                 .authorities(new SimpleGrantedAuthority("ROLE_" + role));

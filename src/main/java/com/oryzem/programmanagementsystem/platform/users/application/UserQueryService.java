@@ -7,7 +7,6 @@ import com.oryzem.programmanagementsystem.platform.authorization.AuthorizationCo
 import com.oryzem.programmanagementsystem.platform.authorization.AuthorizationDecision;
 import com.oryzem.programmanagementsystem.platform.authorization.AuthorizationService;
 import com.oryzem.programmanagementsystem.platform.authorization.Role;
-import com.oryzem.programmanagementsystem.platform.audit.AccessAdoptionTelemetryService;
 import com.oryzem.programmanagementsystem.platform.users.api.UserSummaryResponse;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -19,15 +18,10 @@ class UserQueryService {
 
     private final AuthorizationService authorizationService;
     private final UserAccessService accessService;
-    private final AccessAdoptionTelemetryService telemetryService;
 
-    UserQueryService(
-            AuthorizationService authorizationService,
-            UserAccessService accessService,
-            AccessAdoptionTelemetryService telemetryService) {
+    UserQueryService(AuthorizationService authorizationService, UserAccessService accessService) {
         this.authorizationService = authorizationService;
         this.accessService = accessService;
-        this.telemetryService = telemetryService;
     }
 
     List<UserSummaryResponse> listUsers(
@@ -51,10 +45,9 @@ class UserQueryService {
         if (decision.auditRequired() || (decision.crossTenant() && actor.hasRole(Role.SUPPORT))) {
             accessService.recordAudit(actor, effectiveTenantId, "USERS_VIEW", null, justification, decision.crossTenant());
         }
-        telemetryService.recordLegacyUsersUsage(actor, "list", effectiveTenantId, effectiveOrganizationId);
 
         return accessService.selectUsersForScope(actor, effectiveOrganizationId, supportOverride, justification).stream()
-                .map(user -> UserSummaryResponse.from(user, accessService.resolveOrganizationName(user.tenantId())))
+                .map(accessService::toSummary)
                 .toList();
     }
 }

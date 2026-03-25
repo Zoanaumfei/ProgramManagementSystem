@@ -1,6 +1,8 @@
 package com.oryzem.programmanagementsystem.platform.auth.api;
 
+import com.oryzem.programmanagementsystem.app.bootstrap.BootstrapDataService;
 import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -24,6 +26,14 @@ class AuthControllerSecurityTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private BootstrapDataService bootstrapDataService;
+
+    @BeforeEach
+    void setUp() {
+        bootstrapDataService.reset();
+    }
 
     @Test
     void authConfigShouldBePublic() throws Exception {
@@ -180,11 +190,9 @@ class AuthControllerSecurityTest {
         mockMvc.perform(get("/api/auth/me")
                         .with(jwt().jwt(jwt -> jwt
                                         .claim("sub", "user-123")
-                                        .claim("cognito:username", "alice")
-                                        .claim("email", "alice@oryzem.com")
+                                        .claim("cognito:username", "admin.a@tenant.com")
+                                        .claim("email", "admin.a@tenant.com")
                                         .claim("email_verified", false)
-                                        .claim("tenant_id", "tenant-a")
-                                        .claim("tenant_type", "EXTERNAL")
                                         .claim("token_use", "access")
                                         .claim("scope", "openid profile")
                                         .claim("cognito:groups", List.of("admin", "program-managers")))
@@ -195,12 +203,14 @@ class AuthControllerSecurityTest {
                                         new SimpleGrantedAuthority("SCOPE_profile"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.subject").value("user-123"))
-                .andExpect(jsonPath("$.username").value("alice"))
-                .andExpect(jsonPath("$.email").value("alice@oryzem.com"))
+                .andExpect(jsonPath("$.username").value("admin.a@tenant.com"))
+                .andExpect(jsonPath("$.email").value("admin.a@tenant.com"))
                 .andExpect(jsonPath("$.emailVerified").value(false))
                 .andExpect(jsonPath("$.emailVerificationRequired").value(true))
                 .andExpect(jsonPath("$.tokenUse").value("access"))
-                .andExpect(jsonPath("$.tenantId").value("tenant-a"))
+                .andExpect(jsonPath("$.userId").value("USR-EXT-A-ADM-001"))
+                .andExpect(jsonPath("$.activeTenantId").value("TEN-tenant-a"))
+                .andExpect(jsonPath("$.activeOrganizationId").value("tenant-a"))
                 .andExpect(jsonPath("$.tenantType").value("EXTERNAL"))
                 .andExpect(jsonPath("$.roles[0]").value("ADMIN"))
                 .andExpect(jsonPath("$.groups[0]").value("admin"))
@@ -212,25 +222,25 @@ class AuthControllerSecurityTest {
     }
 
     @Test
-    void meShouldSupportCustomCognitoTenantClaims() throws Exception {
+    void meShouldIgnoreLegacyCustomTenantClaimsAndResolveMembershipContext() throws Exception {
         mockMvc.perform(get("/api/auth/me")
                         .with(jwt().jwt(jwt -> jwt
                                         .claim("sub", "user-456")
-                                        .claim("cognito:username", "bob")
-                                        .claim("email", "bob@oryzem.com")
-                                        .claim("custom:tenant_id", "tenant-b")
-                                        .claim("custom:tenant_type", "EXTERNAL")
+                                        .claim("cognito:username", "manager.b@tenant.com")
+                                        .claim("email", "manager.b@tenant.com")
+                                        .claim("custom:tenant_id", "legacy-tenant")
+                                        .claim("custom:tenant_type", "INTERNAL")
                                         .claim("custom:user_status", "ACTIVE")
                                         .claim("token_use", "id"))
                                 .authorities(new SimpleGrantedAuthority("ROLE_MANAGER"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.subject").value("user-456"))
-                .andExpect(jsonPath("$.username").value("bob"))
-                .andExpect(jsonPath("$.tenantId").value("tenant-b"))
+                .andExpect(jsonPath("$.username").value("manager.b@tenant.com"))
+                .andExpect(jsonPath("$.userId").value("USR-EXT-B-MGR-001"))
+                .andExpect(jsonPath("$.activeTenantId").value("TEN-tenant-b"))
+                .andExpect(jsonPath("$.activeOrganizationId").value("tenant-b"))
                 .andExpect(jsonPath("$.tenantType").value("EXTERNAL"))
-                .andExpect(jsonPath("$.tenantIdClaim").value("tenant-b"))
-                .andExpect(jsonPath("$.tenantTypeClaim").value("EXTERNAL"))
-                .andExpect(jsonPath("$.userStatusClaim").value("ACTIVE"));
+                .andExpect(jsonPath("$.roles[0]").value("MANAGER"));
     }
 
     @Test
@@ -238,15 +248,14 @@ class AuthControllerSecurityTest {
         mockMvc.perform(get("/api/auth/me")
                         .with(jwt().jwt(jwt -> jwt
                                         .claim("sub", "user-789")
-                                        .claim("username", "access-user")
-                                        .claim("tenant_id", "internal-core")
-                                        .claim("tenant_type", "INTERNAL")
+                                        .claim("username", "support@oryzem.com")
+                                        .claim("email", "support@oryzem.com")
                                         .claim("token_use", "access"))
                                 .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.subject").value("user-789"))
-                .andExpect(jsonPath("$.username").value("access-user"))
-                .andExpect(jsonPath("$.tenantId").value("internal-core"))
+                .andExpect(jsonPath("$.username").value("support@oryzem.com"))
+                .andExpect(jsonPath("$.activeTenantId").value("TEN-internal-core"))
                 .andExpect(jsonPath("$.tenantType").value("INTERNAL"));
     }
 

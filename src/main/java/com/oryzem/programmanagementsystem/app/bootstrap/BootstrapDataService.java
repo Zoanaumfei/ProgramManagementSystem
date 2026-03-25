@@ -7,6 +7,7 @@ import com.oryzem.programmanagementsystem.modules.projectmanagement.PortfolioRes
 import com.oryzem.programmanagementsystem.modules.operations.OperationRecord;
 import com.oryzem.programmanagementsystem.modules.operations.OperationRepository;
 import com.oryzem.programmanagementsystem.modules.operations.OperationStatus;
+import com.oryzem.programmanagementsystem.platform.access.AccessContextService;
 import com.oryzem.programmanagementsystem.platform.access.AccessContextResetService;
 import com.oryzem.programmanagementsystem.platform.tenant.OrganizationBootstrapPort;
 import com.oryzem.programmanagementsystem.platform.users.domain.ManagedUser;
@@ -38,6 +39,7 @@ public class BootstrapDataService {
     private final OperationRepository operationRepository;
     private final AuditTrailService auditTrailService;
     private final PortfolioResetPort portfolioResetPort;
+    private final AccessContextService accessContextService;
     private final AccessContextResetService accessContextResetService;
     private final OrganizationBootstrapPort organizationBootstrapPort;
     private final UserIdentityGateway userIdentityGateway;
@@ -48,6 +50,7 @@ public class BootstrapDataService {
             OperationRepository operationRepository,
             AuditTrailService auditTrailService,
             PortfolioResetPort portfolioResetPort,
+            AccessContextService accessContextService,
             AccessContextResetService accessContextResetService,
             OrganizationBootstrapPort organizationBootstrapPort,
             UserIdentityGateway userIdentityGateway,
@@ -56,6 +59,7 @@ public class BootstrapDataService {
         this.operationRepository = operationRepository;
         this.auditTrailService = auditTrailService;
         this.portfolioResetPort = portfolioResetPort;
+        this.accessContextService = accessContextService;
         this.accessContextResetService = accessContextResetService;
         this.organizationBootstrapPort = organizationBootstrapPort;
         this.userIdentityGateway = userIdentityGateway;
@@ -95,25 +99,66 @@ public class BootstrapDataService {
     private void seedUsers() {
         Instant baseTime = Instant.parse("2026-03-07T12:00:00Z");
         seedOrganizations();
-        userRepository.save(user("USR-ADMIN-001", "Platform Admin", "admin@oryzem.com", Role.ADMIN, "internal-core", TenantType.INTERNAL, UserStatus.ACTIVE, baseTime));
-        userRepository.save(user("USR-ADMIN-002", "Security Admin", "security.admin@oryzem.com", Role.ADMIN, "internal-core", TenantType.INTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(60)));
-        userRepository.save(user("USR-INT-SUP-001", "Support Analyst", "support@oryzem.com", Role.SUPPORT, "internal-core", TenantType.INTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(120)));
-        userRepository.save(user("USR-EXT-A-ADM-001", "Tenant A Admin", "admin.a@tenant.com", Role.ADMIN, "tenant-a", TenantType.EXTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(180)));
-        userRepository.save(user("USR-EXT-A-MGR-001", "Tenant A Manager", "manager.a@tenant.com", Role.MANAGER, "tenant-a", TenantType.EXTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(240)));
-        userRepository.save(user("USR-EXT-A-MEM-001", "Tenant A Member", "member.a@tenant.com", Role.MEMBER, "tenant-a", TenantType.EXTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(300)));
-        userRepository.save(user("USR-EXT-B-ADM-001", "Tenant B Admin", "admin.b@tenant.com", Role.ADMIN, "tenant-b", TenantType.EXTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(360)));
-        userRepository.save(user("USR-EXT-B-MGR-001", "Tenant B Manager", "manager.b@tenant.com", Role.MANAGER, "tenant-b", TenantType.EXTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(420)));
-        userRepository.save(user("USR-EXT-B-MEM-001", "Tenant B Member", "member.b@tenant.com", Role.MEMBER, "tenant-b", TenantType.EXTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(480)));
-        userRepository.save(user("USR-EXT-B-AUD-001", "Tenant B Auditor", "auditor.b@tenant.com", Role.AUDITOR, "tenant-b", TenantType.EXTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(540)));
+        seedUserWithMembership(user("USR-ADMIN-001", "Platform Admin", "admin@oryzem.com", Role.ADMIN, "internal-core", TenantType.INTERNAL, UserStatus.ACTIVE, baseTime));
+        seedUserWithMembership(user("USR-ADMIN-002", "Security Admin", "security.admin@oryzem.com", Role.ADMIN, "internal-core", TenantType.INTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(60)));
+        seedUserWithMembership(user("USR-INT-SUP-001", "Support Analyst", "support@oryzem.com", Role.SUPPORT, "internal-core", TenantType.INTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(120)));
+        seedUserWithMembership(user("USR-EXT-A-ADM-001", "Tenant A Admin", "admin.a@tenant.com", Role.ADMIN, "tenant-a", TenantType.EXTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(180)));
+        seedUserWithMembership(user("USR-EXT-A-SUP-001", "Tenant A Support", "support.a@tenant.com", Role.SUPPORT, "tenant-a", TenantType.EXTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(240)));
+        seedUserWithMembership(user("USR-EXT-A-MGR-001", "Tenant A Manager", "manager.a@tenant.com", Role.MANAGER, "tenant-a", TenantType.EXTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(300)));
+        seedUserWithMembership(user("USR-EXT-A-MEM-001", "Tenant A Member", "member.a@tenant.com", Role.MEMBER, "tenant-a", TenantType.EXTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(360)));
+        seedUserWithMembership(user("USR-EXT-B-ADM-001", "Tenant B Admin", "admin.b@tenant.com", Role.ADMIN, "tenant-b", TenantType.EXTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(360)));
+        seedUserWithMembership(user("USR-EXT-B-MGR-001", "Tenant B Manager", "manager.b@tenant.com", Role.MANAGER, "tenant-b", TenantType.EXTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(420)));
+        seedUserWithMembership(user("USR-EXT-B-MEM-001", "Tenant B Member", "member.b@tenant.com", Role.MEMBER, "tenant-b", TenantType.EXTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(480)));
+        seedUserWithMembership(user("USR-EXT-B-AUD-001", "Tenant B Auditor", "auditor.b@tenant.com", Role.AUDITOR, "tenant-b", TenantType.EXTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(540)));
     }
 
     private void seedOperations() {
         Instant baseTime = Instant.parse("2026-03-07T12:30:00Z");
-        operationRepository.save(operation("OP-TA-001", "APQP Kickoff", "Initial kickoff for supplier A", "tenant-a", TenantType.EXTERNAL, "manager-123", OperationStatus.DRAFT, baseTime));
-        operationRepository.save(operation("OP-TA-002", "PPAP Package", "Prepare PPAP package for approval", "tenant-a", TenantType.EXTERNAL, "member-123", OperationStatus.SUBMITTED, baseTime.plusSeconds(120)));
-        operationRepository.save(operation("OP-TA-003", "Run @ Rate", "Capacity validation for tenant A", "tenant-a", TenantType.EXTERNAL, "member-123", OperationStatus.DRAFT, baseTime.plusSeconds(180)));
-        operationRepository.save(operation("OP-TB-001", "Line Trial", "Production line trial for tenant B", "tenant-b", TenantType.EXTERNAL, "manager-b", OperationStatus.APPROVED, baseTime.plusSeconds(240)));
-        operationRepository.save(operation("OP-TB-002", "Corrective Action", "Corrective action follow-up", "tenant-b", TenantType.EXTERNAL, "member-b", OperationStatus.REJECTED, baseTime.plusSeconds(360)));
+        operationRepository.save(operation(
+                "OP-TA-001",
+                "APQP Kickoff",
+                "Initial kickoff for supplier A",
+                accessContextService.resolveTenantBoundaryId("tenant-a"),
+                TenantType.EXTERNAL,
+                "manager-123",
+                OperationStatus.DRAFT,
+                baseTime));
+        operationRepository.save(operation(
+                "OP-TA-002",
+                "PPAP Package",
+                "Prepare PPAP package for approval",
+                accessContextService.resolveTenantBoundaryId("tenant-a"),
+                TenantType.EXTERNAL,
+                "member-123",
+                OperationStatus.SUBMITTED,
+                baseTime.plusSeconds(120)));
+        operationRepository.save(operation(
+                "OP-TA-003",
+                "Run @ Rate",
+                "Capacity validation for tenant A",
+                accessContextService.resolveTenantBoundaryId("tenant-a"),
+                TenantType.EXTERNAL,
+                "member-123",
+                OperationStatus.DRAFT,
+                baseTime.plusSeconds(180)));
+        operationRepository.save(operation(
+                "OP-TB-001",
+                "Line Trial",
+                "Production line trial for tenant B",
+                accessContextService.resolveTenantBoundaryId("tenant-b"),
+                TenantType.EXTERNAL,
+                "manager-b",
+                OperationStatus.APPROVED,
+                baseTime.plusSeconds(240)));
+        operationRepository.save(operation(
+                "OP-TB-002",
+                "Corrective Action",
+                "Corrective action follow-up",
+                accessContextService.resolveTenantBoundaryId("tenant-b"),
+                TenantType.EXTERNAL,
+                "member-b",
+                OperationStatus.REJECTED,
+                baseTime.plusSeconds(360)));
     }
 
     private void seedOrganizations() {
@@ -172,6 +217,14 @@ public class BootstrapDataService {
                 blankToNull(internalAdmin.password()),
                 blankToNull(internalAdmin.temporaryPassword()));
         ManagedUser saved = userRepository.save(bootstrapUser);
+        accessContextService.upsertDefaultMembership(
+                saved.id(),
+                accessContextService.resolveTenantBoundaryId(INTERNAL_CORE_ORGANIZATION_ID),
+                INTERNAL_CORE_ORGANIZATION_ID,
+                null,
+                saved.status(),
+                Set.of(Role.ADMIN),
+                saved.createdAt());
         pruneOtherInternalUsersIfRequested(internalAdmin, saved.email());
         log.info(
                 "Ensured INTERNAL ADMIN break-glass user for organization '{}': {} with roles {}",
@@ -237,14 +290,14 @@ public class BootstrapDataService {
                 userIdentityGateway.deleteUser(user);
             } catch (RuntimeException exception) {
                 log.warn(
-                        "Unable to delete legacy INTERNAL user '{}' from Cognito during break-glass prune. "
+                        "Unable to delete stale INTERNAL user '{}' from Cognito during break-glass prune. "
                                 + "Proceeding with local cleanup only. reason={}",
                         user.email(),
                         exception.getMessage());
             }
             userRepository.deleteById(user.id());
             log.info(
-                    "Pruned legacy INTERNAL user during break-glass bootstrap. organization='{}', email={}",
+                    "Pruned stale INTERNAL user during break-glass bootstrap. organization='{}', email={}",
                     INTERNAL_CORE_ORGANIZATION_ID,
                     user.email());
         }
@@ -302,6 +355,18 @@ public class BootstrapDataService {
                 createdAt,
                 null,
                 null);
+    }
+
+    private void seedUserWithMembership(ManagedUser user) {
+        ManagedUser saved = userRepository.save(user);
+        accessContextService.upsertDefaultMembership(
+                saved.id(),
+                accessContextService.resolveTenantBoundaryId(user.tenantId()),
+                user.tenantId(),
+                null,
+                saved.status(),
+                Set.of(user.role()),
+                saved.createdAt());
     }
 
     private OperationRecord operation(

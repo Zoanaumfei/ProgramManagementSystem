@@ -7,9 +7,11 @@ import com.oryzem.programmanagementsystem.platform.users.domain.ManagedUser;
 import com.oryzem.programmanagementsystem.platform.users.domain.UserRepository;
 import com.oryzem.programmanagementsystem.platform.users.domain.UserStatus;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.springframework.context.annotation.Lazy;
@@ -93,53 +95,16 @@ public class AccessContextService {
                 Set.copyOf(permissions)));
     }
 
-    @Transactional
-    public void synchronizeDefaultMembership(ManagedUser user) {
-        if (user == null || user.id() == null || user.id().isBlank()) {
-            return;
-        }
-
-        String organizationId = user.tenantId();
-        if (organizationId == null || organizationId.isBlank()) {
-            return;
-        }
-
-        membershipRepository.findByUserIdAndDefaultMembershipTrue(user.id())
-                .ifPresentOrElse(
-                        membership -> synchronizeNonDestructive(user, membership),
-                        () -> synchronizeLegacyDefaultMembership(user));
+    public ResolvedMembershipContext requireActiveContext(ManagedUser user) {
+        return resolveActiveContext(user, null)
+                .orElseThrow(() -> new IllegalStateException(
+                        "User '%s' does not have an active membership context.".formatted(user.id())));
     }
 
-    @Transactional
-    public void synchronizeLegacyDefaultMembership(ManagedUser user) {
-        if (user == null || user.id() == null || user.id().isBlank()) {
-            return;
-        }
-
-        String organizationId = user.tenantId();
-        if (organizationId == null || organizationId.isBlank()) {
-            return;
-        }
-
-        var now = java.time.Instant.now();
-        UserMembershipEntity membership = membershipRepository.findByUserIdAndDefaultMembershipTrue(user.id())
-                .orElseGet(() -> UserMembershipEntity.createDefault(
-                        "MBR-" + user.id(),
-                        user.id(),
-                        resolveTenantId(organizationId),
-                        organizationId,
-                        null,
-                        toMembershipStatus(user.status()),
-                        user.createdAt(),
-                        now));
-        membership.synchronizeDefaultContext(
-                resolveTenantId(organizationId),
-                organizationId,
-                null,
-                toMembershipStatus(user.status()),
-                now);
-        membershipRepository.save(membership);
-        replaceLegacyCompatibilityRoles(membership.getId(), user.role());
+    public Optional<Role> resolvePrimaryRole(ManagedUser user) {
+        return resolveActiveContext(user, null)
+                .map(ResolvedMembershipContext::roles)
+                .map(this::primaryRole);
     }
 
     @Transactional
@@ -153,19 +118,165 @@ public class AccessContextService {
         membershipRepository.deleteByUserId(userId);
     }
 
-    public ManagedUser hydrateLegacyCompatibilityView(ManagedUser user) {
-        if (user == null) {
+    public Optional<String> resolvePrimaryOrganizationId(ManagedUser user) {
+        return resolveActiveContext(user, null)
+                .map(ResolvedMembershipContext::activeOrganizationId);
+    }
+
+    public Optional<TenantType> resolvePrimaryTenantType(ManagedUser user) {
+        return resolveActiveContext(user, null)
+                .map(ResolvedMembershipContext::tenantType);
+    }
+
+    public Optional<String> resolvePrimaryTenantId(ManagedUser user) {
+        return resolveActiveContext(user, null)
+                .map(ResolvedMembershipContext::activeTenantId);
+    }
+
+    public String resolveTenantBoundaryId(String organizationId) {
+        if (!hasText(organizationId)) {
             return null;
         }
+        if (tenantRepository.existsById(organizationId)) {
+            return organizationId;
+        }
+        return organizationBoundaryResolver.findBoundary(organizationId)
+                .map(OrganizationBoundaryResolver.OrganizationBoundaryView::tenantId)
+                .orElse(organizationId);
+    }
 
-        return resolveActiveContext(user, null)
-                .map(context -> user.withUpdatedDetails(
-                        user.displayName(),
-                        user.email(),
-                        preferredLegacyRole(context.roles(), user.role()),
-                        context.activeOrganizationId() != null ? context.activeOrganizationId() : user.tenantId(),
-                        context.tenantType() != null ? context.tenantType() : user.tenantType()))
-                .orElse(user);
+    public Set<String> equivalentTenantIds(String tenantOrOrganizationId) {
+        String canonicalTenantId = canonicalTenantId(tenantOrOrganizationId);
+        if (!hasText(canonicalTenantId)) {
+            return Set.of();
+        }
+
+        LinkedHashSet<String> equivalents = new LinkedHashSet<>();
+        equivalents.add(canonicalTenantId);
+        tenantRepository.findById(canonicalTenantId)
+                .map(TenantEntity::getRootOrganizationId)
+                .filter(this::hasText)
+                .ifPresent(equivalents::add);
+        return Set.copyOf(equivalents);
+    }
+
+    public String canonicalTenantId(String tenantOrOrganizationId) {
+        if (!hasText(tenantOrOrganizationId)) {
+            return null;
+        }
+        return resolveTenantBoundaryId(tenantOrOrganizationId.trim());
+    }
+
+    public Optional<TenantType> resolveTenantType(String tenantOrOrganizationId) {
+        String canonicalTenantId = canonicalTenantId(tenantOrOrganizationId);
+        if (!hasText(canonicalTenantId)) {
+            return Optional.empty();
+        }
+
+        return tenantRepository.findById(canonicalTenantId)
+                .map(TenantEntity::getTenantType)
+                .or(() -> organizationBoundaryResolver.findBoundary(tenantOrOrganizationId)
+                        .map(OrganizationBoundaryResolver.OrganizationBoundaryView::tenantType));
+    }
+
+    public Set<String> findUserIdsByOrganization(String organizationId) {
+        if (!hasText(organizationId)) {
+            return Set.of();
+        }
+        return membershipRepository.findAllByOrganizationId(organizationId).stream()
+                .filter(membership -> membership.getStatus() != MembershipStatus.INACTIVE)
+                .map(UserMembershipEntity::getUserId)
+                .collect(java.util.stream.Collectors.toSet());
+    }
+
+    public Set<String> findUserIdsByTenant(String tenantId) {
+        if (!hasText(tenantId)) {
+            return Set.of();
+        }
+
+        Map<String, UserMembershipEntity> activeMembershipsById = new LinkedHashMap<>();
+        membershipRepository.findAllByTenantId(canonicalTenantId(tenantId)).stream()
+                .filter(membership -> membership.getStatus() != MembershipStatus.INACTIVE)
+                .forEach(membership -> activeMembershipsById.put(membership.getId(), membership));
+        membershipRepository.findAllByOrganizationIdIn(equivalentTenantIds(tenantId)).stream()
+                .filter(membership -> membership.getStatus() != MembershipStatus.INACTIVE)
+                .forEach(membership -> activeMembershipsById.putIfAbsent(membership.getId(), membership));
+        return activeMembershipsById.values().stream()
+                .map(UserMembershipEntity::getUserId)
+                .collect(java.util.stream.Collectors.toSet());
+    }
+
+    public boolean hasInvitedOrActiveAdmin(String organizationId) {
+        if (!hasText(organizationId)) {
+            return false;
+        }
+
+        Set<String> activeMembershipIds = membershipRepository.findAllByOrganizationId(organizationId).stream()
+                .filter(membership -> membership.getStatus() != MembershipStatus.INACTIVE)
+                .map(UserMembershipEntity::getId)
+                .collect(java.util.stream.Collectors.toSet());
+        if (activeMembershipIds.isEmpty()) {
+            return false;
+        }
+
+        Set<String> adminUserIds = membershipRoleRepository.findAll().stream()
+                .filter(role -> activeMembershipIds.contains(role.getMembershipId()))
+                .filter(role -> Role.ADMIN.name().equals(role.getRoleCode()))
+                .map(MembershipRoleEntity::getMembershipId)
+                .flatMap(membershipId -> membershipRepository.findById(membershipId).stream())
+                .map(UserMembershipEntity::getUserId)
+                .collect(java.util.stream.Collectors.toSet());
+        if (adminUserIds.isEmpty()) {
+            return false;
+        }
+
+        return userRepository.findAll().stream()
+                .filter(user -> adminUserIds.contains(user.id()))
+                .anyMatch(user -> user.status() == com.oryzem.programmanagementsystem.platform.users.domain.UserStatus.ACTIVE
+                        || user.status() == com.oryzem.programmanagementsystem.platform.users.domain.UserStatus.INVITED);
+    }
+
+    @Transactional
+    public void upsertDefaultMembership(
+            String userId,
+            String tenantId,
+            String organizationId,
+            String marketId,
+            UserStatus userStatus,
+            Set<Role> roles,
+            java.time.Instant joinedAt) {
+        if (!hasText(userId) || !hasText(tenantId) || !hasText(organizationId)) {
+            throw new IllegalArgumentException("Default membership requires userId, tenantId and organizationId.");
+        }
+
+        java.time.Instant now = java.time.Instant.now();
+        UserMembershipEntity membership = membershipRepository.findByUserIdAndDefaultMembershipTrue(userId)
+                .orElseGet(() -> UserMembershipEntity.createDefault(
+                        "MBR-" + userId,
+                        userId,
+                        tenantId,
+                        organizationId,
+                        marketId,
+                        toMembershipStatus(userStatus),
+                        joinedAt != null ? joinedAt : now,
+                        now));
+        membership.synchronizeDefaultContext(
+                tenantId,
+                organizationId,
+                marketId,
+                toMembershipStatus(userStatus),
+                now);
+        membershipRepository.save(membership);
+
+        membershipRoleRepository.deleteByMembershipId(membership.getId());
+        if (roles != null) {
+            roles.stream()
+                    .sorted(Comparator.comparing(Enum::name))
+                    .forEach(role -> membershipRoleRepository.save(MembershipRoleEntity.create(
+                            "MBRROLE-" + membership.getId() + "-" + role.name(),
+                            membership.getId(),
+                            role.name())));
+        }
     }
 
     private Optional<ManagedUser> resolveUser(String identitySubject, String identityUsername, String email) {
@@ -209,53 +320,6 @@ public class AccessContextService {
         return status == UserStatus.INACTIVE ? MembershipStatus.INACTIVE : MembershipStatus.ACTIVE;
     }
 
-    private void synchronizeNonDestructive(ManagedUser user, UserMembershipEntity membership) {
-        var now = java.time.Instant.now();
-        String resolvedOrganizationId = hasText(membership.getOrganizationId()) ? membership.getOrganizationId() : user.tenantId();
-        String resolvedTenantId = hasText(membership.getTenantId()) ? membership.getTenantId() : resolveTenantId(resolvedOrganizationId);
-        membership.synchronizeDefaultContext(
-                resolvedTenantId,
-                resolvedOrganizationId,
-                membership.getMarketId(),
-                toMembershipStatus(user.status()),
-                now);
-        membershipRepository.save(membership);
-
-        if (membershipRoleRepository.findByMembershipId(membership.getId()).isEmpty() && user.role() != null) {
-            membershipRoleRepository.save(MembershipRoleEntity.create(
-                    "MBRROLE-" + membership.getId() + "-" + user.role().name(),
-                    membership.getId(),
-                    user.role().name()));
-        }
-    }
-
-    private void replaceLegacyCompatibilityRoles(String membershipId, Role role) {
-        membershipRoleRepository.deleteByMembershipId(membershipId);
-        if (role != null) {
-            membershipRoleRepository.save(MembershipRoleEntity.create(
-                    "MBRROLE-" + membershipId + "-" + role.name(),
-                    membershipId,
-                    role.name()));
-        }
-    }
-
-    private String resolveTenantId(String organizationId) {
-        return organizationBoundaryResolver.findBoundary(organizationId)
-                .map(OrganizationBoundaryResolver.OrganizationBoundaryView::tenantId)
-                .orElseGet(() -> "TEN-" + organizationId);
-    }
-
-    private Role preferredLegacyRole(Set<Role> roles, Role fallback) {
-        if (roles == null || roles.isEmpty()) {
-            return fallback;
-        }
-        List<Role> precedence = List.of(Role.ADMIN, Role.SUPPORT, Role.MANAGER, Role.AUDITOR, Role.MEMBER);
-        return precedence.stream()
-                .filter(roles::contains)
-                .findFirst()
-                .orElse(fallback != null ? fallback : roles.stream().sorted().findFirst().orElse(null));
-    }
-
     private Optional<Role> toRole(String roleCode) {
         if (!hasText(roleCode)) {
             return Optional.empty();
@@ -269,5 +333,16 @@ public class AccessContextService {
 
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private Role primaryRole(Set<Role> roles) {
+        if (roles == null || roles.isEmpty()) {
+            return null;
+        }
+        List<Role> precedence = List.of(Role.ADMIN, Role.SUPPORT, Role.MANAGER, Role.AUDITOR, Role.MEMBER);
+        return precedence.stream()
+                .filter(roles::contains)
+                .findFirst()
+                .orElseGet(() -> roles.stream().sorted(Comparator.comparing(Enum::name)).findFirst().orElse(null));
     }
 }

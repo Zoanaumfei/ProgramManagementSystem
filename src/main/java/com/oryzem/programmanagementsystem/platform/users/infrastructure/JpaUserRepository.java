@@ -29,7 +29,6 @@ public class JpaUserRepository implements UserRepository {
     public List<ManagedUser> findAll() {
         return delegate.findAll().stream()
                 .map(UserEntity::toDomain)
-                .map(accessContextService::hydrateLegacyCompatibilityView)
                 .sorted(java.util.Comparator.comparing(ManagedUser::createdAt).thenComparing(ManagedUser::id))
                 .toList();
     }
@@ -37,8 +36,13 @@ public class JpaUserRepository implements UserRepository {
     @Override
     @Transactional(readOnly = true)
     public List<ManagedUser> findByTenantId(String tenantId) {
-        return findAll().stream()
-                .filter(user -> tenantId != null && tenantId.equals(user.tenantId()))
+        if (tenantId == null || tenantId.isBlank()) {
+            return List.of();
+        }
+
+        return delegate.findAllById(accessContextService.findUserIdsByTenant(tenantId)).stream()
+                .map(UserEntity::toDomain)
+                .sorted(java.util.Comparator.comparing(ManagedUser::createdAt).thenComparing(ManagedUser::id))
                 .toList();
     }
 
@@ -46,47 +50,39 @@ public class JpaUserRepository implements UserRepository {
     @Transactional(readOnly = true)
     public Optional<ManagedUser> findById(String userId) {
         return delegate.findById(userId)
-                .map(UserEntity::toDomain)
-                .map(accessContextService::hydrateLegacyCompatibilityView);
+                .map(UserEntity::toDomain);
     }
 
     @Override
     @Transactional(readOnly = true)
     public Optional<ManagedUser> findByIdentityUsername(String identityUsername) {
         return delegate.findByIdentityUsernameIgnoreCase(identityUsername)
-                .map(UserEntity::toDomain)
-                .map(accessContextService::hydrateLegacyCompatibilityView);
+                .map(UserEntity::toDomain);
     }
 
     @Override
     @Transactional(readOnly = true)
     public Optional<ManagedUser> findByIdentitySubject(String identitySubject) {
         return delegate.findByIdentitySubject(identitySubject)
-                .map(UserEntity::toDomain)
-                .map(accessContextService::hydrateLegacyCompatibilityView);
+                .map(UserEntity::toDomain);
     }
 
     @Override
     @Transactional(readOnly = true)
     public Optional<ManagedUser> findByEmailIgnoreCase(String email) {
         return delegate.findByEmailIgnoreCase(email)
-                .map(UserEntity::toDomain)
-                .map(accessContextService::hydrateLegacyCompatibilityView);
+                .map(UserEntity::toDomain);
     }
 
     @Override
     @Transactional(readOnly = true)
     public boolean hasInvitedOrActiveAdmin(String tenantId) {
-        return findByTenantId(tenantId).stream()
-                .anyMatch(user -> user.role() == Role.ADMIN
-                        && List.of(UserStatus.INVITED, UserStatus.ACTIVE).contains(user.status()));
+        return accessContextService.hasInvitedOrActiveAdmin(tenantId);
     }
 
     @Override
     public ManagedUser save(ManagedUser user) {
-        ManagedUser saved = delegate.save(UserEntity.fromDomain(user)).toDomain();
-        accessContextService.synchronizeDefaultMembership(saved);
-        return saved;
+        return delegate.save(UserEntity.fromDomain(user)).toDomain();
     }
 
     @Override

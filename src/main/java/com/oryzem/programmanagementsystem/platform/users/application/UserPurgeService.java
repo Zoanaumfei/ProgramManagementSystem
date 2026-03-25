@@ -6,7 +6,7 @@ import com.oryzem.programmanagementsystem.platform.authorization.AuthenticatedUs
 import com.oryzem.programmanagementsystem.platform.authorization.AuthorizationContext;
 import com.oryzem.programmanagementsystem.platform.authorization.AuthorizationDecision;
 import com.oryzem.programmanagementsystem.platform.authorization.AuthorizationService;
-import com.oryzem.programmanagementsystem.platform.audit.AccessAdoptionTelemetryService;
+import com.oryzem.programmanagementsystem.platform.access.ResolvedMembershipContext;
 import com.oryzem.programmanagementsystem.platform.tenant.OrganizationLookup;
 import com.oryzem.programmanagementsystem.platform.users.api.UserActionResponse;
 import com.oryzem.programmanagementsystem.platform.users.domain.ManagedUser;
@@ -25,21 +25,18 @@ class UserPurgeService {
     private final UserAccessService accessService;
     private final UserIdentityGateway userIdentityGateway;
     private final OrganizationLookup organizationLookup;
-    private final AccessAdoptionTelemetryService telemetryService;
 
     UserPurgeService(
             UserRepository userRepository,
             AuthorizationService authorizationService,
             UserAccessService accessService,
             UserIdentityGateway userIdentityGateway,
-            OrganizationLookup organizationLookup,
-            AccessAdoptionTelemetryService telemetryService) {
+            OrganizationLookup organizationLookup) {
         this.userRepository = userRepository;
         this.authorizationService = authorizationService;
         this.accessService = accessService;
         this.userIdentityGateway = userIdentityGateway;
         this.organizationLookup = organizationLookup;
-        this.telemetryService = telemetryService;
     }
 
     UserActionResponse purgeUser(
@@ -48,14 +45,16 @@ class UserPurgeService {
             boolean supportOverride,
             String justification) {
         ManagedUser target = accessService.findRequiredUser(userId);
-        OrganizationLookup.OrganizationView targetOrganization = organizationLookup.getRequired(target.tenantId());
+        ResolvedMembershipContext targetContext = accessService.resolveRequiredUserContext(target);
+        OrganizationLookup.OrganizationView targetOrganization =
+                organizationLookup.getRequired(targetContext.activeOrganizationId());
         accessService.ensureUserIsInactive(target);
         accessService.ensurePurgeIsExplicitlyConfirmed(supportOverride, justification);
 
         AuthorizationContext context = AuthorizationContext.builder(AppModule.USERS, Action.PURGE)
                 .resourceTenantId(targetOrganization.tenantId())
                 .resourceTenantType(targetOrganization.tenantType())
-                .targetRole(target.role())
+                .targetRole(accessService.resolvePrimaryRole(target))
                 .targetUserId(target.id())
                 .auditTrailEnabled(true)
                 .supportOverride(supportOverride)
@@ -85,7 +84,6 @@ class UserPurgeService {
                 target.id(),
                 justification,
                 decision.crossTenant());
-        telemetryService.recordLegacyUsersUsage(actor, "purge", targetOrganization.tenantId(), target.id());
         return new UserActionResponse(target.id(), Action.PURGE.name(), Instant.now(), "OK");
     }
 }

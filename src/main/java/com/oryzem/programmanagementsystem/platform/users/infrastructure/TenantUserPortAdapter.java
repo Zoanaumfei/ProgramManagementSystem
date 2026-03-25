@@ -1,5 +1,6 @@
 package com.oryzem.programmanagementsystem.platform.users.infrastructure;
 
+import com.oryzem.programmanagementsystem.platform.access.AccessContextService;
 import com.oryzem.programmanagementsystem.platform.tenant.TenantUserPurgePort;
 import com.oryzem.programmanagementsystem.platform.tenant.TenantUserQueryPort;
 import com.oryzem.programmanagementsystem.platform.users.domain.ManagedUser;
@@ -17,12 +18,15 @@ class TenantUserPortAdapter implements TenantUserQueryPort, TenantUserPurgePort 
 
     private final UserRepository userRepository;
     private final UserIdentityGateway userIdentityGateway;
+    private final AccessContextService accessContextService;
 
     TenantUserPortAdapter(
             UserRepository userRepository,
-            UserIdentityGateway userIdentityGateway) {
+            UserIdentityGateway userIdentityGateway,
+            AccessContextService accessContextService) {
         this.userRepository = userRepository;
         this.userIdentityGateway = userIdentityGateway;
+        this.accessContextService = accessContextService;
     }
 
     @Override
@@ -32,16 +36,20 @@ class TenantUserPortAdapter implements TenantUserQueryPort, TenantUserPurgePort 
 
     @Override
     public boolean hasInvitedOrActiveUsers(String organizationId) {
-        return userRepository.findByTenantId(organizationId).stream()
+        Set<String> userIdsInOrganization = accessContextService.findUserIdsByOrganization(organizationId);
+        return userRepository.findAll().stream()
+                .filter(user -> userIdsInOrganization.contains(user.id()))
                 .anyMatch(user -> user.status() != UserStatus.INACTIVE);
     }
 
     @Override
     public Map<String, OrganizationUserStats> summarizeByOrganizationIds(Set<String> organizationIds) {
         return userRepository.findAll().stream()
-                .filter(user -> organizationIds.contains(user.tenantId()))
+                .filter(user -> accessContextService.resolvePrimaryOrganizationId(user)
+                        .filter(organizationIds::contains)
+                        .isPresent())
                 .collect(Collectors.groupingBy(
-                        ManagedUser::tenantId,
+                        user -> accessContextService.resolvePrimaryOrganizationId(user).orElse("unknown"),
                         Collectors.collectingAndThen(Collectors.toList(), this::toStats)));
     }
 
@@ -49,7 +57,9 @@ class TenantUserPortAdapter implements TenantUserQueryPort, TenantUserPurgePort 
     @Transactional
     public int purgeUsersByOrganizationIds(Set<String> organizationIds) {
         java.util.List<ManagedUser> usersToPurge = userRepository.findAll().stream()
-                .filter(user -> organizationIds.contains(user.tenantId()))
+                .filter(user -> accessContextService.resolvePrimaryOrganizationId(user)
+                        .filter(organizationIds::contains)
+                        .isPresent())
                 .toList();
 
         for (ManagedUser user : usersToPurge) {
@@ -64,7 +74,8 @@ class TenantUserPortAdapter implements TenantUserQueryPort, TenantUserPurgePort 
         long activeCount = users.stream().filter(user -> user.status() == UserStatus.ACTIVE).count();
         long inactiveCount = users.stream().filter(user -> user.status() == UserStatus.INACTIVE).count();
         boolean hasInvitedOrActiveAdmin = users.stream()
-                .anyMatch(user -> user.role() == com.oryzem.programmanagementsystem.platform.authorization.Role.ADMIN
+                .anyMatch(user -> accessContextService.resolvePrimaryRole(user)
+                                .orElse(null) == com.oryzem.programmanagementsystem.platform.authorization.Role.ADMIN
                         && user.status() != UserStatus.INACTIVE);
         return new OrganizationUserStats(
                 Math.toIntExact(invitedCount),

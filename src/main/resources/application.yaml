@@ -58,11 +58,6 @@ app:
       provider: ${APP_SECURITY_IDENTITY_PROVIDER:stub}
       user-pool-id: ${APP_SECURITY_IDENTITY_USER_POOL_ID:}
       region: ${APP_SECURITY_IDENTITY_REGION:${AWS_REGION:sa-east-1}}
-  features:
-    users-legacy:
-      ui-enabled: ${APP_FEATURES_USERS_LEGACY_UI_ENABLED:true}
-      write-enabled: ${APP_FEATURES_USERS_LEGACY_WRITE_ENABLED:true}
-      read-enabled: ${APP_FEATURES_USERS_LEGACY_READ_ENABLED:true}
 
 logging:
   level:

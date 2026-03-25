@@ -8,7 +8,6 @@ import com.oryzem.programmanagementsystem.platform.auth.CognitoJwtAuthentication
 import com.oryzem.programmanagementsystem.platform.auth.JsonAccessDeniedHandler;
 import com.oryzem.programmanagementsystem.platform.auth.JsonAuthenticationEntryPoint;
 import com.oryzem.programmanagementsystem.platform.auth.AuthenticatedUserSynchronizationFilter;
-import com.oryzem.programmanagementsystem.platform.users.deprecation.LegacyUsersDeprecationHeadersFilter;
 import java.util.List;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -44,7 +43,6 @@ public class SecurityConfig {
             RequestCorrelationFilter requestCorrelationFilter,
             RequestCorrelationContext requestCorrelationContext,
             AuthenticatedUserSynchronizationFilter authenticatedUserSynchronizationFilter,
-            LegacyUsersDeprecationHeadersFilter legacyUsersDeprecationHeadersFilter,
             ObjectMapper objectMapper) throws Exception {
 
         http
@@ -68,7 +66,6 @@ public class SecurityConfig {
                 .exceptionHandling(exceptionHandling(objectMapper, requestCorrelationContext))
                 .addFilterBefore(requestCorrelationFilter, BearerTokenAuthenticationFilter.class)
                 .addFilterAfter(authenticatedUserSynchronizationFilter, BearerTokenAuthenticationFilter.class)
-                .addFilterAfter(legacyUsersDeprecationHeadersFilter, AuthenticatedUserSynchronizationFilter.class)
                 .addFilterAfter(new AuthenticationLoggingFilter(requestCorrelationContext), AuthenticatedUserSynchronizationFilter.class);
 
         return http.build();
@@ -101,15 +98,7 @@ public class SecurityConfig {
                 "X-Correlation-Id"));
         configuration.setExposedHeaders(List.of(
                 "Location",
-                "Deprecation",
-                "Warning",
-                "X-Correlation-Id",
-                "X-Legacy-Users-Endpoint",
-                "X-Legacy-Users-Replacement",
-                "X-Legacy-Users-Stage",
-                "X-Legacy-Users-UI-Enabled",
-                "X-Legacy-Users-Read-Enabled",
-                "X-Legacy-Users-Write-Enabled"));
+                "X-Correlation-Id"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 

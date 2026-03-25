@@ -17,10 +17,6 @@ public class AuthenticatedUserMapper {
 
     private static final String USERNAME_CLAIM = "cognito:username";
     private static final String ACCESS_TOKEN_USERNAME_CLAIM = "username";
-    private static final String TENANT_ID_CLAIM = "tenant_id";
-    private static final String TENANT_TYPE_CLAIM = "tenant_type";
-    private static final String CUSTOM_TENANT_ID_CLAIM = "custom:tenant_id";
-    private static final String CUSTOM_TENANT_TYPE_CLAIM = "custom:tenant_type";
     private static final String ACCESS_CONTEXT_HEADER = "X-Access-Context";
 
     private final AccessContextService accessContextService;
@@ -52,35 +48,19 @@ public class AuthenticatedUserMapper {
                 username,
                 jwt.getClaimAsString("email"),
                 requestHeaderHint);
-        if (resolvedContext.isPresent()) {
-            ResolvedMembershipContext membershipContext = resolvedContext.get();
-            return new AuthenticatedUser(
-                    jwt.getSubject(),
-                    username,
-                    membershipContext.roles(),
-                    membershipContext.permissions(),
-                    membershipContext.userId(),
-                    membershipContext.membershipId(),
-                    membershipContext.activeTenantId(),
-                    membershipContext.activeOrganizationId(),
-                    membershipContext.activeMarketId(),
-                    membershipContext.tenantType());
-        }
-
-        Set<Role> roles = authentication.getAuthorities().stream()
-                .map(authority -> Role.fromAuthority(authority.getAuthority()))
-                .flatMap(Optional::stream)
-                .collect(Collectors.toUnmodifiableSet());
-
+        ResolvedMembershipContext membershipContext = resolvedContext.orElseThrow(() -> new IllegalStateException(
+                "Authenticated user does not have a resolvable membership context. Hard cut membership-first requires a local membership."));
         return new AuthenticatedUser(
                 jwt.getSubject(),
                 username,
-                roles,
-                firstNonBlank(jwt.getClaimAsString(TENANT_ID_CLAIM), jwt.getClaimAsString(CUSTOM_TENANT_ID_CLAIM)),
-                TenantType.fromClaim(firstNonBlank(
-                                jwt.getClaimAsString(TENANT_TYPE_CLAIM),
-                                jwt.getClaimAsString(CUSTOM_TENANT_TYPE_CLAIM)))
-                        .orElse(null));
+                membershipContext.roles(),
+                membershipContext.permissions(),
+                membershipContext.userId(),
+                membershipContext.membershipId(),
+                membershipContext.activeTenantId(),
+                membershipContext.activeOrganizationId(),
+                membershipContext.activeMarketId(),
+                membershipContext.tenantType());
     }
 
     private String firstNonBlank(String... values) {

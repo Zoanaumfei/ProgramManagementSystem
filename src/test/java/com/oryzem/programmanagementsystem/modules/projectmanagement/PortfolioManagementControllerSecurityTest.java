@@ -209,7 +209,7 @@ class PortfolioManagementControllerSecurityTest {
         mockMvc.perform(get("/api/portfolio/organizations/" + customerId).with(defaultJwt()))
                 .andExpect(status().isNotFound());
 
-        mockMvc.perform(get("/api/users")
+        mockMvc.perform(get("/api/access/users")
                         .with(jwtFor("internal-support", "internal-core", "INTERNAL", "SUPPORT"))
                         .param("organizationId", childOrganizationId))
                 .andExpect(status().isOk())
@@ -470,6 +470,7 @@ class PortfolioManagementControllerSecurityTest {
         String customerBId = createOrganization("Customer B", "CUST-B");
         String tier1AId = createChildOrganization(customerAId, "Tier 1 A", "CUST-A-T1");
         createAdminUser(customerAId, "customer.a.admin@oryzem.com");
+        createAdminUser(customerBId, "customer.b.admin@oryzem.com");
         createAdminUser(tier1AId, "tier1.a.admin@oryzem.com");
 
         String milestoneTemplateId = createMilestoneTemplate();
@@ -504,7 +505,7 @@ class PortfolioManagementControllerSecurityTest {
                 .andExpect(status().isOk());
 
         mockMvc.perform(get("/api/portfolio/organizations")
-                        .with(jwtFor("customer-a-admin", customerAId, "EXTERNAL", "ADMIN")))
+                        .with(jwtFor("customer.a.admin@oryzem.com", customerAId, "EXTERNAL", "ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[?(@.id == '%s')]".formatted(customerAId)).exists())
@@ -512,13 +513,13 @@ class PortfolioManagementControllerSecurityTest {
                 .andExpect(jsonPath("$[?(@.id == '%s')]".formatted(customerBId)).doesNotExist());
 
         mockMvc.perform(get("/api/portfolio/programs")
-                        .with(jwtFor("customer-a-admin", customerAId, "EXTERNAL", "ADMIN")))
+                        .with(jwtFor("customer.a.admin@oryzem.com", customerAId, "EXTERNAL", "ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].ownerOrganizationId").value(tier1AId));
 
         mockMvc.perform(get("/api/portfolio/programs")
-                        .with(jwtFor("customer-b-admin", customerBId, "EXTERNAL", "ADMIN")))
+                        .with(jwtFor("customer.b.admin@oryzem.com", customerBId, "EXTERNAL", "ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
     }
@@ -663,7 +664,7 @@ class PortfolioManagementControllerSecurityTest {
                                 milestoneTemplateId)))
                 .andExpect(status().isOk());
 
-        mockMvc.perform(delete("/api/users/" + ownerAdminUserId)
+        mockMvc.perform(delete("/api/access/users/" + ownerAdminUserId)
                         .with(defaultJwt()))
                 .andExpect(status().isNoContent());
 
@@ -1162,7 +1163,7 @@ class PortfolioManagementControllerSecurityTest {
     }
 
     private String createAdminUser(String organizationId, String email) throws Exception {
-        String response = mockMvc.perform(post("/api/users")
+        String response = mockMvc.perform(post("/api/access/users")
                         .with(defaultJwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -1251,9 +1252,23 @@ class PortfolioManagementControllerSecurityTest {
             String tenantId,
             String tenantType,
             String role) {
+        String resolvedUsername = switch (username) {
+            case "admin" -> "admin@oryzem.com";
+            case "internal-admin" -> "admin@oryzem.com";
+            case "external-admin" -> "admin.a@tenant.com";
+            case "tenant-a-admin" -> "admin.a@tenant.com";
+            case "internal-support" -> "support@oryzem.com";
+            case "external-support" -> "support.a@tenant.com";
+            case "tenant-a-manager" -> "manager.a@tenant.com";
+            case "tenant-a-member" -> "member.a@tenant.com";
+            case "customer-a-admin" -> "admin@customer-a.com";
+            case "customer-b-admin" -> "admin@customer-b.com";
+            default -> username;
+        };
         return jwt().jwt(jwt -> jwt
-                        .claim("sub", username + "-123")
-                        .claim("cognito:username", username)
+                        .claim("sub", resolvedUsername + "-123")
+                        .claim("cognito:username", resolvedUsername)
+                        .claim("email", resolvedUsername)
                         .claim("tenant_id", tenantId)
                         .claim("tenant_type", tenantType))
                 .authorities(new SimpleGrantedAuthority("ROLE_" + role));

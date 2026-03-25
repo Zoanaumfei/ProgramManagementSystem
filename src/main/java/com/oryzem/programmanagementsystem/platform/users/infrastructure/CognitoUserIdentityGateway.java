@@ -294,8 +294,6 @@ final class CognitoUserIdentityGateway implements UserIdentityGateway, CurrentUs
         List<AttributeType> attributes = new ArrayList<>();
         attributes.add(attribute("email", user.email()));
         attributes.add(attribute("name", user.displayName()));
-        attributes.add(attribute("custom:tenant_id", user.tenantId()));
-        attributes.add(attribute("custom:tenant_type", user.tenantType().name()));
         attributes.add(attribute("custom:user_status", user.status().name()));
         return attributes;
     }

@@ -256,21 +256,17 @@ class AccessAdministrationControllerTest {
 
     private RequestPostProcessor internalAdmin() {
         return jwt().jwt(jwt -> jwt
-                        .claim("sub", "admin-123")
-                        .claim("cognito:username", "admin")
-                        .claim("email", "admin@oryzem.com")
-                        .claim("tenant_id", "internal-core")
-                        .claim("tenant_type", "INTERNAL"))
+                        .claim("sub", "admin@oryzem.com-sub")
+                        .claim("cognito:username", "admin@oryzem.com")
+                        .claim("email", "admin@oryzem.com"))
                 .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
     }
 
     private RequestPostProcessor externalAdminTenantA() {
         return jwt().jwt(jwt -> jwt
-                        .claim("sub", "admin-a-123")
-                        .claim("cognito:username", "admin.a")
-                        .claim("email", "admin.a@tenant.com")
-                        .claim("tenant_id", "tenant-a")
-                        .claim("tenant_type", "EXTERNAL"))
+                        .claim("sub", "admin.a@tenant.com-sub")
+                        .claim("cognito:username", "admin.a@tenant.com")
+                        .claim("email", "admin.a@tenant.com"))
                 .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
     }
 

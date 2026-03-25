@@ -2,6 +2,8 @@ package com.oryzem.programmanagementsystem.platform.users.application;
 
 import com.oryzem.programmanagementsystem.platform.audit.AuditTrailEvent;
 import com.oryzem.programmanagementsystem.platform.audit.AuditTrailService;
+import com.oryzem.programmanagementsystem.platform.access.AccessContextService;
+import com.oryzem.programmanagementsystem.platform.access.ResolvedMembershipContext;
 import com.oryzem.programmanagementsystem.platform.authorization.Action;
 import com.oryzem.programmanagementsystem.platform.authorization.AppModule;
 import com.oryzem.programmanagementsystem.platform.authorization.AuthenticatedUser;
@@ -11,6 +13,7 @@ import com.oryzem.programmanagementsystem.platform.authorization.AuthorizationSe
 import com.oryzem.programmanagementsystem.platform.authorization.Role;
 import com.oryzem.programmanagementsystem.platform.authorization.TenantType;
 import com.oryzem.programmanagementsystem.platform.tenant.OrganizationLookup;
+import com.oryzem.programmanagementsystem.platform.users.api.UserSummaryResponse;
 import com.oryzem.programmanagementsystem.platform.users.domain.ManagedUser;
 import com.oryzem.programmanagementsystem.platform.users.domain.UserNotFoundException;
 import com.oryzem.programmanagementsystem.platform.users.domain.UserRepository;
@@ -30,16 +33,19 @@ class UserAccessService {
     private final AuthorizationService authorizationService;
     private final AuditTrailService auditTrailService;
     private final OrganizationLookup organizationLookup;
+    private final AccessContextService accessContextService;
 
     UserAccessService(
             UserRepository userRepository,
             AuthorizationService authorizationService,
             AuditTrailService auditTrailService,
-            OrganizationLookup organizationLookup) {
+            OrganizationLookup organizationLookup,
+            AccessContextService accessContextService) {
         this.userRepository = userRepository;
         this.authorizationService = authorizationService;
         this.auditTrailService = auditTrailService;
         this.organizationLookup = organizationLookup;
+        this.accessContextService = accessContextService;
     }
 
     ManagedUser findRequiredUser(String userId) {
@@ -80,9 +86,10 @@ class UserAccessService {
     }
 
     void assertOrganizationChangeAllowed(ManagedUser target, String updatedOrganizationId) {
+        String currentOrganizationId = resolveRequiredUserContext(target).activeOrganizationId();
         if (target.status() == UserStatus.ACTIVE
                 && updatedOrganizationId != null
-                && !updatedOrganizationId.equals(target.tenantId())) {
+                && !updatedOrganizationId.equals(currentOrganizationId)) {
             throw new IllegalArgumentException(
                     "Active users cannot change organization. Inactivate and recreate the user or update while still invited.");
         }
@@ -245,6 +252,24 @@ class UserAccessService {
                 .orElse(null);
     }
 
+    UserSummaryResponse toSummary(ManagedUser user) {
+        ResolvedMembershipContext context = resolveRequiredUserContext(user);
+        return UserSummaryResponse.from(
+                user,
+                resolvePrimaryRole(user),
+                context.activeOrganizationId(),
+                resolveOrganizationName(context.activeOrganizationId()));
+    }
+
+    ResolvedMembershipContext resolveRequiredUserContext(ManagedUser user) {
+        return accessContextService.requireActiveContext(user);
+    }
+
+    Role resolvePrimaryRole(ManagedUser user) {
+        return accessContextService.resolvePrimaryRole(user)
+                .orElse(Role.MEMBER);
+    }
+
     List<ManagedUser> selectUsersForScope(
             AuthenticatedUser actor,
             String effectiveOrganizationId,
@@ -273,7 +298,10 @@ class UserAccessService {
                 && actor.organizationId() != null) {
             Set<String> visibleOrganizationIds = organizationLookup.collectSubtreeIds(actor.organizationId());
             return userRepository.findAll().stream()
-                    .filter(user -> visibleOrganizationIds.contains(user.tenantId()))
+                    .filter(user -> {
+                        String organizationId = resolveRequiredUserContext(user).activeOrganizationId();
+                        return organizationId != null && visibleOrganizationIds.contains(organizationId);
+                    })
                     .toList();
         }
 

@@ -53,20 +53,19 @@ class OperationManagementControllerSecurityTest {
                                 {
                                   "title": "New Trial",
                                   "description": "Operation created by member",
-                                  "tenantId": "tenant-a",
+                                  "tenantId": "TEN-tenant-a",
                                   "tenantType": "EXTERNAL"
                                 }
                                 """)
                         .with(jwt().jwt(jwt -> jwt
-                                        .claim("sub", "member-123")
-                                        .claim("cognito:username", "member")
-                                        .claim("tenant_id", "tenant-a")
-                                        .claim("tenant_type", "EXTERNAL"))
+                                        .claim("sub", "member.a@tenant.com-sub")
+                                        .claim("cognito:username", "member.a@tenant.com")
+                                        .claim("email", "member.a@tenant.com"))
                                 .authorities(new SimpleGrantedAuthority("ROLE_MEMBER"))))
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", org.hamcrest.Matchers.containsString("/api/operations/")))
                 .andExpect(jsonPath("$.status").value("DRAFT"))
-                .andExpect(jsonPath("$.tenantId").value("tenant-a"));
+                .andExpect(jsonPath("$.tenantId").value("TEN-tenant-a"));
     }
 
     @Test
@@ -80,10 +79,9 @@ class OperationManagementControllerSecurityTest {
                                 }
                                 """)
                         .with(jwt().jwt(jwt -> jwt
-                                        .claim("sub", "member-123")
-                                        .claim("cognito:username", "member")
-                                        .claim("tenant_id", "tenant-a")
-                                        .claim("tenant_type", "EXTERNAL"))
+                                        .claim("sub", "member.a@tenant.com-sub")
+                                        .claim("cognito:username", "member.a@tenant.com")
+                                        .claim("email", "member.a@tenant.com"))
                                 .authorities(new SimpleGrantedAuthority("ROLE_MEMBER"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.title").value("Run @ Rate Updated"));
@@ -93,10 +91,9 @@ class OperationManagementControllerSecurityTest {
     void managerShouldApproveSubmittedOperationInOwnTenant() throws Exception {
         mockMvc.perform(post("/api/operations/OP-TA-002/approve")
                         .with(jwt().jwt(jwt -> jwt
-                                        .claim("sub", "manager-123")
-                                        .claim("cognito:username", "manager")
-                                        .claim("tenant_id", "tenant-a")
-                                        .claim("tenant_type", "EXTERNAL"))
+                                        .claim("sub", "manager.a@tenant.com-sub")
+                                        .claim("cognito:username", "manager.a@tenant.com")
+                                        .claim("email", "manager.a@tenant.com"))
                                 .authorities(new SimpleGrantedAuthority("ROLE_MANAGER"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.action").value("APPROVE"))
@@ -109,10 +106,9 @@ class OperationManagementControllerSecurityTest {
                         .param("supportOverride", "true")
                         .param("justification", "Diagnosing supplier incident")
                         .with(jwt().jwt(jwt -> jwt
-                                        .claim("sub", "support-123")
-                                        .claim("cognito:username", "support")
-                                        .claim("tenant_id", "internal-core")
-                                        .claim("tenant_type", "INTERNAL"))
+                                        .claim("sub", "support@oryzem.com-sub")
+                                        .claim("cognito:username", "support@oryzem.com")
+                                        .claim("email", "support@oryzem.com"))
                                 .authorities(new SimpleGrantedAuthority("ROLE_SUPPORT"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.action").value("REPROCESS"))
@@ -130,10 +126,9 @@ class OperationManagementControllerSecurityTest {
                                 }
                                 """)
                         .with(jwt().jwt(jwt -> jwt
-                                        .claim("sub", "auditor-123")
-                                        .claim("cognito:username", "auditor")
-                                        .claim("tenant_id", "tenant-b")
-                                        .claim("tenant_type", "EXTERNAL"))
+                                        .claim("sub", "auditor.b@tenant.com-sub")
+                                        .claim("cognito:username", "auditor.b@tenant.com")
+                                        .claim("email", "auditor.b@tenant.com"))
                                 .authorities(new SimpleGrantedAuthority("ROLE_AUDITOR"))))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error").value("Forbidden"));

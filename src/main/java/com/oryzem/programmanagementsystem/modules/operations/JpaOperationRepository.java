@@ -1,5 +1,6 @@
 package com.oryzem.programmanagementsystem.modules.operations;
 
+import com.oryzem.programmanagementsystem.platform.access.AccessContextService;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.context.annotation.Primary;
@@ -12,9 +13,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class JpaOperationRepository implements OperationRepository {
 
     private final SpringDataOperationJpaRepository delegate;
+    private final AccessContextService accessContextService;
 
-    public JpaOperationRepository(SpringDataOperationJpaRepository delegate) {
+    public JpaOperationRepository(
+            SpringDataOperationJpaRepository delegate,
+            AccessContextService accessContextService) {
         this.delegate = delegate;
+        this.accessContextService = accessContextService;
     }
 
     @Override
@@ -29,7 +34,7 @@ public class JpaOperationRepository implements OperationRepository {
     @Override
     @Transactional(readOnly = true)
     public List<OperationRecord> findByTenantId(String tenantId) {
-        return delegate.findByTenantIdOrderByCreatedAtAscIdAsc(tenantId).stream()
+        return delegate.findByTenantIdInOrderByCreatedAtAscIdAsc(accessContextService.equivalentTenantIds(tenantId)).stream()
                 .map(OperationEntity::toDomain)
                 .toList();
     }
@@ -42,7 +47,22 @@ public class JpaOperationRepository implements OperationRepository {
 
     @Override
     public OperationRecord save(OperationRecord operation) {
-        return delegate.save(OperationEntity.fromDomain(operation)).toDomain();
+        return delegate.save(OperationEntity.fromDomain(new OperationRecord(
+                                operation.id(),
+                                operation.title(),
+                                operation.description(),
+                                accessContextService.canonicalTenantId(operation.tenantId()),
+                                operation.tenantType(),
+                                operation.createdBy(),
+                                operation.status(),
+                                operation.createdAt(),
+                                operation.updatedAt(),
+                                operation.submittedAt(),
+                                operation.approvedAt(),
+                                operation.rejectedAt(),
+                                operation.reopenedAt(),
+                                operation.reprocessedAt())))
+                        .toDomain();
     }
 
     @Override

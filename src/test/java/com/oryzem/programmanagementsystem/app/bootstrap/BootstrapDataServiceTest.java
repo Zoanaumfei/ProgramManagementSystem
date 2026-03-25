@@ -5,6 +5,7 @@ import com.oryzem.programmanagementsystem.platform.authorization.Role;
 import com.oryzem.programmanagementsystem.platform.authorization.TenantType;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.PortfolioResetPort;
 import com.oryzem.programmanagementsystem.modules.operations.OperationRepository;
+import com.oryzem.programmanagementsystem.platform.access.AccessContextService;
 import com.oryzem.programmanagementsystem.platform.access.AccessContextResetService;
 import com.oryzem.programmanagementsystem.platform.tenant.OrganizationBootstrapPort;
 import com.oryzem.programmanagementsystem.platform.tenant.OrganizationLookup;
@@ -37,6 +38,9 @@ class BootstrapDataServiceTest {
 
     @Autowired
     private AccessContextResetService accessContextResetService;
+
+    @Autowired
+    private AccessContextService accessContextService;
 
     @Autowired
     private OrganizationBootstrapPort organizationBootstrapPort;
@@ -101,6 +105,7 @@ class BootstrapDataServiceTest {
                 operationRepository,
                 auditTrailService,
                 portfolioResetPort,
+                accessContextService,
                 accessContextResetService,
                 organizationBootstrapPort,
                 userIdentityGateway,
@@ -131,6 +136,7 @@ class BootstrapDataServiceTest {
                 operationRepository,
                 auditTrailService,
                 portfolioResetPort,
+                accessContextService,
                 accessContextResetService,
                 organizationBootstrapPort,
                 userIdentityGateway,
@@ -178,12 +184,21 @@ class BootstrapDataServiceTest {
                 java.time.Instant.now(),
                 null,
                 null));
+        accessContextService.upsertDefaultMembership(
+                "USR-LEGACY-ADMIN-001",
+                accessContextService.resolveTenantBoundaryId("internal-core"),
+                "internal-core",
+                null,
+                UserStatus.ACTIVE,
+                java.util.Set.of(Role.ADMIN),
+                java.time.Instant.now());
 
         BootstrapDataService service = new BootstrapDataService(
                 userRepository,
                 operationRepository,
                 auditTrailService,
                 portfolioResetPort,
+                accessContextService,
                 accessContextResetService,
                 organizationBootstrapPort,
                 userIdentityGateway,
@@ -209,6 +224,7 @@ class BootstrapDataServiceTest {
                 operationRepository,
                 auditTrailService,
                 portfolioResetPort,
+                accessContextService,
                 accessContextResetService,
                 organizationBootstrapPort,
                 userIdentityGateway,

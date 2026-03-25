@@ -1,5 +1,6 @@
 package com.oryzem.programmanagementsystem.platform.authorization;
 
+import com.oryzem.programmanagementsystem.platform.access.AccessContextService;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
@@ -12,12 +13,15 @@ public class AuthorizationService {
 
     private final AuthorizationMatrix authorizationMatrix;
     private final AuthenticatedUserMapper authenticatedUserMapper;
+    private final AccessContextService accessContextService;
 
     public AuthorizationService(
             AuthorizationMatrix authorizationMatrix,
-            AuthenticatedUserMapper authenticatedUserMapper) {
+            AuthenticatedUserMapper authenticatedUserMapper,
+            AccessContextService accessContextService) {
         this.authorizationMatrix = authorizationMatrix;
         this.authenticatedUserMapper = authenticatedUserMapper;
+        this.accessContextService = accessContextService;
     }
 
     public AuthorizationDecision decide(Authentication authentication, AuthorizationContext context) {
@@ -182,8 +186,8 @@ public class AuthorizationService {
     }
 
     private boolean isCrossTenant(AuthenticatedUser user, AuthorizationContext context) {
-        String actorTenantId = user.tenantId();
-        String resourceTenantId = context.effectiveResourceTenantId(user);
+        String actorTenantId = accessContextService.canonicalTenantId(user.tenantId());
+        String resourceTenantId = accessContextService.canonicalTenantId(context.effectiveResourceTenantId(user));
 
         if (actorTenantId == null || actorTenantId.isBlank() || resourceTenantId == null || resourceTenantId.isBlank()) {
             return false;

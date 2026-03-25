@@ -29,11 +29,6 @@ public class AuthController {
     private static final String GROUPS_CLAIM = "cognito:groups";
     private static final String USERNAME_CLAIM = "cognito:username";
     private static final String ACCESS_TOKEN_USERNAME_CLAIM = "username";
-    private static final String TENANT_ID_CLAIM = "tenant_id";
-    private static final String TENANT_TYPE_CLAIM = "tenant_type";
-    private static final String CUSTOM_TENANT_ID_CLAIM = "custom:tenant_id";
-    private static final String CUSTOM_TENANT_TYPE_CLAIM = "custom:tenant_type";
-    private static final String CUSTOM_USER_STATUS_CLAIM = "custom:user_status";
 
     private final CognitoProperties cognitoProperties;
     private final AuthenticatedUserMapper authenticatedUserMapper;
@@ -121,7 +116,6 @@ public class AuthController {
         body.put("emailVerificationRequired", emailVerificationState.emailVerificationRequired());
         body.put("tokenUse", jwt.getClaimAsString("token_use"));
         body.put("userId", authenticatedUser.userId());
-        body.put("tenantId", authenticatedUser.tenantId());
         body.put("membershipId", authenticatedUser.membershipId());
         body.put("activeTenantId", authenticatedUser.activeTenantId());
         body.put("activeTenantName", activeContextLabels.tenantName());
@@ -130,13 +124,6 @@ public class AuthController {
         body.put("activeMarketId", authenticatedUser.activeMarketId());
         body.put("activeMarketName", activeContextLabels.marketName());
         body.put("tenantType", authenticatedUser.tenantType() != null ? authenticatedUser.tenantType().name() : null);
-        body.put("tenantIdClaim", firstNonBlank(
-                jwt.getClaimAsString(TENANT_ID_CLAIM),
-                jwt.getClaimAsString(CUSTOM_TENANT_ID_CLAIM)));
-        body.put("tenantTypeClaim", firstNonBlank(
-                jwt.getClaimAsString(TENANT_TYPE_CLAIM),
-                jwt.getClaimAsString(CUSTOM_TENANT_TYPE_CLAIM)));
-        body.put("userStatusClaim", jwt.getClaimAsString(CUSTOM_USER_STATUS_CLAIM));
         body.put("roles", authenticatedUser.roles().stream().map(Enum::name).sorted().toList());
         body.put("permissions", authenticatedUser.permissions().stream().sorted().toList());
         body.put("groups", defaultList(jwt.getClaimAsStringList(GROUPS_CLAIM)));

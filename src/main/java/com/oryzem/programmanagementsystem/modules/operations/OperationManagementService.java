@@ -1,5 +1,6 @@
 package com.oryzem.programmanagementsystem.modules.operations;
 
+import com.oryzem.programmanagementsystem.platform.access.AccessContextService;
 import com.oryzem.programmanagementsystem.platform.audit.AuditTrailEvent;
 import com.oryzem.programmanagementsystem.platform.audit.AuditTrailService;
 import com.oryzem.programmanagementsystem.platform.authorization.Action;
@@ -23,14 +24,17 @@ public class OperationManagementService {
     private final OperationRepository operationRepository;
     private final AuthorizationService authorizationService;
     private final AuditTrailService auditTrailService;
+    private final AccessContextService accessContextService;
 
     public OperationManagementService(
             OperationRepository operationRepository,
             AuthorizationService authorizationService,
-            AuditTrailService auditTrailService) {
+            AuditTrailService auditTrailService,
+            AccessContextService accessContextService) {
         this.operationRepository = operationRepository;
         this.authorizationService = authorizationService;
         this.auditTrailService = auditTrailService;
+        this.accessContextService = accessContextService;
     }
 
     public List<OperationResponse> listOperations(
@@ -67,15 +71,19 @@ public class OperationManagementService {
                 .build();
         AuthorizationDecision decision = authorizationService.decide(actor, context);
         assertAllowed(decision);
-        enforceTenantScope(actor, request.tenantId(), request.tenantType());
+        String canonicalTenantId = accessContextService.canonicalTenantId(request.tenantId());
+        TenantType tenantType = request.tenantType() != null
+                ? request.tenantType()
+                : accessContextService.resolveTenantType(canonicalTenantId).orElse(actor.tenantType());
+        enforceTenantScope(actor, canonicalTenantId, tenantType);
 
         Instant now = Instant.now();
         OperationRecord created = new OperationRecord(
                 "OP-" + UUID.randomUUID().toString().replace("-", "").substring(0, 10).toUpperCase(),
                 request.title().trim(),
                 normalizeDescription(request.description()),
-                request.tenantId().trim(),
-                request.tenantType(),
+                canonicalTenantId,
+                tenantType,
                 actor.subject(),
                 OperationStatus.DRAFT,
                 now,
@@ -264,7 +272,9 @@ public class OperationManagementService {
             return;
         }
 
-        if (actor.tenantId() != null && !actor.tenantId().equals(targetTenantId)) {
+        String actorTenantId = accessContextService.canonicalTenantId(actor.tenantId());
+        String effectiveTargetTenantId = accessContextService.canonicalTenantId(targetTenantId);
+        if (actorTenantId != null && !actorTenantId.equals(effectiveTargetTenantId)) {
             throw new AccessDeniedException("Tenant scope mismatch for requested operation.");
         }
 
@@ -275,9 +285,9 @@ public class OperationManagementService {
 
     private String resolveListTenantId(AuthenticatedUser actor, String tenantId) {
         if (tenantId != null && !tenantId.isBlank()) {
-            return tenantId.trim();
+            return accessContextService.canonicalTenantId(tenantId);
         }
-        return actor.isAdmin() ? null : actor.tenantId();
+        return actor.isAdmin() ? null : accessContextService.canonicalTenantId(actor.tenantId());
     }
 
     private TenantType resolveListTenantType(AuthenticatedUser actor, String effectiveTenantId) {
@@ -300,8 +310,8 @@ public class OperationManagementService {
         }
 
         return effectiveTenantId != null
-                && actor.tenantId() != null
-                && !actor.tenantId().equals(effectiveTenantId)
+                && accessContextService.canonicalTenantId(actor.tenantId()) != null
+                && !accessContextService.canonicalTenantId(actor.tenantId()).equals(effectiveTenantId)
                 && supportOverride
                 && justification != null
                 && !justification.isBlank();

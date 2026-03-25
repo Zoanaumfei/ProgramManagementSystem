@@ -10,6 +10,7 @@ import com.oryzem.programmanagementsystem.platform.authorization.AuthorizationDe
 import com.oryzem.programmanagementsystem.platform.authorization.AuthorizationService;
 import com.oryzem.programmanagementsystem.platform.authorization.Role;
 import com.oryzem.programmanagementsystem.platform.authorization.TenantType;
+import com.oryzem.programmanagementsystem.platform.access.AccessContextService;
 import com.oryzem.programmanagementsystem.platform.tenant.OrganizationLookup;
 import com.oryzem.programmanagementsystem.modules.operations.OperationStatus;
 import java.time.Instant;
@@ -39,18 +40,21 @@ public class ReportManagementService {
     private final OrganizationLookup organizationLookup;
     private final AuthorizationService authorizationService;
     private final AuditTrailService auditTrailService;
+    private final AccessContextService accessContextService;
 
     public ReportManagementService(
             ReportUserQueryPort reportUserQueryPort,
             ReportOperationQueryPort reportOperationQueryPort,
             OrganizationLookup organizationLookup,
             AuthorizationService authorizationService,
-            AuditTrailService auditTrailService) {
+            AuditTrailService auditTrailService,
+            AccessContextService accessContextService) {
         this.reportUserQueryPort = reportUserQueryPort;
         this.reportOperationQueryPort = reportOperationQueryPort;
         this.organizationLookup = organizationLookup;
         this.authorizationService = authorizationService;
         this.auditTrailService = auditTrailService;
+        this.accessContextService = accessContextService;
     }
 
     public ReportSummaryResponse getSummary(
@@ -219,9 +223,9 @@ public class ReportManagementService {
 
     private String resolveRequestedTenant(AuthenticatedUser actor, String tenantId) {
         if (tenantId != null && !tenantId.isBlank()) {
-            return tenantId.trim();
+            return accessContextService.canonicalTenantId(tenantId);
         }
-        return actor.isAdmin() ? null : actor.tenantId();
+        return actor.isAdmin() ? null : accessContextService.canonicalTenantId(actor.tenantId());
     }
 
     private TenantType resolveTenantType(AuthenticatedUser actor, String tenantId) {
@@ -229,8 +233,10 @@ public class ReportManagementService {
             return null;
         }
 
-        return organizationLookup.findById(tenantId)
+        return accessContextService.resolveTenantType(tenantId)
+                .or(() -> organizationLookup.findById(tenantId)
                 .map(OrganizationLookup.OrganizationView::tenantType)
+                )
                 .orElse(actor.tenantType());
     }
 
@@ -314,8 +320,8 @@ public class ReportManagementService {
         }
 
         return tenantId != null
-                && actor.tenantId() != null
-                && !actor.tenantId().equals(tenantId)
+                && accessContextService.canonicalTenantId(actor.tenantId()) != null
+                && !accessContextService.canonicalTenantId(actor.tenantId()).equals(tenantId)
                 && supportOverride
                 && justification != null
                 && !justification.isBlank();

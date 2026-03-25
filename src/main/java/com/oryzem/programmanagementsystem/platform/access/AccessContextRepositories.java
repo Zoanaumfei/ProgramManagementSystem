@@ -31,6 +31,12 @@ interface SpringDataUserMembershipJpaRepository extends JpaRepository<UserMember
 
     Optional<UserMembershipEntity> findByIdAndUserId(String id, String userId);
 
+    List<UserMembershipEntity> findAllByOrganizationId(String organizationId);
+
+    List<UserMembershipEntity> findAllByOrganizationIdIn(Collection<String> organizationIds);
+
+    List<UserMembershipEntity> findAllByTenantId(String tenantId);
+
     List<UserMembershipEntity> findAllByMarketIdAndStatus(String marketId, MembershipStatus status);
 
     void deleteByUserId(String userId);

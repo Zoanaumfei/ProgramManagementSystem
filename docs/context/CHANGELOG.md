@@ -1,93 +1,16 @@
 # Changelog
 
-Ultima atualizacao: `2026-03-25`
-
-## 2026-03-07
-- Base inicial de autenticacao, autorizacao, persistencia e modulos `users`, `operations` e `reports`.
-
-## 2026-03-08 a 2026-03-10
-- Consolidacao da operacao AWS com RDS privado, ECS/Fargate, ALB, ECR, Secrets Manager e health checks.
-
-## 2026-03-11
-- Fechamento do mapa inicial do dominio principal com raiz em `Programa`.
-
-## 2026-03-13
-- `docs/context/PROJECT_CONTEXT.md` passou a ser a memoria operacional compartilhada entre backend e frontend.
-
-## 2026-03-14
-- Primeira UI basica do portfolio no frontend consumindo o backend real.
-- Ajustes de tratamento de erro e compatibilidade de token no frontend.
-
-## 2026-03-15
-- Contrato de `users` migrou para `organizationId` e `organizationName`.
-- Jornada integrada `Organizacao -> primeiro ADMIN` entrou no desenho funcional.
-
-## 2026-03-17
-- Modulo de `users` ganhou update e inativacao logica.
-- `setupStatus` de organizacao e bloqueios de onboarding foram implantados.
-
-## 2026-03-19
-- Integracao do modulo de `users` com identidade real no Cognito.
-- Lambda de `Pre Token Generation` passou a emitir claims de tenant no `access_token`.
-- Workspace de `users` foi implementado no frontend.
-- Fluxo de `purge` foi validado no runtime AWS apos ajuste de IAM.
-
-## 2026-03-20
-- Hierarquia de organizacoes por customer/subarvore entrou no backend.
-- Regras de visibilidade e permissoes de portfolio por papel foram fechadas.
-- Frontend foi alinhado ao contrato hierarquico de organizacoes e ao novo recorte de papeis.
-- `purge-subtree` entrou no frontend para saneamento operacional restrito.
-
-## 2026-03-21
-- Segunda passada do refactor para monolito modular: movimentos fisicos, servicos menores em `projectmanagement` e alinhamento de packages.
-- Consolidacao de fronteiras: `OrganizationLookup` movido para `tenant`, tenant/users/reports passaram a conversar por portas explicitas e servicos grandes foram quebrados.
-- Testes e pacotes legados foram reorganizados sem mudar o comportamento funcional.
-
-## 2026-03-22
-- O contexto compartilhado foi consolidado em `docs/context/PROJECT_CONTEXT.md` como fonte unica.
-- `platform.users` foi consolidado como primeiro modulo com camadas internas mais claras: `api`, `application`, `domain` e `infrastructure`.
-- DTOs, servicos, repositorios e integracao de identidade de `users` foram movidos fisicamente para pastas coerentes com seus packages.
-- O contrato de tenant permaneceu em `platform.tenant.OrganizationLookup`, mantendo `users` desacoplado da implementacao concreta de diretorio organizacional.
-- O fluxo de documentos foi preparado para `S3` real sem mudar o contrato HTTP: upload assinado, `complete`, listagem e download assinado.
-
-## 2026-03-23
-- O app client do Cognito em dev foi alinhado para `ALLOW_USER_PASSWORD_AUTH`, alem dos flows administrativos ja habilitados.
-- Foi identificado e corrigido o binding incorreto do provider de autenticacao publica para o gateway `cognito`.
-- Entrou teste de regressao em `PublicAuthenticationConfigTest` para garantir a selecao correta do gateway por provider.
+## 2026-03-25
+- hard cut completed for the legacy `/api/users` surface; the supported administrative route is `/api/access/users`
+- removed legacy users deprecation flags, deprecation headers and operational adoption-report endpoints
+- removed authorization fallback based on Cognito tenant claims; active context now resolves strictly from local membership data
+- repository reads and user-facing authorization flows were updated to use membership context instead of legacy compatibility hydration
+- bootstrap now provisions memberships explicitly for seeded users and internal break-glass users
+- operations, reports and authorization now normalize tenant boundary ids consistently during access checks
+- Cognito user sync no longer writes legacy tenant custom attributes
+- tests were rewritten to validate the final membership-first backend contract
+- physical schema cleanup of old `app_user` access columns is still pending in a follow-up migration
 
 ## 2026-03-24
-- Entrou a migration `V7__introduce_tenant_membership_and_market.sql`.
-- Entrou a migration `V8__allow_multiple_memberships_per_user.sql` para remover a restricao indevida que limitava memberships adicionais.
-- `tenant`, `tenant_market`, `user_membership`, `membership_role`, `app_permission` e `role_permission` passaram a existir explicitamente.
-- `organization` passou a carregar `tenant_id` explicito e `market_id` opcional sem perder a hierarquia por subarvore.
-- `AuthenticatedUser` e `AuthenticatedUserMapper` passaram a suportar `membershipId`, `activeTenantId`, `activeOrganizationId`, `activeMarketId`, `roles` e `permissions`.
-- `AccessContextService` passou a resolver o contexto ativo a partir de membership e a sincronizar um membership default a partir do modelo legado.
-- Entraram as APIs `/api/access/users/{userId}/memberships`, `/api/access/context/activate` e `/api/access/tenants/{tenantId}/markets`.
-- O backend passou a aceitar `X-Access-Context` para trocar o contexto ativo por request sem alterar o token do Cognito.
-- Organizacoes raiz agora provisionam `tenant` explicito e o bootstrap/reset passou a limpar tambem as estruturas contextuais novas.
-- Fluxos de `users`, `portfolio` e `/api/auth/me` seguem compatíveis com campos legados durante a transicao.
-- A pasta `docs` foi realinhada ao modelo `User -> Membership -> Tenant / Organization / Market -> Role -> Permission`, incluindo contexto ativo e gaps atualizados.
-- O frontend passou a operar a trilha nova de acesso com seletor de contexto ativo no `AppShell`, administracao de memberships em `Users` e gestao de markets em `/workspace/markets`.
-- `/api/auth/me` passou a expor tambem `userId` para permitir que a UI resolva os memberships do proprio usuario sem heuristicas extras.
-- Entrou a fase 2 de consolidacao do Core de Acesso, com logs estruturados e `correlationId` no backend e frontend para troca de contexto, requests com/sem `X-Access-Context` e falhas `401/403` relacionadas.
-- O frontend deixou de usar invalidação ampla no context switch e passou a invalidar seletivamente os dominios de `current-user`, `access`, `users`, `portfolio` e `organizations`.
-- `GET /api/auth/me` passou a expor tambem `activeTenantName`, `activeOrganizationName` e `activeMarketName` para labels confiaveis na UI.
-- `GET /api/access/tenants` passou a ser a fonte explicita de tenant label no frontend, sem heuristica via organizacoes visiveis.
-- O bloco legado de `/api/users` foi reforcado como trilha de compatibilidade, com guardrail explicito para evitar uso como superficie primaria de telas novas.
-- Foi adicionado checklist de homologacao manual multi-membership/multi-market e plano funcional de rollback em `docs/context/HOMOLOGATION_CHECKLIST.md`.
-
-## 2026-03-25
-- Entrou a estrategia backend de deprecacao progressiva de `/api/users`, controlada por feature flags `users-legacy`.
-- O legado agora publica headers de deprecacao e opera por estagios `ONLY_WARNING`, `READ_ONLY` e `OFF_BY_DEFAULT`.
-- `GET /api/access/legacy-users/deprecation-status` passou a expor o estado efetivo das flags por ambiente.
-- `GET /api/access/legacy-users/adoption-report` passou a consolidar adocao do legado versus `membership-first`, com totais, share percentual, tendencia semanal, quebrando por operacao, perfil e tenants ainda dependentes.
-- O backend passou a registrar telemetria Micrometer e auditoria persistente para `/api/users` e `/api/access/users/{userId}/memberships`.
-- Entraram testes de integracao cobrindo os estados `ONLY_WARNING`, `READ_ONLY` e `OFF_BY_DEFAULT`, alem de um guardrail para evitar novas rotas backend em `/api/users`.
-- Foram definidos defaults por profile:
-- `dev` e `homolog`: legado visivel com leitura e escrita liberadas.
-- `prod`: legado oculto por padrao na flag de UI, mantendo leitura e escrita liberadas enquanto o desligamento nao avanca.
-- Entrou o runbook operacional `docs/context/LEGACY_USERS_DEPRECATION_RUNBOOK.md` para rollout, sinais de alerta e rollback.
-- Comecou a fase de reducao do dual-write legado de `app_user.role` e `app_user.tenant_id`.
-- Leituras do repositorio de usuarios agora preferem o contexto resolvido por membership default.
-- Salvamentos nao-legados de usuario deixaram de sobrescrever roles/contexto de membership ja administrados pela trilha membership-first.
-- A sincronizacao forte do legacy shape ficou restrita ao create/update explicito de `/api/users`.
+- introduced explicit tenant, market and membership structures
+- added active context activation and market administration endpoints

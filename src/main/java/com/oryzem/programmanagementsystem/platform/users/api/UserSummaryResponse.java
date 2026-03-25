@@ -17,13 +17,17 @@ public record UserSummaryResponse(
         Instant inviteResentAt,
         Instant accessResetAt) {
 
-    public static UserSummaryResponse from(ManagedUser user, String organizationName) {
+    public static UserSummaryResponse from(
+            ManagedUser user,
+            Role role,
+            String organizationId,
+            String organizationName) {
         return new UserSummaryResponse(
                 user.id(),
                 user.displayName(),
                 user.email(),
-                user.role(),
-                user.tenantId(),
+                role,
+                organizationId,
                 organizationName,
                 user.status(),
                 user.createdAt(),

@@ -1,6 +1,7 @@
 package com.oryzem.programmanagementsystem.platform.users.infrastructure;
 
 import com.oryzem.programmanagementsystem.modules.reports.ReportUserQueryPort;
+import com.oryzem.programmanagementsystem.platform.access.AccessContextService;
 import com.oryzem.programmanagementsystem.platform.users.domain.ManagedUser;
 import com.oryzem.programmanagementsystem.platform.users.domain.UserRepository;
 import org.springframework.stereotype.Component;
@@ -9,9 +10,11 @@ import org.springframework.stereotype.Component;
 class ReportUserQueryAdapter implements ReportUserQueryPort {
 
     private final UserRepository userRepository;
+    private final AccessContextService accessContextService;
 
-    ReportUserQueryAdapter(UserRepository userRepository) {
+    ReportUserQueryAdapter(UserRepository userRepository, AccessContextService accessContextService) {
         this.userRepository = userRepository;
+        this.accessContextService = accessContextService;
     }
 
     @Override
@@ -20,10 +23,13 @@ class ReportUserQueryAdapter implements ReportUserQueryPort {
                 ? userRepository.findAll()
                 : userRepository.findByTenantId(tenantId);
         return users.stream()
-                .map(user -> new ReportUserView(
-                        user.role(),
-                        user.status().name(),
-                        user.tenantType()))
+                .map(user -> {
+                    var context = accessContextService.requireActiveContext(user);
+                    return new ReportUserView(
+                            accessContextService.resolvePrimaryRole(user).orElse(null),
+                            user.status().name(),
+                            context.tenantType());
+                })
                 .toList();
     }
 }

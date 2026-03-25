@@ -57,6 +57,14 @@ class AccessContextServiceTest {
                 Instant.parse("2026-03-24T21:00:00Z"),
                 null,
                 null));
+        accessContextService.upsertDefaultMembership(
+                saved.id(),
+                "TEN-tenant-a",
+                "tenant-a",
+                null,
+                saved.status(),
+                java.util.Set.of(Role.MANAGER),
+                saved.createdAt());
 
         ResolvedMembershipContext context = accessContextService.resolveActiveContext(
                         "subject-membership-001",
@@ -87,6 +95,14 @@ class AccessContextServiceTest {
                 Instant.parse("2026-03-24T21:05:00Z"),
                 null,
                 null));
+        accessContextService.upsertDefaultMembership(
+                saved.id(),
+                "TEN-tenant-a",
+                "tenant-a",
+                null,
+                saved.status(),
+                java.util.Set.of(Role.ADMIN),
+                saved.createdAt());
 
         organizationBootstrapPort.ensureSeeded(
                 "tenant-b",
@@ -134,7 +150,7 @@ class AccessContextServiceTest {
     }
 
     @Test
-    void shouldPreserveMembershipManagedContextDuringNonLegacyUserSaves() {
+    void shouldPreserveMembershipManagedContextDuringProfileOnlyUserSaves() {
         ManagedUser saved = userRepository.save(new ManagedUser(
                 "USR-MBR-003",
                 "compat.user@oryzem.com",
@@ -148,6 +164,14 @@ class AccessContextServiceTest {
                 Instant.parse("2026-03-24T21:10:00Z"),
                 null,
                 null));
+        accessContextService.upsertDefaultMembership(
+                saved.id(),
+                "TEN-tenant-a",
+                "tenant-a",
+                null,
+                saved.status(),
+                java.util.Set.of(Role.MEMBER),
+                saved.createdAt());
 
         UserMembershipEntity membership = membershipRepository.findByUserIdAndDefaultMembershipTrue(saved.id()).orElseThrow();
         membership.updateContext(
@@ -170,7 +194,6 @@ class AccessContextServiceTest {
 
         userRepository.save(saved.withIdentitySubject("subject-membership-003"));
 
-        ManagedUser hydrated = userRepository.findById(saved.id()).orElseThrow();
         ResolvedMembershipContext context = accessContextService.resolveActiveContext(
                         "subject-membership-003",
                         "compat.user@oryzem.com",
@@ -178,14 +201,12 @@ class AccessContextServiceTest {
                         null)
                 .orElseThrow();
 
-        Assertions.assertThat(hydrated.tenantId()).isEqualTo("tenant-b");
-        Assertions.assertThat(hydrated.role()).isEqualTo(Role.ADMIN);
         Assertions.assertThat(context.activeOrganizationId()).isEqualTo("tenant-b");
         Assertions.assertThat(context.roles()).containsExactlyInAnyOrder(Role.ADMIN, Role.SUPPORT);
     }
 
     @Test
-    void shouldForceLegacyCompatibilitySyncWhenExplicitlyRequested() {
+    void shouldUpsertExplicitDefaultMembershipContext() {
         ManagedUser saved = userRepository.save(new ManagedUser(
                 "USR-MBR-004",
                 "legacy.sync@oryzem.com",
@@ -199,15 +220,14 @@ class AccessContextServiceTest {
                 Instant.parse("2026-03-24T21:15:00Z"),
                 null,
                 null));
-
-        accessContextService.synchronizeLegacyDefaultMembership(saved.withUpdatedDetails(
-                saved.displayName(),
-                saved.email(),
-                Role.ADMIN,
+        accessContextService.upsertDefaultMembership(
+                saved.id(),
+                "TEN-tenant-b",
                 "tenant-b",
-                TenantType.EXTERNAL));
-
-        ManagedUser hydrated = userRepository.findById(saved.id()).orElseThrow();
+                null,
+                saved.status(),
+                java.util.Set.of(Role.ADMIN),
+                saved.createdAt());
         ResolvedMembershipContext context = accessContextService.resolveActiveContext(
                         "subject-membership-004",
                         "legacy.sync@oryzem.com",
@@ -215,8 +235,6 @@ class AccessContextServiceTest {
                         null)
                 .orElseThrow();
 
-        Assertions.assertThat(hydrated.tenantId()).isEqualTo("tenant-b");
-        Assertions.assertThat(hydrated.role()).isEqualTo(Role.ADMIN);
         Assertions.assertThat(context.activeTenantId()).isEqualTo("TEN-tenant-b");
         Assertions.assertThat(context.activeOrganizationId()).isEqualTo("tenant-b");
         Assertions.assertThat(context.roles()).containsExactly(Role.ADMIN);
