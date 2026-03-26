@@ -86,8 +86,11 @@ class UserAccessService {
     }
 
     void assertOrganizationChangeAllowed(ManagedUser target, String updatedOrganizationId) {
-        String currentOrganizationId = resolveRequiredUserContext(target).activeOrganizationId();
+        String currentOrganizationId = resolveUserContext(target)
+                .map(ResolvedMembershipContext::activeOrganizationId)
+                .orElse(null);
         if (target.status() == UserStatus.ACTIVE
+                && currentOrganizationId != null
                 && updatedOrganizationId != null
                 && !updatedOrganizationId.equals(currentOrganizationId)) {
             throw new IllegalArgumentException(
@@ -253,16 +256,15 @@ class UserAccessService {
     }
 
     UserSummaryResponse toSummary(ManagedUser user) {
-        ResolvedMembershipContext context = resolveRequiredUserContext(user);
-        return UserSummaryResponse.from(
-                user,
-                resolvePrimaryRole(user),
-                context.activeOrganizationId(),
-                resolveOrganizationName(context.activeOrganizationId()));
+        return UserSummaryResponse.from(user, resolveUserContext(user).isPresent());
     }
 
     ResolvedMembershipContext resolveRequiredUserContext(ManagedUser user) {
         return accessContextService.requireActiveContext(user);
+    }
+
+    java.util.Optional<ResolvedMembershipContext> resolveUserContext(ManagedUser user) {
+        return accessContextService.resolveActiveContext(user, null);
     }
 
     Role resolvePrimaryRole(ManagedUser user) {

@@ -63,7 +63,6 @@ final class CognitoUserIdentityGateway implements UserIdentityGateway, CurrentUs
                 .desiredDeliveryMediums(DeliveryMediumType.EMAIL)
                 .userAttributes(attributes(user))
                 .build());
-        syncRoleGroup(null, user);
     }
 
     @Override
@@ -73,7 +72,6 @@ final class CognitoUserIdentityGateway implements UserIdentityGateway, CurrentUs
                 .username(requiredIdentityUsername(updatedUser))
                 .userAttributes(attributes(updatedUser))
                 .build());
-        syncRoleGroup(existingUser.role(), updatedUser);
     }
 
     @Override
@@ -150,7 +148,7 @@ final class CognitoUserIdentityGateway implements UserIdentityGateway, CurrentUs
 
     @Override
     public void ensureBootstrapUser(ManagedUser user, Set<Role> grantedRoles, String password, String temporaryPassword) {
-        Set<Role> effectiveRoles = normalizeRoles(grantedRoles, user.role());
+        Set<Role> effectiveRoles = normalizeRoles(grantedRoles);
         if (identityExists(user)) {
             client.adminUpdateUserAttributes(AdminUpdateUserAttributesRequest.builder()
                     .userPoolId(properties.userPoolId())
@@ -272,24 +270,6 @@ final class CognitoUserIdentityGateway implements UserIdentityGateway, CurrentUs
         }
     }
 
-    private void syncRoleGroup(Role previousRole, ManagedUser user) {
-        if (previousRole != null && previousRole != user.role()) {
-            client.adminRemoveUserFromGroup(AdminRemoveUserFromGroupRequest.builder()
-                    .userPoolId(properties.userPoolId())
-                    .username(requiredIdentityUsername(user))
-                    .groupName(previousRole.name())
-                    .build());
-        }
-
-        if (previousRole != user.role()) {
-            client.adminAddUserToGroup(AdminAddUserToGroupRequest.builder()
-                    .userPoolId(properties.userPoolId())
-                    .username(requiredIdentityUsername(user))
-                    .groupName(user.role().name())
-                    .build());
-        }
-    }
-
     private List<AttributeType> attributes(ManagedUser user) {
         List<AttributeType> attributes = new ArrayList<>();
         attributes.add(attribute("email", user.email()));
@@ -318,11 +298,8 @@ final class CognitoUserIdentityGateway implements UserIdentityGateway, CurrentUs
         return user.identityUsername();
     }
 
-    private Set<Role> normalizeRoles(Set<Role> grantedRoles, Role primaryRole) {
+    private Set<Role> normalizeRoles(Set<Role> grantedRoles) {
         LinkedHashSet<Role> normalizedRoles = new LinkedHashSet<>();
-        if (primaryRole != null) {
-            normalizedRoles.add(primaryRole);
-        }
         if (grantedRoles != null) {
             normalizedRoles.addAll(grantedRoles);
         }

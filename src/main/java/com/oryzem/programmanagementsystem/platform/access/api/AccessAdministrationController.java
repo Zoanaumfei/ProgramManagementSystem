@@ -48,6 +48,17 @@ public class AccessAdministrationController {
                 .body(created);
     }
 
+    @PostMapping("/users/{userId}/bootstrap-membership")
+    public ResponseEntity<MembershipResponse> bootstrapMembership(
+            Authentication authentication,
+            @PathVariable String userId,
+            @Valid @RequestBody BootstrapMembershipRequest request) {
+        AuthenticatedUser actor = authenticatedUserMapper.from(authentication);
+        MembershipResponse created = accessAdministrationService.bootstrapMembership(actor, userId, request);
+        return ResponseEntity.created(URI.create("/api/access/users/" + userId + "/memberships/" + created.id()))
+                .body(created);
+    }
+
     @PutMapping("/users/{userId}/memberships/{membershipId}")
     public MembershipResponse updateMembership(
             Authentication authentication,

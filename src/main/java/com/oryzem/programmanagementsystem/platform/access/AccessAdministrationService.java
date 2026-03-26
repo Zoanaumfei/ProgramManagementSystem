@@ -2,6 +2,7 @@ package com.oryzem.programmanagementsystem.platform.access;
 
 import com.oryzem.programmanagementsystem.platform.access.api.ActivateMembershipRequest;
 import com.oryzem.programmanagementsystem.platform.access.api.ActiveAccessContextResponse;
+import com.oryzem.programmanagementsystem.platform.access.api.BootstrapMembershipRequest;
 import com.oryzem.programmanagementsystem.platform.access.api.CreateMembershipRequest;
 import com.oryzem.programmanagementsystem.platform.access.api.CreateTenantMarketRequest;
 import com.oryzem.programmanagementsystem.platform.access.api.MembershipResponse;
@@ -110,6 +111,37 @@ public class AccessAdministrationService {
                 scope.marketId(),
                 request.status() != null ? request.status() : MembershipStatus.ACTIVE,
                 defaultMembership,
+                now,
+                now));
+        replaceRoles(saved.getId(), request.roles());
+        return toMembershipResponse(saved);
+    }
+
+    public MembershipResponse bootstrapMembership(
+            AuthenticatedUser actor,
+            String userId,
+            BootstrapMembershipRequest request) {
+        ManagedUser targetUser = findRequiredUser(userId);
+        if (!membershipRepository.findByUserIdOrderByDefaultMembershipDescJoinedAtAsc(targetUser.id()).isEmpty()) {
+            throw new IllegalArgumentException("Bootstrap membership is allowed only for users without memberships.");
+        }
+
+        OrganizationLookup.OrganizationView organization = organizationLookup.findById(trimToNull(request.organizationId()))
+                .orElseThrow(() -> new IllegalArgumentException("Organization not found: " + request.organizationId()));
+        MembershipScope scope = resolveMembershipScope(
+                organization.tenantId(),
+                organization.id(),
+                request.marketId());
+        assertMembershipMutationAllowed(actor, scope, Action.CREATE, request.roles());
+
+        Instant now = Instant.now();
+        UserMembershipEntity saved = membershipRepository.save(UserMembershipEntity.createDefault(
+                newId("MBR"),
+                targetUser.id(),
+                scope.tenant().getId(),
+                scope.organizationId(),
+                scope.marketId(),
+                request.status() != null ? request.status() : MembershipStatus.ACTIVE,
                 now,
                 now));
         replaceRoles(saved.getId(), request.roles());

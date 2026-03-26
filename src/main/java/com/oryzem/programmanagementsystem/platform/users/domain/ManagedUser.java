@@ -1,7 +1,5 @@
 package com.oryzem.programmanagementsystem.platform.users.domain;
 
-import com.oryzem.programmanagementsystem.platform.authorization.Role;
-import com.oryzem.programmanagementsystem.platform.authorization.TenantType;
 import java.time.Instant;
 
 public record ManagedUser(
@@ -10,29 +8,18 @@ public record ManagedUser(
         String identitySubject,
         String displayName,
         String email,
-        Role role,
-        String tenantId,
-        TenantType tenantType,
         UserStatus status,
         Instant createdAt,
         Instant inviteResentAt,
         Instant accessResetAt) {
 
-    public ManagedUser withUpdatedDetails(
-            String displayName,
-            String email,
-            Role role,
-            String tenantId,
-            TenantType tenantType) {
+    public ManagedUser withUpdatedDetails(String displayName, String email) {
         return new ManagedUser(
                 id,
                 identityUsername,
                 identitySubject,
                 displayName,
                 email,
-                role,
-                tenantId,
-                tenantType,
                 status,
                 createdAt,
                 inviteResentAt,
@@ -46,9 +33,6 @@ public record ManagedUser(
                 identitySubject,
                 displayName,
                 email,
-                role,
-                tenantId,
-                tenantType,
                 status,
                 createdAt,
                 performedAt,
@@ -62,9 +46,6 @@ public record ManagedUser(
                 identitySubject,
                 displayName,
                 email,
-                role,
-                tenantId,
-                tenantType,
                 status,
                 createdAt,
                 inviteResentAt,
@@ -78,9 +59,6 @@ public record ManagedUser(
                 identitySubject,
                 displayName,
                 email,
-                role,
-                tenantId,
-                tenantType,
                 status,
                 createdAt,
                 inviteResentAt,
@@ -94,9 +72,6 @@ public record ManagedUser(
                 identitySubject,
                 displayName,
                 email,
-                role,
-                tenantId,
-                tenantType,
                 status,
                 createdAt,
                 inviteResentAt,

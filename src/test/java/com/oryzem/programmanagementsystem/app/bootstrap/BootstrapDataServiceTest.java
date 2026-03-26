@@ -80,10 +80,10 @@ class BootstrapDataServiceTest {
                         "TempPassword123!")));
 
         ManagedUser createdUser = userRepository.findByEmailIgnoreCase("bootstrap.admin@oryzem.com").orElseThrow();
-        Assertions.assertThat(createdUser.role()).isEqualTo(Role.ADMIN);
-        Assertions.assertThat(createdUser.tenantId()).isEqualTo("internal-core");
-        Assertions.assertThat(createdUser.tenantType()).isEqualTo(TenantType.INTERNAL);
         Assertions.assertThat(createdUser.status()).isEqualTo(UserStatus.ACTIVE);
+        Assertions.assertThat(accessContextService.resolvePrimaryRole(createdUser)).contains(Role.ADMIN);
+        Assertions.assertThat(accessContextService.resolvePrimaryOrganizationId(createdUser)).contains("internal-core");
+        Assertions.assertThat(accessContextService.resolvePrimaryTenantType(createdUser)).contains(TenantType.INTERNAL);
         Assertions.assertThat(userIdentityGateway.identityExists(createdUser)).isTrue();
         assertBootstrapRoles(Role.ADMIN, Role.SUPPORT, Role.AUDITOR);
     }
@@ -115,7 +115,8 @@ class BootstrapDataServiceTest {
         service.seedIfEmpty();
 
         Assertions.assertThat(userRepository.findAll())
-                .filteredOn(user -> user.tenantId().equals("internal-core") && user.role() == Role.ADMIN)
+                .filteredOn(user -> accessContextService.resolvePrimaryOrganizationId(user).orElse("").equals("internal-core")
+                        && accessContextService.resolvePrimaryRole(user).orElse(null) == Role.ADMIN)
                 .hasSize(1);
     }
 
@@ -153,7 +154,8 @@ class BootstrapDataServiceTest {
         service.seedIfEmpty();
 
         Assertions.assertThat(userRepository.findAll())
-                .filteredOn(user -> user.tenantId().equals("internal-core") && user.role() == Role.ADMIN)
+                .filteredOn(user -> accessContextService.resolvePrimaryOrganizationId(user).orElse("").equals("internal-core")
+                        && accessContextService.resolvePrimaryRole(user).orElse(null) == Role.ADMIN)
                 .hasSize(2)
                 .extracting(ManagedUser::email)
                 .contains("bootstrap.admin@oryzem.com", "recovery.admin@oryzem.com");
@@ -177,9 +179,6 @@ class BootstrapDataServiceTest {
                 null,
                 "Legacy Admin",
                 "admin@oryzem.com",
-                Role.ADMIN,
-                "internal-core",
-                TenantType.INTERNAL,
                 UserStatus.ACTIVE,
                 java.time.Instant.now(),
                 null,

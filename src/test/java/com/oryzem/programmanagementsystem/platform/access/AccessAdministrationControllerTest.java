@@ -72,6 +72,54 @@ class AccessAdministrationControllerTest {
     }
 
     @Test
+    void shouldBootstrapFirstMembershipThroughExplicitFlow() throws Exception {
+        String createUserResponse = mockMvc.perform(post("/api/access/users")
+                        .with(externalAdminTenantA())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "displayName": "Bootstrap Pending",
+                                  "email": "bootstrap.pending@tenant.com"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.membershipAssigned").value(false))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String userId = objectMapper.readTree(createUserResponse).get("id").asText();
+
+        mockMvc.perform(post("/api/access/users/" + userId + "/bootstrap-membership")
+                        .with(externalAdminTenantA())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "organizationId": "tenant-a",
+                                  "roles": ["MEMBER"],
+                                  "status": "ACTIVE"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.userId").value(userId))
+                .andExpect(jsonPath("$.organizationId").value("tenant-a"))
+                .andExpect(jsonPath("$.defaultMembership").value(true))
+                .andExpect(jsonPath("$.roles[0]").value("MEMBER"));
+
+        mockMvc.perform(post("/api/access/users/" + userId + "/bootstrap-membership")
+                        .with(externalAdminTenantA())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "organizationId": "tenant-a",
+                                  "roles": ["SUPPORT"],
+                                  "status": "ACTIVE"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Bootstrap membership is allowed only for users without memberships."));
+    }
+
+    @Test
     void externalAdminShouldNotCreateMembershipOutsideOwnTenant() throws Exception {
         mockMvc.perform(post("/api/access/users/USR-EXT-A-MEM-001/memberships")
                         .with(externalAdminTenantA())
@@ -208,6 +256,49 @@ class AccessAdministrationControllerTest {
                         .with(internalAdmin()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Market cannot be inactivated while referenced by an active membership."));
+    }
+
+    @Test
+    void shouldUpdateAndInactivateMembership() throws Exception {
+        String createResponse = mockMvc.perform(post("/api/access/users/USR-EXT-A-MEM-001/memberships")
+                        .with(internalAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "tenantId": "TEN-tenant-a",
+                                  "organizationId": "tenant-a",
+                                  "roles": ["SUPPORT"],
+                                  "defaultMembership": false,
+                                  "status": "ACTIVE"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String membershipId = objectMapper.readTree(createResponse).get("id").asText();
+
+        mockMvc.perform(put("/api/access/users/USR-EXT-A-MEM-001/memberships/" + membershipId)
+                        .with(internalAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "tenantId": "TEN-tenant-a",
+                                  "organizationId": "tenant-a",
+                                  "roles": ["MANAGER"],
+                                  "defaultMembership": false,
+                                  "status": "ACTIVE"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(membershipId))
+                .andExpect(jsonPath("$.roles[0]").value("MANAGER"));
+
+        mockMvc.perform(delete("/api/access/users/USR-EXT-A-MEM-001/memberships/" + membershipId)
+                        .with(internalAdmin()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(membershipId))
+                .andExpect(jsonPath("$.status").value("INACTIVE"));
     }
 
     @Test

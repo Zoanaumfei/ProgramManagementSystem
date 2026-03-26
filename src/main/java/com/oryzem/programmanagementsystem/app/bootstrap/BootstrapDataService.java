@@ -99,17 +99,17 @@ public class BootstrapDataService {
     private void seedUsers() {
         Instant baseTime = Instant.parse("2026-03-07T12:00:00Z");
         seedOrganizations();
-        seedUserWithMembership(user("USR-ADMIN-001", "Platform Admin", "admin@oryzem.com", Role.ADMIN, "internal-core", TenantType.INTERNAL, UserStatus.ACTIVE, baseTime));
-        seedUserWithMembership(user("USR-ADMIN-002", "Security Admin", "security.admin@oryzem.com", Role.ADMIN, "internal-core", TenantType.INTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(60)));
-        seedUserWithMembership(user("USR-INT-SUP-001", "Support Analyst", "support@oryzem.com", Role.SUPPORT, "internal-core", TenantType.INTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(120)));
-        seedUserWithMembership(user("USR-EXT-A-ADM-001", "Tenant A Admin", "admin.a@tenant.com", Role.ADMIN, "tenant-a", TenantType.EXTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(180)));
-        seedUserWithMembership(user("USR-EXT-A-SUP-001", "Tenant A Support", "support.a@tenant.com", Role.SUPPORT, "tenant-a", TenantType.EXTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(240)));
-        seedUserWithMembership(user("USR-EXT-A-MGR-001", "Tenant A Manager", "manager.a@tenant.com", Role.MANAGER, "tenant-a", TenantType.EXTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(300)));
-        seedUserWithMembership(user("USR-EXT-A-MEM-001", "Tenant A Member", "member.a@tenant.com", Role.MEMBER, "tenant-a", TenantType.EXTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(360)));
-        seedUserWithMembership(user("USR-EXT-B-ADM-001", "Tenant B Admin", "admin.b@tenant.com", Role.ADMIN, "tenant-b", TenantType.EXTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(360)));
-        seedUserWithMembership(user("USR-EXT-B-MGR-001", "Tenant B Manager", "manager.b@tenant.com", Role.MANAGER, "tenant-b", TenantType.EXTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(420)));
-        seedUserWithMembership(user("USR-EXT-B-MEM-001", "Tenant B Member", "member.b@tenant.com", Role.MEMBER, "tenant-b", TenantType.EXTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(480)));
-        seedUserWithMembership(user("USR-EXT-B-AUD-001", "Tenant B Auditor", "auditor.b@tenant.com", Role.AUDITOR, "tenant-b", TenantType.EXTERNAL, UserStatus.ACTIVE, baseTime.plusSeconds(540)));
+        seedUserWithMembership(user("USR-ADMIN-001", "Platform Admin", "admin@oryzem.com", UserStatus.ACTIVE, baseTime), "internal-core", Set.of(Role.ADMIN));
+        seedUserWithMembership(user("USR-ADMIN-002", "Security Admin", "security.admin@oryzem.com", UserStatus.ACTIVE, baseTime.plusSeconds(60)), "internal-core", Set.of(Role.ADMIN));
+        seedUserWithMembership(user("USR-INT-SUP-001", "Support Analyst", "support@oryzem.com", UserStatus.ACTIVE, baseTime.plusSeconds(120)), "internal-core", Set.of(Role.SUPPORT));
+        seedUserWithMembership(user("USR-EXT-A-ADM-001", "Tenant A Admin", "admin.a@tenant.com", UserStatus.ACTIVE, baseTime.plusSeconds(180)), "tenant-a", Set.of(Role.ADMIN));
+        seedUserWithMembership(user("USR-EXT-A-SUP-001", "Tenant A Support", "support.a@tenant.com", UserStatus.ACTIVE, baseTime.plusSeconds(240)), "tenant-a", Set.of(Role.SUPPORT));
+        seedUserWithMembership(user("USR-EXT-A-MGR-001", "Tenant A Manager", "manager.a@tenant.com", UserStatus.ACTIVE, baseTime.plusSeconds(300)), "tenant-a", Set.of(Role.MANAGER));
+        seedUserWithMembership(user("USR-EXT-A-MEM-001", "Tenant A Member", "member.a@tenant.com", UserStatus.ACTIVE, baseTime.plusSeconds(360)), "tenant-a", Set.of(Role.MEMBER));
+        seedUserWithMembership(user("USR-EXT-B-ADM-001", "Tenant B Admin", "admin.b@tenant.com", UserStatus.ACTIVE, baseTime.plusSeconds(360)), "tenant-b", Set.of(Role.ADMIN));
+        seedUserWithMembership(user("USR-EXT-B-MGR-001", "Tenant B Manager", "manager.b@tenant.com", UserStatus.ACTIVE, baseTime.plusSeconds(420)), "tenant-b", Set.of(Role.MANAGER));
+        seedUserWithMembership(user("USR-EXT-B-MEM-001", "Tenant B Member", "member.b@tenant.com", UserStatus.ACTIVE, baseTime.plusSeconds(480)), "tenant-b", Set.of(Role.MEMBER));
+        seedUserWithMembership(user("USR-EXT-B-AUD-001", "Tenant B Auditor", "auditor.b@tenant.com", UserStatus.ACTIVE, baseTime.plusSeconds(540)), "tenant-b", Set.of(Role.AUDITOR));
     }
 
     private void seedOperations() {
@@ -234,9 +234,13 @@ public class BootstrapDataService {
     }
 
     private ManagedUser alignBootstrapInternalAdmin(ManagedUser existing, String displayName) {
-        if (existing.tenantType() != TenantType.INTERNAL
-                || !INTERNAL_CORE_ORGANIZATION_ID.equals(existing.tenantId())
-                || existing.role() != Role.ADMIN) {
+        var existingContext = accessContextService.resolveActiveContext(existing, null)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Bootstrap INTERNAL ADMIN email already belongs to a user without an active membership: "
+                                + existing.email()));
+        if (existingContext.tenantType() != TenantType.INTERNAL
+                || !INTERNAL_CORE_ORGANIZATION_ID.equals(existingContext.activeOrganizationId())
+                || accessContextService.resolvePrimaryRole(existing).orElse(null) != Role.ADMIN) {
             throw new IllegalStateException(
                     "Bootstrap INTERNAL ADMIN email already belongs to another user and cannot be reused safely: "
                             + existing.email());
@@ -244,12 +248,7 @@ public class BootstrapDataService {
 
         ManagedUser aligned = existing;
         if (!displayName.equals(existing.displayName())) {
-            aligned = aligned.withUpdatedDetails(
-                    displayName,
-                    existing.email(),
-                    existing.role(),
-                    existing.tenantId(),
-                    existing.tenantType());
+            aligned = aligned.withUpdatedDetails(displayName, existing.email());
         }
         if (aligned.status() != UserStatus.ACTIVE) {
             aligned = aligned.withStatus(UserStatus.ACTIVE);
@@ -264,9 +263,6 @@ public class BootstrapDataService {
                 null,
                 normalizedDisplayName,
                 normalizedEmail,
-                Role.ADMIN,
-                INTERNAL_CORE_ORGANIZATION_ID,
-                TenantType.INTERNAL,
                 UserStatus.ACTIVE,
                 Instant.now(),
                 null,
@@ -281,7 +277,7 @@ public class BootstrapDataService {
         }
 
         List<ManagedUser> usersToDelete = userRepository.findByTenantId(INTERNAL_CORE_ORGANIZATION_ID).stream()
-                .filter(user -> user.tenantType() == TenantType.INTERNAL)
+                .filter(user -> accessContextService.resolvePrimaryTenantType(user).orElse(null) == TenantType.INTERNAL)
                 .filter(user -> !equalsIgnoreCase(user.email(), preservedEmail))
                 .toList();
 
@@ -337,9 +333,6 @@ public class BootstrapDataService {
             String id,
             String displayName,
             String email,
-            Role role,
-            String tenantId,
-            TenantType tenantType,
             UserStatus status,
             Instant createdAt) {
         return new ManagedUser(
@@ -348,24 +341,21 @@ public class BootstrapDataService {
                 null,
                 displayName,
                 email,
-                role,
-                tenantId,
-                tenantType,
                 status,
                 createdAt,
                 null,
                 null);
     }
 
-    private void seedUserWithMembership(ManagedUser user) {
+    private void seedUserWithMembership(ManagedUser user, String organizationId, Set<Role> roles) {
         ManagedUser saved = userRepository.save(user);
         accessContextService.upsertDefaultMembership(
                 saved.id(),
-                accessContextService.resolveTenantBoundaryId(user.tenantId()),
-                user.tenantId(),
+                accessContextService.resolveTenantBoundaryId(organizationId),
+                organizationId,
                 null,
                 saved.status(),
-                Set.of(user.role()),
+                roles,
                 saved.createdAt());
     }
 

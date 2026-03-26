@@ -1,7 +1,5 @@
 package com.oryzem.programmanagementsystem.platform.users.infrastructure;
 
-import com.oryzem.programmanagementsystem.platform.authorization.Role;
-import com.oryzem.programmanagementsystem.platform.authorization.TenantType;
 import com.oryzem.programmanagementsystem.platform.users.domain.ManagedUser;
 import com.oryzem.programmanagementsystem.platform.users.domain.UserStatus;
 import jakarta.persistence.Column;
@@ -36,17 +34,6 @@ public class UserEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(length = 32, nullable = false)
-    private Role role;
-
-    @Column(name = "tenant_id", length = 64, nullable = false)
-    private String tenantId;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "tenant_type", length = 32, nullable = false)
-    private TenantType tenantType;
-
-    @Enumerated(EnumType.STRING)
-    @Column(length = 32, nullable = false)
     private UserStatus status;
 
     @Column(name = "created_at", nullable = false)
@@ -70,9 +57,6 @@ public class UserEntity {
             String identitySubject,
             String displayName,
             String email,
-            Role role,
-            String tenantId,
-            TenantType tenantType,
             UserStatus status,
             Instant createdAt,
             Instant inviteResentAt,
@@ -82,9 +66,6 @@ public class UserEntity {
         this.identitySubject = identitySubject;
         this.displayName = displayName;
         this.email = email;
-        this.role = role;
-        this.tenantId = tenantId;
-        this.tenantType = tenantType;
         this.status = status;
         this.createdAt = createdAt;
         this.updatedAt = createdAt;
@@ -99,9 +80,6 @@ public class UserEntity {
                 user.identitySubject(),
                 user.displayName(),
                 user.email(),
-                user.role(),
-                user.tenantId(),
-                user.tenantType(),
                 user.status(),
                 user.createdAt(),
                 user.inviteResentAt(),
@@ -115,9 +93,6 @@ public class UserEntity {
                 identitySubject,
                 displayName,
                 email,
-                role,
-                tenantId,
-                tenantType,
                 status,
                 createdAt,
                 inviteResentAt,

@@ -146,10 +146,7 @@ public final class StubUserIdentityGateway implements UserIdentityGateway, Curre
         return new StubUserIdentityOperation(
                 action,
                 user.identityUsername(),
-                user.email(),
-                user.role(),
-                user.tenantId(),
-                user.tenantType());
+                user.email());
     }
 
     private void trackIdentity(ManagedUser user) {

@@ -4,6 +4,7 @@ import com.oryzem.programmanagementsystem.modules.operations.OperationNotFoundEx
 import com.oryzem.programmanagementsystem.platform.audit.RequestCorrelationContext;
 import com.oryzem.programmanagementsystem.platform.auth.AuthenticationFailedException;
 import com.oryzem.programmanagementsystem.platform.shared.ConflictException;
+import com.oryzem.programmanagementsystem.platform.shared.FeatureTemporarilyUnavailableException;
 import com.oryzem.programmanagementsystem.platform.shared.RateLimitExceededException;
 import com.oryzem.programmanagementsystem.platform.shared.ResourceNotFoundException;
 import com.oryzem.programmanagementsystem.platform.users.domain.UserNotFoundException;
@@ -99,6 +100,19 @@ public class ApiExceptionHandler {
             HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(errorBody(request, HttpStatus.CONFLICT, "Conflict", exception.getMessage(), null));
+    }
+
+    @ExceptionHandler(FeatureTemporarilyUnavailableException.class)
+    public ResponseEntity<Map<String, Object>> handleFeatureTemporarilyUnavailable(
+            FeatureTemporarilyUnavailableException exception,
+            HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(errorBody(
+                        request,
+                        HttpStatus.SERVICE_UNAVAILABLE,
+                        "Service Unavailable",
+                        exception.getMessage(),
+                        null));
     }
 
     @ExceptionHandler(RateLimitExceededException.class)

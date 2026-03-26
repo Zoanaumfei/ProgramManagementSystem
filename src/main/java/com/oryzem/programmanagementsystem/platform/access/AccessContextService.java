@@ -82,7 +82,8 @@ public class AccessContextService {
         TenantType tenantType = tenantRepository.findById(selectedMembership.getTenantId())
                 .map(TenantEntity::getTenantType)
                 .or(() -> tenantTypeFromOrganization)
-                .orElse(user.tenantType());
+                .orElseThrow(() -> new IllegalStateException(
+                        "Membership '%s' does not resolve a tenant type.".formatted(selectedMembership.getId())));
 
         return Optional.of(new ResolvedMembershipContext(
                 user.id(),

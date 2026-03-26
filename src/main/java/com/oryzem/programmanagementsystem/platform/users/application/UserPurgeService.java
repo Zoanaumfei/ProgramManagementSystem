@@ -45,15 +45,18 @@ class UserPurgeService {
             boolean supportOverride,
             String justification) {
         ManagedUser target = accessService.findRequiredUser(userId);
-        ResolvedMembershipContext targetContext = accessService.resolveRequiredUserContext(target);
-        OrganizationLookup.OrganizationView targetOrganization =
-                organizationLookup.getRequired(targetContext.activeOrganizationId());
         accessService.ensureUserIsInactive(target);
         accessService.ensurePurgeIsExplicitlyConfirmed(supportOverride, justification);
+        ResolvedMembershipContext targetContext = accessService.resolveUserContext(target).orElse(null);
+        String targetTenantId = targetContext != null ? targetContext.activeTenantId() : actor.activeTenantId();
+        String targetOrganizationId = targetContext != null ? targetContext.activeOrganizationId() : actor.organizationId();
+        OrganizationLookup.OrganizationView targetOrganization = targetOrganizationId == null
+                ? null
+                : organizationLookup.getRequired(targetOrganizationId);
 
         AuthorizationContext context = AuthorizationContext.builder(AppModule.USERS, Action.PURGE)
-                .resourceTenantId(targetOrganization.tenantId())
-                .resourceTenantType(targetOrganization.tenantType())
+                .resourceTenantId(targetTenantId)
+                .resourceTenantType(targetContext != null ? targetContext.tenantType() : actor.tenantType())
                 .targetRole(accessService.resolvePrimaryRole(target))
                 .targetUserId(target.id())
                 .auditTrailEnabled(true)
@@ -63,13 +66,15 @@ class UserPurgeService {
 
         AuthorizationDecision decision = authorizationService.decide(actor, context);
         accessService.assertAllowed(decision);
-        accessService.enforceOrganizationScope(
-                actor,
-                targetOrganization.id(),
-                targetOrganization.tenantId(),
-                targetOrganization.tenantType(),
-                decision.crossTenant(),
-                supportOverride);
+        if (targetOrganization != null && targetContext != null) {
+            accessService.enforceOrganizationScope(
+                    actor,
+                    targetOrganization.id(),
+                    targetOrganization.tenantId(),
+                    targetOrganization.tenantType(),
+                    decision.crossTenant(),
+                    supportOverride);
+        }
 
         if (userIdentityGateway.identityExists(target)) {
             throw new IllegalArgumentException(
@@ -79,7 +84,7 @@ class UserPurgeService {
         userRepository.deleteById(target.id());
         accessService.recordAudit(
                 actor,
-                targetOrganization.tenantId(),
+                targetTenantId,
                 "USER_PURGE",
                 target.id(),
                 justification,

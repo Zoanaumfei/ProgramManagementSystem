@@ -71,8 +71,7 @@ class UserManagementControllerSecurityTest {
                         .with(jwtFor("admin.a@tenant.com", "ROLE_ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(4))
-                .andExpect(jsonPath("$[0].organizationId").value("tenant-a"))
-                .andExpect(jsonPath("$[0].organizationName").value("Tenant A"));
+                .andExpect(jsonPath("$[0].membershipAssigned").value(true));
     }
 
     @Test
@@ -83,22 +82,19 @@ class UserManagementControllerSecurityTest {
     }
 
     @Test
-    void externalAdminShouldCreateMemberInOwnTenant() throws Exception {
+    void externalAdminShouldCreateLifecycleOnlyUser() throws Exception {
         mockMvc.perform(post("/api/access/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
                                   "displayName": "New Member",
-                                  "email": "new.member@tenant.com",
-                                  "role": "MEMBER",
-                                  "organizationId": "tenant-a"
+                                  "email": "new.member@tenant.com"
                                 }
                                 """)
                         .with(jwtFor("admin.a@tenant.com", "ROLE_ADMIN")))
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", org.hamcrest.Matchers.containsString("/api/access/users/")))
-                .andExpect(jsonPath("$.role").value("MEMBER"))
-                .andExpect(jsonPath("$.organizationId").value("tenant-a"))
+                .andExpect(jsonPath("$.membershipAssigned").value(false))
                 .andExpect(jsonPath("$.status").value("INVITED"));
 
         StubUserIdentityGateway stubGateway = (StubUserIdentityGateway) userIdentityGateway;
@@ -108,22 +104,20 @@ class UserManagementControllerSecurityTest {
     }
 
     @Test
-    void externalAdminShouldUpdateMemberInOwnTenant() throws Exception {
+    void externalAdminShouldUpdateLifecycleUserProfile() throws Exception {
         mockMvc.perform(put("/api/access/users/USR-EXT-A-MEM-001")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
                                   "displayName": "Tenant A Member Updated",
-                                  "email": "member.a.updated@tenant.com",
-                                  "role": "MEMBER",
-                                  "organizationId": "tenant-a"
+                                  "email": "member.a.updated@tenant.com"
                                 }
                                 """)
                         .with(jwtFor("admin.a@tenant.com", "ROLE_ADMIN")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("USR-EXT-A-MEM-001"))
                 .andExpect(jsonPath("$.email").value("member.a.updated@tenant.com"))
-                .andExpect(jsonPath("$.organizationId").value("tenant-a"));
+                .andExpect(jsonPath("$.membershipAssigned").value(true));
     }
 
     @Test
@@ -170,9 +164,7 @@ class UserManagementControllerSecurityTest {
                         .content("""
                                 {
                                   "displayName": "Invited Member",
-                                  "email": "invited.member@tenant.com",
-                                  "role": "MEMBER",
-                                  "organizationId": "tenant-a"
+                                  "email": "invited.member@tenant.com"
                                 }
                                 """)
                         .with(jwtFor("admin.a@tenant.com", "ROLE_ADMIN")))
@@ -182,6 +174,20 @@ class UserManagementControllerSecurityTest {
                 .getContentAsString();
 
         String createdUserId = objectMapper.readTree(response).get("id").asText();
+
+        mockMvc.perform(post("/api/access/users/" + createdUserId + "/bootstrap-membership")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "organizationId": "tenant-a",
+                                  "roles": ["MEMBER"],
+                                  "status": "ACTIVE"
+                                }
+                                """)
+                        .with(jwtFor("admin.a@tenant.com", "ROLE_ADMIN")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.organizationId").value("tenant-a"))
+                .andExpect(jsonPath("$.roles[0]").value("MEMBER"));
 
         mockMvc.perform(get("/api/auth/me")
                         .with(jwtFor("invited.member@tenant.com", "ROLE_MEMBER")))

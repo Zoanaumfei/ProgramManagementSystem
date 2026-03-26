@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/portfolio")
+@RequestMapping("/api/access/organizations")
 public class TenantOrganizationController {
 
     private final PortfolioOrganizationService portfolioOrganizationService;
@@ -30,7 +30,7 @@ public class TenantOrganizationController {
         this.authenticatedUserMapper = authenticatedUserMapper;
     }
 
-    @GetMapping("/organizations")
+    @GetMapping
     public List<OrganizationResponse> listOrganizations(
             Authentication authentication,
             @RequestParam(required = false) OrganizationStatus status,
@@ -50,7 +50,7 @@ public class TenantOrganizationController {
                 search);
     }
 
-    @GetMapping("/organizations/{organizationId}")
+    @GetMapping("/{organizationId}")
     public OrganizationResponse getOrganization(
             Authentication authentication,
             @PathVariable String organizationId) {
@@ -58,7 +58,7 @@ public class TenantOrganizationController {
         return portfolioOrganizationService.getOrganization(organizationId, actor);
     }
 
-    @PostMapping("/organizations")
+    @PostMapping
     public ResponseEntity<OrganizationResponse> createOrganization(
             Authentication authentication,
             @Valid @RequestBody CreateOrganizationRequest request) {
@@ -66,7 +66,7 @@ public class TenantOrganizationController {
         return ResponseEntity.ok(portfolioOrganizationService.createOrganization(request, actor));
     }
 
-    @PutMapping("/organizations/{organizationId}")
+    @PutMapping("/{organizationId}")
     public ResponseEntity<OrganizationResponse> updateOrganization(
             Authentication authentication,
             @PathVariable String organizationId,
@@ -75,7 +75,7 @@ public class TenantOrganizationController {
         return ResponseEntity.ok(portfolioOrganizationService.updateOrganization(organizationId, request, actor));
     }
 
-    @DeleteMapping("/organizations/{organizationId}")
+    @DeleteMapping("/{organizationId}")
     public ResponseEntity<OrganizationResponse> inactivateOrganization(
             Authentication authentication,
             @PathVariable String organizationId) {
@@ -83,7 +83,7 @@ public class TenantOrganizationController {
         return ResponseEntity.ok(portfolioOrganizationService.inactivateOrganization(organizationId, actor));
     }
 
-    @PostMapping("/organizations/{organizationId}/purge-subtree")
+    @PostMapping("/{organizationId}/purge-subtree")
     public ResponseEntity<OrganizationPurgeResponse> purgeOrganizationSubtree(
             Authentication authentication,
             @PathVariable String organizationId,

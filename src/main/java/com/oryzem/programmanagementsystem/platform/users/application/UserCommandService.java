@@ -6,11 +6,7 @@ import com.oryzem.programmanagementsystem.platform.authorization.AuthenticatedUs
 import com.oryzem.programmanagementsystem.platform.authorization.AuthorizationContext;
 import com.oryzem.programmanagementsystem.platform.authorization.AuthorizationDecision;
 import com.oryzem.programmanagementsystem.platform.authorization.AuthorizationService;
-import com.oryzem.programmanagementsystem.platform.authorization.Role;
-import com.oryzem.programmanagementsystem.platform.authorization.TenantType;
-import com.oryzem.programmanagementsystem.platform.access.AccessContextService;
 import com.oryzem.programmanagementsystem.platform.access.ResolvedMembershipContext;
-import com.oryzem.programmanagementsystem.platform.tenant.OrganizationLookup;
 import com.oryzem.programmanagementsystem.platform.users.api.CreateUserRequest;
 import com.oryzem.programmanagementsystem.platform.users.api.UpdateUserRequest;
 import com.oryzem.programmanagementsystem.platform.users.api.UserSummaryResponse;
@@ -31,22 +27,16 @@ class UserCommandService {
     private final AuthorizationService authorizationService;
     private final UserAccessService accessService;
     private final UserIdentityGateway userIdentityGateway;
-    private final OrganizationLookup organizationLookup;
-    private final AccessContextService accessContextService;
 
     UserCommandService(
             UserRepository userRepository,
             AuthorizationService authorizationService,
             UserAccessService accessService,
-            UserIdentityGateway userIdentityGateway,
-            OrganizationLookup organizationLookup,
-            AccessContextService accessContextService) {
+            UserIdentityGateway userIdentityGateway) {
         this.userRepository = userRepository;
         this.authorizationService = authorizationService;
         this.accessService = accessService;
         this.userIdentityGateway = userIdentityGateway;
-        this.organizationLookup = organizationLookup;
-        this.accessContextService = accessContextService;
     }
 
     UserSummaryResponse createUser(AuthenticatedUser actor, CreateUserRequest request) {
@@ -55,29 +45,13 @@ class UserCommandService {
             throw new IllegalArgumentException("A user with this email already exists.");
         }
 
-        OrganizationLookup.OrganizationView organization = organizationLookup.getRequired(
-                accessService.normalizeOrganizationId(request.organizationId()));
-        if (!organization.active()) {
-            throw new IllegalArgumentException("Inactive organization cannot receive new users.");
-        }
-        accessService.assertOrganizationCanReceiveRole(organization.id(), request.role());
-        TenantType targetTenantType = accessService.resolveTenantTypeForOrganization(actor, organization.id());
-
         AuthorizationContext context = AuthorizationContext.builder(AppModule.USERS, Action.CREATE)
-                .resourceTenantId(organization.tenantId())
-                .resourceTenantType(targetTenantType)
-                .targetRole(request.role())
+                .resourceTenantId(actor.activeTenantId())
+                .resourceTenantType(actor.tenantType())
                 .build();
 
         AuthorizationDecision decision = authorizationService.decide(actor, context);
         accessService.assertAllowed(decision);
-        accessService.enforceOrganizationScope(
-                actor,
-                organization.id(),
-                organization.tenantId(),
-                targetTenantType,
-                decision.crossTenant(),
-                false);
 
         String userId = "USR-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase();
         ManagedUser created = new ManagedUser(
@@ -86,25 +60,14 @@ class UserCommandService {
                 null,
                 accessService.normalizeDisplayName(request.displayName()),
                 normalizedEmail,
-                request.role(),
-                organization.id(),
-                targetTenantType,
                 UserStatus.INVITED,
                 Instant.now(),
                 null,
                 null);
 
         ManagedUser saved = userRepository.save(created);
-        accessContextService.upsertDefaultMembership(
-                saved.id(),
-                organization.tenantId(),
-                organization.id(),
-                null,
-                saved.status(),
-                java.util.Set.of(request.role()),
-                saved.createdAt());
         userIdentityGateway.createUser(saved);
-        accessService.recordAudit(actor, organization.id(), "USER_CREATE", saved.id(), null, decision.crossTenant());
+        accessService.recordAudit(actor, actor.activeTenantId(), "USER_CREATE", saved.id(), null, decision.crossTenant());
         return accessService.toSummary(saved);
     }
 
@@ -119,74 +82,62 @@ class UserCommandService {
                     throw new IllegalArgumentException("A user with this email already exists.");
                 });
 
-        OrganizationLookup.OrganizationView organization = organizationLookup.getRequired(
-                accessService.normalizeOrganizationId(request.organizationId()));
-        if (!organization.active()) {
-            throw new IllegalArgumentException("Inactive organization cannot receive users.");
-        }
-        accessService.assertOrganizationCanReceiveRole(organization.id(), request.role());
-        TenantType targetTenantType = accessService.resolveTenantTypeForOrganization(actor, organization.id());
-        accessService.assertOrganizationChangeAllowed(target, organization.id());
+        ResolvedMembershipContext targetContext = accessService.resolveUserContext(target).orElse(null);
+        String targetTenantId = targetContext != null ? targetContext.activeTenantId() : actor.activeTenantId();
+        String targetOrganizationId = targetContext != null ? targetContext.activeOrganizationId() : actor.organizationId();
 
         AuthorizationContext context = AuthorizationContext.builder(AppModule.USERS, Action.EDIT)
-                .resourceTenantId(organization.tenantId())
-                .resourceTenantType(targetTenantType)
-                .targetRole(request.role())
-                .targetUserId(target.id())
-                .build();
-
-        AuthorizationDecision decision = authorizationService.decide(actor, context);
-        accessService.assertAllowed(decision);
-        accessService.enforceOrganizationScope(
-                actor,
-                organization.id(),
-                organization.tenantId(),
-                targetTenantType,
-                decision.crossTenant(),
-                false);
-
-        ManagedUser updated = target.withUpdatedDetails(
-                accessService.normalizeDisplayName(request.displayName()),
-                normalizedEmail,
-                request.role(),
-                organization.id(),
-                targetTenantType);
-
-        ManagedUser saved = userRepository.save(updated);
-        accessContextService.upsertDefaultMembership(
-                saved.id(),
-                organization.tenantId(),
-                organization.id(),
-                null,
-                saved.status(),
-                java.util.Set.of(request.role()),
-                saved.createdAt());
-        userIdentityGateway.updateUser(target, saved);
-        accessService.recordAudit(actor, organization.id(), "USER_UPDATE", saved.id(), null, decision.crossTenant());
-        return accessService.toSummary(saved);
-    }
-
-    void deleteUser(AuthenticatedUser actor, String userId) {
-        ManagedUser target = accessService.findRequiredUser(userId);
-        ResolvedMembershipContext targetContext = accessService.resolveRequiredUserContext(target);
-        OrganizationLookup.OrganizationView targetOrganization =
-                organizationLookup.getRequired(targetContext.activeOrganizationId());
-        AuthorizationContext context = AuthorizationContext.builder(AppModule.USERS, Action.DELETE)
-                .resourceTenantId(targetOrganization.tenantId())
-                .resourceTenantType(targetOrganization.tenantType())
+                .resourceTenantId(targetTenantId)
+                .resourceTenantType(targetContext != null ? targetContext.tenantType() : actor.tenantType())
                 .targetRole(accessService.resolvePrimaryRole(target))
                 .targetUserId(target.id())
                 .build();
 
         AuthorizationDecision decision = authorizationService.decide(actor, context);
         accessService.assertAllowed(decision);
-        accessService.enforceOrganizationScope(
-                actor,
-                targetOrganization.id(),
-                targetOrganization.tenantId(),
-                targetOrganization.tenantType(),
-                decision.crossTenant(),
-                false);
+        if (targetContext != null && targetOrganizationId != null) {
+            accessService.enforceOrganizationScope(
+                    actor,
+                    targetOrganizationId,
+                    targetTenantId,
+                    targetContext.tenantType(),
+                    decision.crossTenant(),
+                    false);
+        }
+
+        ManagedUser updated = target.withUpdatedDetails(
+                accessService.normalizeDisplayName(request.displayName()),
+                normalizedEmail);
+
+        ManagedUser saved = userRepository.save(updated);
+        userIdentityGateway.updateUser(target, saved);
+        accessService.recordAudit(actor, targetTenantId, "USER_UPDATE", saved.id(), null, decision.crossTenant());
+        return accessService.toSummary(saved);
+    }
+
+    void deleteUser(AuthenticatedUser actor, String userId) {
+        ManagedUser target = accessService.findRequiredUser(userId);
+        ResolvedMembershipContext targetContext = accessService.resolveUserContext(target).orElse(null);
+        String targetTenantId = targetContext != null ? targetContext.activeTenantId() : actor.activeTenantId();
+        String targetOrganizationId = targetContext != null ? targetContext.activeOrganizationId() : actor.organizationId();
+        AuthorizationContext context = AuthorizationContext.builder(AppModule.USERS, Action.DELETE)
+                .resourceTenantId(targetTenantId)
+                .resourceTenantType(targetContext != null ? targetContext.tenantType() : actor.tenantType())
+                .targetRole(accessService.resolvePrimaryRole(target))
+                .targetUserId(target.id())
+                .build();
+
+        AuthorizationDecision decision = authorizationService.decide(actor, context);
+        accessService.assertAllowed(decision);
+        if (targetContext != null && targetOrganizationId != null) {
+            accessService.enforceOrganizationScope(
+                    actor,
+                    targetOrganizationId,
+                    targetTenantId,
+                    targetContext.tenantType(),
+                    decision.crossTenant(),
+                    false);
+        }
 
         if (target.status() == UserStatus.INACTIVE) {
             return;
@@ -196,7 +147,7 @@ class UserCommandService {
         userIdentityGateway.disableUser(updated);
         accessService.recordAudit(
                 actor,
-                targetOrganization.tenantId(),
+                targetTenantId,
                 "USER_INACTIVATE",
                 updated.id(),
                 null,

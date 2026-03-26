@@ -10,10 +10,17 @@
 - `POST /api/access/users/{userId}/resend-invite`
 - `POST /api/access/users/{userId}/reset-access`
 - `POST /api/access/users/{userId}/purge`
+- `POST /api/access/users/{userId}/bootstrap-membership`
 - `GET /api/access/users/{userId}/memberships`
 - `POST /api/access/users/{userId}/memberships`
 - `PUT /api/access/users/{userId}/memberships/{membershipId}`
 - `DELETE /api/access/users/{userId}/memberships/{membershipId}`
+- `GET /api/access/organizations`
+- `GET /api/access/organizations/{organizationId}`
+- `POST /api/access/organizations`
+- `PUT /api/access/organizations/{organizationId}`
+- `DELETE /api/access/organizations/{organizationId}`
+- `POST /api/access/organizations/{organizationId}/purge-subtree`
 - `GET /api/access/tenants`
 - `GET /api/access/tenants/{tenantId}/markets`
 - `POST /api/access/tenants/{tenantId}/markets`
@@ -49,15 +56,13 @@ Fields:
 Legacy claim echo fields were removed. The access context is always resolved from local membership data.
 
 ## User account admin
-`/api/access/users` manages the global user account plus the default access assignment used by the administrative flow.
+`/api/access/users` manages the global user account lifecycle only.
 
 Request shape for create/update:
 ```json
 {
   "displayName": "Jane Doe",
-  "email": "jane@customer.com",
-  "role": "ADMIN",
-  "organizationId": "tenant-a"
+  "email": "jane@customer.com"
 }
 ```
 
@@ -67,10 +72,8 @@ Response shape:
   "id": "USR-...",
   "displayName": "Jane Doe",
   "email": "jane@customer.com",
-  "role": "ADMIN",
-  "organizationId": "tenant-a",
-  "organizationName": "Tenant A",
   "status": "INVITED",
+  "membershipAssigned": false,
   "createdAt": "...",
   "inviteResentAt": null,
   "accessResetAt": null
@@ -79,9 +82,9 @@ Response shape:
 
 Important:
 - effective authorization is not read from `app_user`
-- role and organization shown here are resolved and persisted through membership handling
+- `app_user` is identity-only and does not persist tenant or role snapshots
 - the membership APIs remain the source of truth for contextual access
-- this endpoint is still a combined account-plus-initial-membership bootstrap surface; a future split to a pure `user_account` contract is still pending
+- `membershipAssigned` indicates whether the user already has at least one resolvable membership
 
 ## Membership admin
 Membership is the first-class access resource.
@@ -102,9 +105,37 @@ Membership is the first-class access resource.
 - `roles`
 - `permissions`
 
+## First membership bootstrap
+`POST /api/access/users/{userId}/bootstrap-membership` assigns the first membership to a lifecycle-only user.
+
+Request shape:
+```json
+{
+  "organizationId": "tenant-a",
+  "marketId": null,
+  "status": "ACTIVE",
+  "roles": ["ADMIN"]
+}
+```
+
+Important:
+- this route is valid only when the target user has no memberships yet
+- after the first assignment, further access changes happen through `/api/access/users/{userId}/memberships`
+
+## Organization admin
+Organization hierarchy management is part of the active access core.
+
+Supported route family:
+- `/api/access/organizations`
+
+Important:
+- organization administration no longer lives under the portfolio namespace
+- organization responses may still expose setup/program summary fields, but the portfolio runtime itself is frozen
+- legacy `/api/portfolio/**` requests now return `503 Service Unavailable`
+
 ## Markets
 Markets are tenant-scoped and can be inactivated only when not referenced by active memberships or organizations.
 
-## Pending contract cleanup
-- `POST /api/access/users` and `PUT /api/access/users/{userId}` still accept `role` and `organizationId` to bootstrap the default membership
-- the long-term target is to keep user-account lifecycle and membership assignment as separate API contracts
+## Breaking contract notes
+- `POST /api/access/users` and `PUT /api/access/users/{userId}` no longer accept `role` or `organizationId`
+- clients that previously created a user and membership in one payload must now call `/api/access/users` first and `/api/access/users/{userId}/bootstrap-membership` second
