@@ -1,6 +1,4 @@
 const CLAIM_MAPPINGS = [
-  ["custom:tenant_id", "tenant_id"],
-  ["custom:tenant_type", "tenant_type"],
   ["custom:user_status", "user_status"],
 ];
 
@@ -9,7 +7,7 @@ export const handler = async (event) => {
   const claimsToAddOrOverride = buildClaims(event, userAttributes);
 
   if (Object.keys(claimsToAddOrOverride).length === 0) {
-    console.log("No custom tenant claims found for user.", {
+    console.log("No custom runtime claims found for user.", {
       userName: event.userName,
       version: event.version,
     });

@@ -9,6 +9,8 @@ import com.oryzem.programmanagementsystem.platform.access.api.MembershipResponse
 import com.oryzem.programmanagementsystem.platform.access.api.TenantMarketResponse;
 import com.oryzem.programmanagementsystem.platform.access.api.UpdateMembershipRequest;
 import com.oryzem.programmanagementsystem.platform.access.api.UpdateTenantMarketRequest;
+import com.oryzem.programmanagementsystem.platform.audit.AuditTrailEvent;
+import com.oryzem.programmanagementsystem.platform.audit.AuditTrailService;
 import com.oryzem.programmanagementsystem.platform.authorization.Action;
 import com.oryzem.programmanagementsystem.platform.authorization.AppModule;
 import com.oryzem.programmanagementsystem.platform.authorization.AuthenticatedUser;
@@ -18,9 +20,11 @@ import com.oryzem.programmanagementsystem.platform.authorization.AuthorizationSe
 import com.oryzem.programmanagementsystem.platform.authorization.Role;
 import com.oryzem.programmanagementsystem.platform.authorization.TenantType;
 import com.oryzem.programmanagementsystem.platform.tenant.OrganizationLookup;
+import com.oryzem.programmanagementsystem.platform.users.domain.UserIdentityGateway;
 import com.oryzem.programmanagementsystem.platform.users.domain.ManagedUser;
 import com.oryzem.programmanagementsystem.platform.users.domain.UserNotFoundException;
 import com.oryzem.programmanagementsystem.platform.users.domain.UserRepository;
+import com.oryzem.programmanagementsystem.platform.users.domain.UserStatus;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
@@ -46,6 +50,9 @@ public class AccessAdministrationService {
     private final OrganizationLookup organizationLookup;
     private final AccessContextService accessContextService;
     private final AuthorizationService authorizationService;
+    private final AuditTrailService auditTrailService;
+    private final TenantGovernanceService tenantGovernanceService;
+    private final UserIdentityGateway userIdentityGateway;
     private final SpringDataTenantJpaRepository tenantRepository;
     private final SpringDataTenantMarketJpaRepository tenantMarketRepository;
     private final SpringDataUserMembershipJpaRepository membershipRepository;
@@ -57,6 +64,9 @@ public class AccessAdministrationService {
             OrganizationLookup organizationLookup,
             AccessContextService accessContextService,
             AuthorizationService authorizationService,
+            AuditTrailService auditTrailService,
+            TenantGovernanceService tenantGovernanceService,
+            UserIdentityGateway userIdentityGateway,
             SpringDataTenantJpaRepository tenantRepository,
             SpringDataTenantMarketJpaRepository tenantMarketRepository,
             SpringDataUserMembershipJpaRepository membershipRepository,
@@ -66,6 +76,9 @@ public class AccessAdministrationService {
         this.organizationLookup = organizationLookup;
         this.accessContextService = accessContextService;
         this.authorizationService = authorizationService;
+        this.auditTrailService = auditTrailService;
+        this.tenantGovernanceService = tenantGovernanceService;
+        this.userIdentityGateway = userIdentityGateway;
         this.tenantRepository = tenantRepository;
         this.tenantMarketRepository = tenantMarketRepository;
         this.membershipRepository = membershipRepository;
@@ -94,7 +107,10 @@ public class AccessAdministrationService {
             CreateMembershipRequest request) {
         ManagedUser targetUser = findRequiredUser(userId);
         MembershipScope scope = resolveMembershipScope(request.tenantId(), request.organizationId(), request.marketId());
-        assertMembershipMutationAllowed(actor, scope, Action.CREATE, request.roles());
+        AuthorizationDecision decision = assertMembershipMutationAllowed(actor, scope, Action.CREATE, request.roles());
+        if ((request.status() == null || request.status() == MembershipStatus.ACTIVE)) {
+            tenantGovernanceService.assertActiveMembershipQuotaAvailable(scope.tenant().getId());
+        }
 
         boolean defaultMembership = request.defaultMembership()
                 || membershipRepository.findByUserIdOrderByDefaultMembershipDescJoinedAtAsc(targetUser.id()).isEmpty();
@@ -114,6 +130,14 @@ public class AccessAdministrationService {
                 now,
                 now));
         replaceRoles(saved.getId(), request.roles());
+        recordAudit(
+                actor,
+                scope.tenant().getId(),
+                "MEMBERSHIP_CREATE",
+                "MEMBERSHIP",
+                saved.getId(),
+                decision.crossTenant(),
+                "{\"targetUserId\":\"" + saved.getUserId() + "\"}");
         return toMembershipResponse(saved);
     }
 
@@ -132,7 +156,10 @@ public class AccessAdministrationService {
                 organization.tenantId(),
                 organization.id(),
                 request.marketId());
-        assertMembershipMutationAllowed(actor, scope, Action.CREATE, request.roles());
+        AuthorizationDecision decision = assertMembershipMutationAllowed(actor, scope, Action.CREATE, request.roles());
+        if (request.status() == null || request.status() == MembershipStatus.ACTIVE) {
+            tenantGovernanceService.assertActiveMembershipQuotaAvailable(scope.tenant().getId());
+        }
 
         Instant now = Instant.now();
         UserMembershipEntity saved = membershipRepository.save(UserMembershipEntity.createDefault(
@@ -145,6 +172,14 @@ public class AccessAdministrationService {
                 now,
                 now));
         replaceRoles(saved.getId(), request.roles());
+        recordAudit(
+                actor,
+                scope.tenant().getId(),
+                "MEMBERSHIP_BOOTSTRAP",
+                "MEMBERSHIP",
+                saved.getId(),
+                decision.crossTenant(),
+                "{\"targetUserId\":\"" + saved.getUserId() + "\"}");
         return toMembershipResponse(saved);
     }
 
@@ -157,7 +192,11 @@ public class AccessAdministrationService {
         UserMembershipEntity existing = membershipRepository.findByIdAndUserId(membershipId, userId)
                 .orElseThrow(() -> new IllegalArgumentException("Membership not found: " + membershipId));
         MembershipScope scope = resolveMembershipScope(request.tenantId(), request.organizationId(), request.marketId());
-        assertMembershipMutationAllowed(actor, scope, Action.EDIT, request.roles());
+        AuthorizationDecision decision = assertMembershipMutationAllowed(actor, scope, Action.EDIT, request.roles());
+        if (request.status() == MembershipStatus.ACTIVE
+                && (existing.getStatus() != MembershipStatus.ACTIVE || !existing.getTenantId().equals(scope.tenant().getId()))) {
+            tenantGovernanceService.assertActiveMembershipQuotaAvailable(scope.tenant().getId());
+        }
 
         if (request.defaultMembership()) {
             clearDefaultMemberships(userId, existing.getId());
@@ -172,6 +211,14 @@ public class AccessAdministrationService {
                 Instant.now());
         UserMembershipEntity saved = membershipRepository.save(existing);
         replaceRoles(saved.getId(), request.roles());
+        recordAudit(
+                actor,
+                scope.tenant().getId(),
+                "MEMBERSHIP_UPDATE",
+                "MEMBERSHIP",
+                saved.getId(),
+                decision.crossTenant(),
+                "{\"targetUserId\":\"" + saved.getUserId() + "\"}");
         return toMembershipResponse(saved);
     }
 
@@ -179,7 +226,7 @@ public class AccessAdministrationService {
             AuthenticatedUser actor,
             String userId,
             String membershipId) {
-        findRequiredUser(userId);
+        ManagedUser targetUser = findRequiredUser(userId);
         UserMembershipEntity existing = membershipRepository.findByIdAndUserId(membershipId, userId)
                 .orElseThrow(() -> new IllegalArgumentException("Membership not found: " + membershipId));
         MembershipScope scope = resolveMembershipScope(existing.getTenantId(), existing.getOrganizationId(), existing.getMarketId());
@@ -188,9 +235,10 @@ public class AccessAdministrationService {
                 .map(this::toRole)
                 .flatMap(Optional::stream)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
-        assertMembershipMutationAllowed(actor, scope, Action.DELETE, roles);
+        AuthorizationDecision decision = assertMembershipMutationAllowed(actor, scope, Action.DELETE, roles);
 
-        existing.markInactive(Instant.now());
+        Instant now = Instant.now();
+        existing.offboard(now, tenantGovernanceService.retentionDeadlineFrom(now));
         UserMembershipEntity saved = membershipRepository.save(existing);
         if (membershipRepository.findByUserIdAndDefaultMembershipTrue(userId).isEmpty()) {
             membershipRepository.findByUserIdOrderByDefaultMembershipDescJoinedAtAsc(userId).stream()
@@ -201,6 +249,20 @@ public class AccessAdministrationService {
                         membershipRepository.save(membership);
                     });
         }
+        boolean hasAnyActiveMembership = membershipRepository.findByUserIdOrderByDefaultMembershipDescJoinedAtAsc(userId).stream()
+                .anyMatch(membership -> membership.getStatus() == MembershipStatus.ACTIVE);
+        if (!hasAnyActiveMembership && targetUser.status() != UserStatus.INACTIVE) {
+            ManagedUser disabledUser = userRepository.save(targetUser.withStatus(UserStatus.INACTIVE));
+            userIdentityGateway.disableUser(disabledUser);
+        }
+        recordAudit(
+                actor,
+                scope.tenant().getId(),
+                "MEMBERSHIP_OFFBOARD",
+                "MEMBERSHIP",
+                saved.getId(),
+                decision.crossTenant(),
+                "{\"targetUserId\":\"" + saved.getUserId() + "\"}");
         return toMembershipResponse(saved);
     }
 
@@ -245,6 +307,14 @@ public class AccessAdministrationService {
                 context.activeOrganizationId(),
                 context.activeMarketId(),
                 request.makeDefault());
+        recordAudit(
+                actor,
+                context.activeTenantId(),
+                "ACCESS_CONTEXT_SWITCH",
+                "MEMBERSHIP",
+                context.membershipId(),
+                !context.activeTenantId().equals(actor.activeTenantId()),
+                "{\"makeDefault\":" + request.makeDefault() + "}");
         return new ActiveAccessContextResponse(
                 context.userId(),
                 context.membershipId(),
@@ -285,7 +355,8 @@ public class AccessAdministrationService {
             String tenantId,
             CreateTenantMarketRequest request) {
         TenantEntity tenant = findRequiredTenant(tenantId);
-        assertTenantActionAllowed(actor, tenant, Action.CREATE);
+        AuthorizationDecision decision = assertTenantActionAllowed(actor, tenant, Action.CREATE);
+        tenantGovernanceService.assertMarketQuotaAvailable(tenantId);
         String normalizedCode = normalizeCode(request.code());
         if (tenantMarketRepository.existsByTenantIdAndCodeIgnoreCase(tenantId, normalizedCode)) {
             throw new IllegalArgumentException("Market code already exists for tenant.");
@@ -303,7 +374,9 @@ public class AccessAdministrationService {
                 trimToNull(request.timezone()),
                 now,
                 now);
-        return toTenantMarketResponse(tenantMarketRepository.save(market));
+        TenantMarketResponse response = toTenantMarketResponse(tenantMarketRepository.save(market));
+        recordAudit(actor, tenantId, "TENANT_MARKET_CREATE", "MARKET", response.id(), decision.crossTenant(), null);
+        return response;
     }
 
     public TenantMarketResponse updateTenantMarket(
@@ -312,7 +385,7 @@ public class AccessAdministrationService {
             String marketId,
             UpdateTenantMarketRequest request) {
         TenantEntity tenant = findRequiredTenant(tenantId);
-        assertTenantActionAllowed(actor, tenant, Action.EDIT);
+        AuthorizationDecision decision = assertTenantActionAllowed(actor, tenant, Action.EDIT);
         TenantMarketEntity market = tenantMarketRepository.findByIdAndTenantId(marketId, tenantId)
                 .orElseThrow(() -> new IllegalArgumentException("Market not found: " + marketId));
         String normalizedCode = normalizeCode(request.code());
@@ -328,7 +401,9 @@ public class AccessAdministrationService {
                 trimToNull(request.languageCode()),
                 trimToNull(request.timezone()),
                 Instant.now());
-        return toTenantMarketResponse(tenantMarketRepository.save(market));
+        TenantMarketResponse response = toTenantMarketResponse(tenantMarketRepository.save(market));
+        recordAudit(actor, tenantId, "TENANT_MARKET_UPDATE", "MARKET", response.id(), decision.crossTenant(), null);
+        return response;
     }
 
     public TenantMarketResponse inactivateTenantMarket(
@@ -336,7 +411,7 @@ public class AccessAdministrationService {
             String tenantId,
             String marketId) {
         TenantEntity tenant = findRequiredTenant(tenantId);
-        assertTenantActionAllowed(actor, tenant, Action.DELETE);
+        AuthorizationDecision decision = assertTenantActionAllowed(actor, tenant, Action.DELETE);
         TenantMarketEntity market = tenantMarketRepository.findByIdAndTenantId(marketId, tenantId)
                 .orElseThrow(() -> new IllegalArgumentException("Market not found: " + marketId));
 
@@ -350,7 +425,9 @@ public class AccessAdministrationService {
         }
 
         market.markInactive(Instant.now());
-        return toTenantMarketResponse(tenantMarketRepository.save(market));
+        TenantMarketResponse response = toTenantMarketResponse(tenantMarketRepository.save(market));
+        recordAudit(actor, tenantId, "TENANT_MARKET_INACTIVATE", "MARKET", response.id(), decision.crossTenant(), null);
+        return response;
     }
 
     private ManagedUser findRequiredUser(String userId) {
@@ -462,7 +539,7 @@ public class AccessAdministrationService {
                 market.getUpdatedAt());
     }
 
-    private void assertMembershipMutationAllowed(
+    private AuthorizationDecision assertMembershipMutationAllowed(
             AuthenticatedUser actor,
             MembershipScope scope,
             Action action,
@@ -478,7 +555,7 @@ public class AccessAdministrationService {
         assertAllowed(decision);
 
         if (actor.hasRole(Role.ADMIN) && actor.tenantType() == TenantType.INTERNAL) {
-            return;
+            return decision;
         }
 
         if (actor.hasRole(Role.ADMIN) && actor.tenantType() == TenantType.EXTERNAL) {
@@ -486,13 +563,13 @@ public class AccessAdministrationService {
                 throw new AccessDeniedException("Tenant scope mismatch for requested operation.");
             }
             if (scope.organizationId() == null) {
-                return;
+                return decision;
             }
             if (actor.organizationId() == null
                     || !organizationLookup.isSameOrDescendant(actor.organizationId(), scope.organizationId())) {
                 throw new AccessDeniedException("Organization is outside the manageable hierarchy for the authenticated user.");
             }
-            return;
+            return decision;
         }
 
         throw new AccessDeniedException("Membership administration is restricted to administrators.");
@@ -535,7 +612,7 @@ public class AccessAdministrationService {
         return actor.userId() != null && actor.userId().equals(membership.getUserId());
     }
 
-    private void assertTenantActionAllowed(AuthenticatedUser actor, TenantEntity tenant, Action action) {
+    private AuthorizationDecision assertTenantActionAllowed(AuthenticatedUser actor, TenantEntity tenant, Action action) {
         AuthorizationDecision decision = authorizationService.decide(
                 actor,
                 AuthorizationContext.builder(AppModule.TENANT, action)
@@ -546,13 +623,13 @@ public class AccessAdministrationService {
         assertAllowed(decision);
 
         if (actor.hasRole(Role.ADMIN) && actor.tenantType() == TenantType.INTERNAL) {
-            return;
+            return decision;
         }
         if (action == Action.VIEW && actor.hasRole(Role.SUPPORT) && actor.tenantType() == TenantType.INTERNAL) {
-            return;
+            return decision;
         }
         if (actor.activeTenantId() != null && actor.activeTenantId().equals(tenant.getId()) && actor.hasRole(Role.ADMIN)) {
-            return;
+            return decision;
         }
 
         throw new AccessDeniedException("Tenant scope mismatch for requested operation.");
@@ -608,6 +685,39 @@ public class AccessAdministrationService {
 
     private String newId(String prefix) {
         return prefix + "-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase(Locale.ROOT);
+    }
+
+    private void recordAudit(
+            AuthenticatedUser actor,
+            String targetTenantId,
+            String eventType,
+            String targetResourceType,
+            String targetResourceId,
+            boolean crossTenant,
+            String metadataJson) {
+        auditTrailService.record(new AuditTrailEvent(
+                null,
+                eventType,
+                actor.userId() != null ? actor.userId() : actor.subject(),
+                primaryRole(actor),
+                actor.tenantId(),
+                targetTenantId,
+                targetResourceType,
+                targetResourceId,
+                null,
+                metadataJson != null ? metadataJson : "{\"crossTenant\":" + crossTenant + "}",
+                crossTenant,
+                null,
+                AppModule.TENANT.name(),
+                Instant.now()));
+    }
+
+    private Role primaryRole(AuthenticatedUser actor) {
+        List<Role> precedence = List.of(Role.ADMIN, Role.SUPPORT, Role.MANAGER, Role.AUDITOR, Role.MEMBER);
+        return precedence.stream()
+                .filter(actor.roles()::contains)
+                .findFirst()
+                .orElse(Role.MEMBER);
     }
 
     private record MembershipScope(

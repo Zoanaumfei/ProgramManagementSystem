@@ -156,7 +156,7 @@ class UserAccessService {
             String justification) {
         if (organizationId != null && !organizationId.isBlank()) {
             String requestedOrganizationId = organizationId.trim();
-            enforceListScope(actor, requestedOrganizationId);
+            enforceListScope(actor, requestedOrganizationId, supportOverride, justification);
             return requestedOrganizationId;
         }
 
@@ -235,7 +235,7 @@ class UserAccessService {
         auditTrailService.record(new AuditTrailEvent(
                 null,
                 action,
-                actor.subject(),
+                actor.userId() != null ? actor.userId() : actor.subject(),
                 primaryRole(actor),
                 actor.tenantId(),
                 tenantId,
@@ -292,7 +292,11 @@ class UserAccessService {
         }
 
         if (effectiveOrganizationId != null) {
-            return userRepository.findByTenantId(effectiveOrganizationId);
+            Set<String> visibleOrganizationIds = organizationLookup.collectSubtreeIds(effectiveOrganizationId);
+            Set<String> visibleUserIds = accessContextService.findUserIdsByOrganizations(visibleOrganizationIds);
+            return userRepository.findAll().stream()
+                    .filter(user -> visibleUserIds.contains(user.id()))
+                    .toList();
         }
 
         if (actor.hasRole(Role.ADMIN)
@@ -310,7 +314,11 @@ class UserAccessService {
         return List.of();
     }
 
-    void enforceListScope(AuthenticatedUser actor, String requestedTenantId) {
+    void enforceListScope(
+            AuthenticatedUser actor,
+            String requestedTenantId,
+            boolean supportOverride,
+            String justification) {
         if (actor.hasRole(Role.ADMIN) && actor.tenantType() == TenantType.INTERNAL) {
             return;
         }
@@ -319,7 +327,10 @@ class UserAccessService {
             if (actor.organizationId() != null && actor.organizationId().equals(requestedTenantId)) {
                 return;
             }
-            return;
+            if (supportOverride && justification != null && !justification.isBlank()) {
+                return;
+            }
+            throw new AccessDeniedException("Tenant scope mismatch for requested operation.");
         }
 
         if (actor.hasRole(Role.ADMIN) && actor.tenantType() == TenantType.EXTERNAL) {
@@ -359,8 +370,9 @@ class UserAccessService {
     }
 
     private Role primaryRole(AuthenticatedUser actor) {
-        return actor.roles().stream()
-                .sorted(Comparator.comparing(Enum::name))
+        java.util.List<Role> precedence = java.util.List.of(Role.ADMIN, Role.SUPPORT, Role.MANAGER, Role.AUDITOR, Role.MEMBER);
+        return precedence.stream()
+                .filter(actor.roles()::contains)
                 .findFirst()
                 .orElse(Role.MEMBER);
     }

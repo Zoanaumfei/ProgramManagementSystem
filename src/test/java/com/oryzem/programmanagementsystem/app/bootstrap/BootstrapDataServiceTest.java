@@ -1,14 +1,13 @@
 package com.oryzem.programmanagementsystem.app.bootstrap;
 
+import com.oryzem.programmanagementsystem.platform.access.AccessContextResetService;
+import com.oryzem.programmanagementsystem.platform.access.AccessContextService;
 import com.oryzem.programmanagementsystem.platform.audit.AuditTrailService;
 import com.oryzem.programmanagementsystem.platform.authorization.Role;
 import com.oryzem.programmanagementsystem.platform.authorization.TenantType;
-import com.oryzem.programmanagementsystem.modules.projectmanagement.PortfolioResetPort;
-import com.oryzem.programmanagementsystem.modules.operations.OperationRepository;
-import com.oryzem.programmanagementsystem.platform.access.AccessContextService;
-import com.oryzem.programmanagementsystem.platform.access.AccessContextResetService;
 import com.oryzem.programmanagementsystem.platform.tenant.OrganizationBootstrapPort;
 import com.oryzem.programmanagementsystem.platform.tenant.OrganizationLookup;
+import com.oryzem.programmanagementsystem.platform.tenant.OrganizationResetPort;
 import com.oryzem.programmanagementsystem.platform.users.domain.ManagedUser;
 import com.oryzem.programmanagementsystem.platform.users.domain.UserIdentityGateway;
 import com.oryzem.programmanagementsystem.platform.users.domain.UserRepository;
@@ -28,13 +27,7 @@ class BootstrapDataServiceTest {
     private UserRepository userRepository;
 
     @Autowired
-    private OperationRepository operationRepository;
-
-    @Autowired
     private AuditTrailService auditTrailService;
-
-    @Autowired
-    private PortfolioResetPort portfolioResetPort;
 
     @Autowired
     private AccessContextResetService accessContextResetService;
@@ -44,6 +37,9 @@ class BootstrapDataServiceTest {
 
     @Autowired
     private OrganizationBootstrapPort organizationBootstrapPort;
+
+    @Autowired
+    private OrganizationResetPort organizationResetPort;
 
     @Autowired
     private OrganizationLookup organizationLookup;
@@ -59,8 +55,7 @@ class BootstrapDataServiceTest {
 
     @Test
     void shouldEnsureInternalCoreEvenWhenSeedDataIsDisabled() {
-        OrganizationLookup.OrganizationView internalCore =
-                organizationLookup.getRequired("internal-core");
+        OrganizationLookup.OrganizationView internalCore = organizationLookup.getRequired("internal-core");
 
         Assertions.assertThat(internalCore.id()).isEqualTo("internal-core");
         Assertions.assertThat(internalCore.tenantType()).isEqualTo(TenantType.INTERNAL);
@@ -102,12 +97,11 @@ class BootstrapDataServiceTest {
 
         BootstrapDataService service = new BootstrapDataService(
                 userRepository,
-                operationRepository,
                 auditTrailService,
-                portfolioResetPort,
                 accessContextService,
                 accessContextResetService,
                 organizationBootstrapPort,
+                organizationResetPort,
                 userIdentityGateway,
                 properties);
 
@@ -134,12 +128,11 @@ class BootstrapDataServiceTest {
 
         BootstrapDataService service = new BootstrapDataService(
                 userRepository,
-                operationRepository,
                 auditTrailService,
-                portfolioResetPort,
                 accessContextService,
                 accessContextResetService,
                 organizationBootstrapPort,
+                organizationResetPort,
                 userIdentityGateway,
                 new BootstrapProperties(
                         false,
@@ -194,12 +187,11 @@ class BootstrapDataServiceTest {
 
         BootstrapDataService service = new BootstrapDataService(
                 userRepository,
-                operationRepository,
                 auditTrailService,
-                portfolioResetPort,
                 accessContextService,
                 accessContextResetService,
                 organizationBootstrapPort,
+                organizationResetPort,
                 userIdentityGateway,
                 new BootstrapProperties(
                         false,
@@ -220,12 +212,11 @@ class BootstrapDataServiceTest {
     private void resetWithProperties(BootstrapProperties properties) {
         BootstrapDataService service = new BootstrapDataService(
                 userRepository,
-                operationRepository,
                 auditTrailService,
-                portfolioResetPort,
                 accessContextService,
                 accessContextResetService,
                 organizationBootstrapPort,
+                organizationResetPort,
                 userIdentityGateway,
                 properties);
         service.reset();
@@ -257,5 +248,3 @@ class BootstrapDataServiceTest {
         }
     }
 }
-
-

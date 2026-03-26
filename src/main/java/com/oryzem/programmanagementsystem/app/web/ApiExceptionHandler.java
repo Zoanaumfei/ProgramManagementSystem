@@ -1,6 +1,5 @@
 package com.oryzem.programmanagementsystem.app.web;
 
-import com.oryzem.programmanagementsystem.modules.operations.OperationNotFoundException;
 import com.oryzem.programmanagementsystem.platform.audit.RequestCorrelationContext;
 import com.oryzem.programmanagementsystem.platform.auth.AuthenticationFailedException;
 import com.oryzem.programmanagementsystem.platform.shared.ConflictException;
@@ -46,14 +45,6 @@ public class ApiExceptionHandler {
     @ExceptionHandler(UserNotFoundException.class)
     public ResponseEntity<Map<String, Object>> handleUserNotFound(
             UserNotFoundException exception,
-            HttpServletRequest request) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(errorBody(request, HttpStatus.NOT_FOUND, "Not Found", exception.getMessage(), null));
-    }
-
-    @ExceptionHandler(OperationNotFoundException.class)
-    public ResponseEntity<Map<String, Object>> handleOperationNotFound(
-            OperationNotFoundException exception,
             HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(errorBody(request, HttpStatus.NOT_FOUND, "Not Found", exception.getMessage(), null));
@@ -177,5 +168,3 @@ public class ApiExceptionHandler {
         return fieldError.getField() + ": " + fieldError.getDefaultMessage();
     }
 }
-
-

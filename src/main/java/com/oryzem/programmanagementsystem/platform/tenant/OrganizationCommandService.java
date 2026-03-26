@@ -1,12 +1,19 @@
 package com.oryzem.programmanagementsystem.platform.tenant;
 
+import com.oryzem.programmanagementsystem.platform.access.TenantProvisioningService;
+import com.oryzem.programmanagementsystem.platform.access.TenantGovernanceService;
+import com.oryzem.programmanagementsystem.platform.audit.AuditTrailEvent;
+import com.oryzem.programmanagementsystem.platform.audit.AuditTrailService;
 import com.oryzem.programmanagementsystem.platform.authorization.Action;
 import com.oryzem.programmanagementsystem.platform.authorization.AppModule;
 import com.oryzem.programmanagementsystem.platform.authorization.AuthenticatedUser;
 import com.oryzem.programmanagementsystem.platform.authorization.AuthorizationContext;
+import com.oryzem.programmanagementsystem.platform.authorization.Role;
 import com.oryzem.programmanagementsystem.platform.authorization.AuthorizationService;
 import com.oryzem.programmanagementsystem.platform.authorization.TenantType;
-import com.oryzem.programmanagementsystem.platform.access.TenantProvisioningService;
+import java.time.Instant;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Locale;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,26 +25,32 @@ class OrganizationCommandService {
     private final OrganizationRepository organizationRepository;
     private final AuthorizationService authorizationService;
     private final OrganizationAccessService accessService;
+    private final OrganizationDirectoryService organizationDirectoryService;
     private final OrganizationSnapshotService snapshotService;
-    private final TenantUserQueryPort tenantUserQueryPort;
-    private final TenantProjectPortfolioPort tenantProjectPortfolioPort;
+    private final TenantUserPurgePort tenantUserPurgePort;
     private final TenantProvisioningService tenantProvisioningService;
+    private final TenantGovernanceService tenantGovernanceService;
+    private final AuditTrailService auditTrailService;
 
     OrganizationCommandService(
             OrganizationRepository organizationRepository,
             AuthorizationService authorizationService,
             OrganizationAccessService accessService,
+            OrganizationDirectoryService organizationDirectoryService,
             OrganizationSnapshotService snapshotService,
-            TenantUserQueryPort tenantUserQueryPort,
-            TenantProjectPortfolioPort tenantProjectPortfolioPort,
-            TenantProvisioningService tenantProvisioningService) {
+            TenantUserPurgePort tenantUserPurgePort,
+            TenantProvisioningService tenantProvisioningService,
+            TenantGovernanceService tenantGovernanceService,
+            AuditTrailService auditTrailService) {
         this.organizationRepository = organizationRepository;
         this.authorizationService = authorizationService;
         this.accessService = accessService;
+        this.organizationDirectoryService = organizationDirectoryService;
         this.snapshotService = snapshotService;
-        this.tenantUserQueryPort = tenantUserQueryPort;
-        this.tenantProjectPortfolioPort = tenantProjectPortfolioPort;
+        this.tenantUserPurgePort = tenantUserPurgePort;
         this.tenantProvisioningService = tenantProvisioningService;
+        this.tenantGovernanceService = tenantGovernanceService;
+        this.auditTrailService = auditTrailService;
     }
 
     OrganizationResponse createOrganization(CreateOrganizationRequest request, AuthenticatedUser actor) {
@@ -53,7 +66,7 @@ class OrganizationCommandService {
                     actor,
                     AuthorizationContext.builder(AppModule.TENANT, Action.CREATE).build()));
             accessService.assertCanCreateRootCustomer(actor);
-            String organizationId = PortfolioIds.newId("ORG");
+            String organizationId = OrganizationIds.newId("ORG");
             String tenantId = tenantProvisioningService.tenantIdForRootOrganization(organizationId);
             tenantProvisioningService.ensureTenantForRootOrganization(
                     organizationId,
@@ -71,12 +84,13 @@ class OrganizationCommandService {
                     normalizedCode,
                     defaultValue(request.status(), OrganizationStatus.ACTIVE));
         } else {
-            OrganizationEntity parentOrganization = accessService.findPortfolioOrganization(parentOrganizationId);
+            OrganizationEntity parentOrganization = accessService.findManagedOrganization(parentOrganizationId);
             accessService.assertCanAccessOrganization(actor, parentOrganization, Action.CREATE);
             accessService.assertCanCreateChildOrganization(actor, parentOrganization);
             accessService.assertOrganizationCanOwnChildren(parentOrganization);
+            tenantGovernanceService.assertOrganizationQuotaAvailable(parentOrganization.getTenantId());
             organization = OrganizationEntity.createChild(
-                    PortfolioIds.newId("ORG"),
+                    OrganizationIds.newId("ORG"),
                     actor.username(),
                     normalizeName(request.name()),
                     normalizedCode,
@@ -94,6 +108,7 @@ class OrganizationCommandService {
                     saved.getCreatedAt(),
                     saved.getUpdatedAt());
         }
+        recordAudit(actor, saved.getTenantId(), "ORGANIZATION_CREATE", saved.getId(), false, null);
         return snapshotService.toResponse(saved);
     }
 
@@ -101,7 +116,7 @@ class OrganizationCommandService {
             String organizationId,
             UpdateOrganizationRequest request,
             AuthenticatedUser actor) {
-        OrganizationEntity organization = accessService.findPortfolioOrganization(organizationId);
+        OrganizationEntity organization = accessService.findManagedOrganization(organizationId);
         accessService.assertCanAccessOrganization(actor, organization, Action.EDIT);
         accessService.assertCanManageOrganization(actor, organization);
         accessService.ensureOrganizationIsMutable(organization);
@@ -112,46 +127,44 @@ class OrganizationCommandService {
         }
 
         organization.updateDetails(actor.username(), normalizeName(request.name()), normalizedCode);
-        return snapshotService.toResponse(organizationRepository.save(organization));
+        OrganizationEntity saved = organizationRepository.save(organization);
+        recordAudit(actor, saved.getTenantId(), "ORGANIZATION_UPDATE", saved.getId(), false, null);
+        return snapshotService.toResponse(saved);
     }
 
     OrganizationResponse inactivateOrganization(String organizationId, AuthenticatedUser actor) {
-        OrganizationEntity organization = accessService.findPortfolioOrganization(organizationId);
+        OrganizationEntity organization = accessService.findManagedOrganization(organizationId);
         accessService.assertCanAccessOrganization(actor, organization, Action.DELETE);
         accessService.assertCanManageOrganization(actor, organization);
         if (organization.getStatus() == OrganizationStatus.INACTIVE) {
             return snapshotService.toResponse(organization);
         }
 
-        ensureOrganizationHasNoInvitedOrActiveUsers(organization.getId());
-        ensureOrganizationHasNoActiveChildren(organization.getId());
-        ensureOrganizationHasNoActiveProjects(organization.getId());
-        organization.markInactive(actor.username());
-        return snapshotService.toResponse(organizationRepository.save(organization));
-    }
+        Instant now = Instant.now();
+        Instant retentionUntil = tenantGovernanceService.retentionDeadlineFrom(now);
+        java.util.Set<String> subtreeIds = organizationDirectoryService.collectSubtreeIds(organization.getId());
+        List<OrganizationEntity> subtree = organizationRepository.findAllById(subtreeIds).stream()
+                .sorted(Comparator.comparing(OrganizationEntity::getHierarchyLevel).reversed())
+                .toList();
+        TenantUserPurgePort.OffboardingSummary offboardingSummary =
+                tenantUserPurgePort.offboardUsersByOrganizationIds(subtreeIds, retentionUntil);
 
-    private void ensureOrganizationHasNoInvitedOrActiveUsers(String organizationId) {
-        if (tenantUserQueryPort.hasInvitedOrActiveUsers(organizationId)) {
-            throw new IllegalArgumentException(
-                    "Organization can only be inactivated after all invited or active users are inactivated.");
+        for (OrganizationEntity node : subtree.stream().sorted(Comparator.comparing(OrganizationEntity::getHierarchyLevel).reversed()).toList()) {
+            node.markOffboarding(actor.username(), now, retentionUntil);
+            node.markOffboarded(actor.username(), now, retentionUntil);
+            organizationRepository.save(node);
         }
-    }
-
-    private void ensureOrganizationHasNoActiveChildren(String organizationId) {
-        boolean hasActiveChildren = organizationRepository.findAllByParentOrganizationIdOrderByNameAsc(organizationId).stream()
-                .anyMatch(child -> child.getStatus() == OrganizationStatus.ACTIVE);
-        if (hasActiveChildren) {
-            throw new IllegalArgumentException("Organization can only be inactivated after all active child organizations are inactivated.");
-        }
-    }
-
-    private void ensureOrganizationHasNoActiveProjects(String organizationId) {
-        boolean hasActiveProjects = tenantProjectPortfolioPort.listProgramReferences().stream()
-                .filter(program -> organizationId.equals(program.ownerOrganizationId()))
-                .anyMatch(TenantProjectPortfolioPort.ProgramReference::hasActiveProjects);
-        if (hasActiveProjects) {
-            throw new IllegalArgumentException("Organization can only be inactivated after all active projects are closed or inactivated.");
-        }
+        recordAudit(
+                actor,
+                organization.getTenantId(),
+                "ORGANIZATION_OFFBOARD",
+                organization.getId(),
+                false,
+                "{\"retentionUntil\":\"" + retentionUntil + "\",\"disabledUsers\":" + offboardingSummary.disabledUsers()
+                        + ",\"affectedUsers\":" + offboardingSummary.affectedUsers()
+                        + ",\"offboardedMemberships\":" + offboardingSummary.offboardedMemberships()
+                        + ",\"exportStatus\":\"READY_FOR_EXPORT\"}");
+        return snapshotService.toResponse(organizationRepository.findById(organizationId).orElseThrow());
     }
 
     private String trimToNull(String value) {
@@ -172,5 +185,37 @@ class OrganizationCommandService {
 
     private <T> T defaultValue(T value, T fallback) {
         return value != null ? value : fallback;
+    }
+
+    private void recordAudit(
+            AuthenticatedUser actor,
+            String targetTenantId,
+            String eventType,
+            String organizationId,
+            boolean crossTenant,
+            String metadataJson) {
+        auditTrailService.record(new AuditTrailEvent(
+                null,
+                eventType,
+                actor.userId() != null ? actor.userId() : actor.subject(),
+                primaryRole(actor),
+                actor.tenantId(),
+                targetTenantId,
+                "ORGANIZATION",
+                organizationId,
+                null,
+                metadataJson != null ? metadataJson : "{\"crossTenant\":" + crossTenant + "}",
+                crossTenant,
+                null,
+                AppModule.TENANT.name(),
+                Instant.now()));
+    }
+
+    private Role primaryRole(AuthenticatedUser actor) {
+        List<Role> precedence = List.of(Role.ADMIN, Role.SUPPORT, Role.MANAGER, Role.AUDITOR, Role.MEMBER);
+        return precedence.stream()
+                .filter(actor.roles()::contains)
+                .findFirst()
+                .orElse(Role.MEMBER);
     }
 }

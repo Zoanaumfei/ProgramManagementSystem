@@ -38,13 +38,6 @@ app:
       prune-other-internal-users: ${APP_BOOTSTRAP_INTERNAL_ADMIN_PRUNE_OTHER_INTERNAL_USERS:false}
       password: ${APP_BOOTSTRAP_INTERNAL_ADMIN_PASSWORD:}
       temporary-password: ${APP_BOOTSTRAP_INTERNAL_ADMIN_TEMPORARY_PASSWORD:}
-  portfolio:
-    documents:
-      provider: ${APP_PORTFOLIO_DOCUMENTS_PROVIDER:stub}
-      bucket-name: ${APP_PORTFOLIO_DOCUMENTS_BUCKET_NAME:}
-      key-prefix: ${APP_PORTFOLIO_DOCUMENTS_KEY_PREFIX:portfolio}
-      presign-duration-minutes: ${APP_PORTFOLIO_DOCUMENTS_PRESIGN_DURATION_MINUTES:15}
-      region: ${APP_PORTFOLIO_DOCUMENTS_REGION:${AWS_REGION:sa-east-1}}
   security:
     cognito:
       issuer-uri: ${COGNITO_ISSUER_URI:https://cognito-idp.sa-east-1.amazonaws.com/sa-east-1_aA4I3tEmF}
@@ -58,6 +51,27 @@ app:
       provider: ${APP_SECURITY_IDENTITY_PROVIDER:stub}
       user-pool-id: ${APP_SECURITY_IDENTITY_USER_POOL_ID:}
       region: ${APP_SECURITY_IDENTITY_REGION:${AWS_REGION:sa-east-1}}
+  multitenancy:
+    offboarding:
+      retention-days: ${APP_MULTITENANCY_OFFBOARDING_RETENTION_DAYS:30}
+    rate-limit:
+      window-seconds: ${APP_MULTITENANCY_RATE_LIMIT_WINDOW_SECONDS:60}
+      internal-max-requests: ${APP_MULTITENANCY_RATE_LIMIT_INTERNAL_MAX_REQUESTS:240}
+      standard-max-requests: ${APP_MULTITENANCY_RATE_LIMIT_STANDARD_MAX_REQUESTS:120}
+      enterprise-max-requests: ${APP_MULTITENANCY_RATE_LIMIT_ENTERPRISE_MAX_REQUESTS:300}
+    quota:
+      internal:
+        max-organizations: ${APP_MULTITENANCY_QUOTA_INTERNAL_MAX_ORGANIZATIONS:1000}
+        max-markets: ${APP_MULTITENANCY_QUOTA_INTERNAL_MAX_MARKETS:1000}
+        max-active-memberships: ${APP_MULTITENANCY_QUOTA_INTERNAL_MAX_ACTIVE_MEMBERSHIPS:10000}
+      standard:
+        max-organizations: ${APP_MULTITENANCY_QUOTA_STANDARD_MAX_ORGANIZATIONS:20}
+        max-markets: ${APP_MULTITENANCY_QUOTA_STANDARD_MAX_MARKETS:10}
+        max-active-memberships: ${APP_MULTITENANCY_QUOTA_STANDARD_MAX_ACTIVE_MEMBERSHIPS:250}
+      enterprise:
+        max-organizations: ${APP_MULTITENANCY_QUOTA_ENTERPRISE_MAX_ORGANIZATIONS:200}
+        max-markets: ${APP_MULTITENANCY_QUOTA_ENTERPRISE_MAX_MARKETS:50}
+        max-active-memberships: ${APP_MULTITENANCY_QUOTA_ENTERPRISE_MAX_ACTIVE_MEMBERSHIPS:5000}
 
 logging:
   level:

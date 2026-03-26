@@ -51,28 +51,12 @@ public class AuthorizationMatrix {
                 Action.RESET_ACCESS, Action.RESEND_INVITE, Action.ASSIGN_ROLE);
         grant(matrix, Role.ADMIN, AppModule.TENANT, Action.VIEW, Action.CREATE, Action.EDIT, Action.DELETE,
                 Action.CONFIGURE, Action.MANAGE_INTEGRATION);
-        grant(matrix, Role.ADMIN, AppModule.PORTFOLIO, Action.VIEW, Action.CREATE, Action.EDIT, Action.DELETE,
-                Action.CONFIGURE);
-        grant(matrix, Role.ADMIN, AppModule.OPERATIONS, Action.VIEW, Action.CREATE, Action.EDIT, Action.DELETE,
-                Action.APPROVE, Action.REJECT, Action.SUBMIT, Action.REOPEN, Action.REPROCESS);
-        grant(matrix, Role.ADMIN, AppModule.REPORTS, Action.VIEW, Action.EXPORT);
         grant(matrix, Role.ADMIN, AppModule.AUDIT, Action.VIEW, Action.EXPORT, Action.VIEW_SECURITY_EVENTS);
         grant(matrix, Role.ADMIN, AppModule.SUPPORT, Action.VIEW, Action.REPROCESS, Action.IMPERSONATE, Action.OPEN_INTERVENTION);
         grant(matrix, Role.ADMIN, AppModule.PLATFORM, Action.VIEW, Action.CONFIGURE, Action.IMPERSONATE);
     }
 
     private void grantManager(EnumMap<Role, Map<AppModule, Map<Action, Set<AuthorizationRestriction>>>> matrix) {
-        grant(matrix, Role.MANAGER, AppModule.PORTFOLIO, Action.VIEW, Action.CREATE, Action.EDIT, Action.DELETE);
-        grant(matrix, Role.MANAGER, AppModule.OPERATIONS, restrictions(
-                AuthorizationRestriction.SAME_TENANT_ONLY), Action.VIEW, Action.CREATE, Action.EDIT, Action.DELETE,
-                Action.APPROVE, Action.REJECT, Action.SUBMIT);
-        grant(matrix, Role.MANAGER, AppModule.OPERATIONS, restrictions(
-                AuthorizationRestriction.SAME_TENANT_ONLY,
-                AuthorizationRestriction.AUDIT_TRAIL_REQUIRED), Action.REOPEN, Action.REPROCESS);
-
-        grant(matrix, Role.MANAGER, AppModule.REPORTS, restrictions(
-                AuthorizationRestriction.SAME_TENANT_ONLY), Action.VIEW, Action.EXPORT);
-
         grant(matrix, Role.MANAGER, AppModule.AUDIT, restrictions(
                 AuthorizationRestriction.SAME_TENANT_ONLY), Action.VIEW, Action.VIEW_SECURITY_EVENTS);
         grant(matrix, Role.MANAGER, AppModule.AUDIT, restrictions(
@@ -87,15 +71,7 @@ public class AuthorizationMatrix {
     }
 
     private void grantMember(EnumMap<Role, Map<AppModule, Map<Action, Set<AuthorizationRestriction>>>> matrix) {
-        grant(matrix, Role.MEMBER, AppModule.PORTFOLIO, Action.VIEW, Action.CREATE, Action.EDIT, Action.DELETE);
-        grant(matrix, Role.MEMBER, AppModule.OPERATIONS, restrictions(
-                AuthorizationRestriction.SAME_TENANT_ONLY), Action.VIEW, Action.CREATE, Action.SUBMIT);
-        grant(matrix, Role.MEMBER, AppModule.OPERATIONS, restrictions(
-                AuthorizationRestriction.SAME_TENANT_ONLY,
-                AuthorizationRestriction.MEMBER_EDIT_FLOW_RESTRICTION), Action.EDIT);
-
-        grant(matrix, Role.MEMBER, AppModule.REPORTS, restrictions(
-                AuthorizationRestriction.SAME_TENANT_ONLY), Action.VIEW, Action.EXPORT);
+        // MEMBER does not carry elevated administrative permissions in the active core.
     }
 
     private void grantSupport(EnumMap<Role, Map<AppModule, Map<Action, Set<AuthorizationRestriction>>>> matrix) {
@@ -115,20 +91,6 @@ public class AuthorizationMatrix {
                 AuthorizationRestriction.SUPPORT_SCOPE_RESTRICTION,
                 AuthorizationRestriction.AUDIT_TRAIL_REQUIRED,
                 AuthorizationRestriction.JUSTIFICATION_REQUIRED), Action.PURGE);
-        grant(matrix, Role.SUPPORT, AppModule.PORTFOLIO, restrictions(
-                AuthorizationRestriction.SUPPORT_SCOPE_RESTRICTION), Action.VIEW);
-
-        grant(matrix, Role.SUPPORT, AppModule.OPERATIONS, restrictions(
-                AuthorizationRestriction.SUPPORT_SCOPE_RESTRICTION), Action.VIEW);
-        grant(matrix, Role.SUPPORT, AppModule.OPERATIONS, restrictions(
-                AuthorizationRestriction.SUPPORT_SCOPE_RESTRICTION,
-                AuthorizationRestriction.AUDIT_TRAIL_REQUIRED), Action.REPROCESS);
-
-        grant(matrix, Role.SUPPORT, AppModule.REPORTS, restrictions(
-                AuthorizationRestriction.SUPPORT_SCOPE_RESTRICTION), Action.VIEW);
-        grant(matrix, Role.SUPPORT, AppModule.REPORTS, restrictions(
-                AuthorizationRestriction.SUPPORT_SCOPE_RESTRICTION,
-                AuthorizationRestriction.SENSITIVE_DATA_RESTRICTED), Action.EXPORT);
 
         grant(matrix, Role.SUPPORT, AppModule.AUDIT, restrictions(
                 AuthorizationRestriction.SUPPORT_SCOPE_RESTRICTION), Action.VIEW, Action.VIEW_SECURITY_EVENTS);
@@ -150,11 +112,6 @@ public class AuthorizationMatrix {
     }
 
     private void grantAuditor(EnumMap<Role, Map<AppModule, Map<Action, Set<AuthorizationRestriction>>>> matrix) {
-        grant(matrix, Role.AUDITOR, AppModule.PORTFOLIO, Action.VIEW);
-        grant(matrix, Role.AUDITOR, AppModule.OPERATIONS, restrictions(
-                AuthorizationRestriction.SAME_TENANT_ONLY), Action.VIEW);
-        grant(matrix, Role.AUDITOR, AppModule.REPORTS, restrictions(
-                AuthorizationRestriction.SAME_TENANT_ONLY), Action.VIEW, Action.EXPORT);
         grant(matrix, Role.AUDITOR, AppModule.AUDIT, restrictions(
                 AuthorizationRestriction.SAME_TENANT_ONLY), Action.VIEW, Action.VIEW_SECURITY_EVENTS);
         grant(matrix, Role.AUDITOR, AppModule.AUDIT, restrictions(

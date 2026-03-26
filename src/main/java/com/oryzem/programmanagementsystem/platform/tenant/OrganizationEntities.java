@@ -1,25 +1,18 @@
 package com.oryzem.programmanagementsystem.platform.tenant;
 
 import com.oryzem.programmanagementsystem.platform.authorization.TenantType;
-import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
-import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.MappedSuperclass;
-import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.OffsetDateTime;
 
 @Entity
 @Table(name = "organization")
-class OrganizationEntity extends JpaPortfolioAuditableEntity {
+class OrganizationEntity extends JpaAuditableEntity {
 
     private String name;
     private String code;
@@ -30,6 +23,12 @@ class OrganizationEntity extends JpaPortfolioAuditableEntity {
     private OrganizationEntity parentOrganization;
     private OrganizationEntity customerOrganization;
     private Integer hierarchyLevel;
+    private OrganizationLifecycleState lifecycleState;
+    private java.time.Instant offboardingStartedAt;
+    private java.time.Instant offboardedAt;
+    private java.time.Instant retentionUntil;
+    private OrganizationDataExportStatus dataExportStatus;
+    private java.time.Instant dataExportedAt;
 
     protected OrganizationEntity() {
     }
@@ -50,6 +49,8 @@ class OrganizationEntity extends JpaPortfolioAuditableEntity {
         organization.tenantId = tenantId;
         organization.hierarchyLevel = 0;
         organization.customerOrganization = organization;
+        organization.lifecycleState = OrganizationLifecycleState.ACTIVE;
+        organization.dataExportStatus = OrganizationDataExportStatus.NOT_REQUESTED;
         return organization;
     }
 
@@ -69,6 +70,8 @@ class OrganizationEntity extends JpaPortfolioAuditableEntity {
         organization.tenantId = tenantId;
         organization.hierarchyLevel = 0;
         organization.customerOrganization = null;
+        organization.lifecycleState = OrganizationLifecycleState.ACTIVE;
+        organization.dataExportStatus = OrganizationDataExportStatus.NOT_REQUIRED;
         return organization;
     }
 
@@ -92,6 +95,8 @@ class OrganizationEntity extends JpaPortfolioAuditableEntity {
                 ? parentOrganization.getCustomerOrganization()
                 : parentOrganization;
         organization.hierarchyLevel = parentOrganization.getHierarchyLevel() + 1;
+        organization.lifecycleState = OrganizationLifecycleState.ACTIVE;
+        organization.dataExportStatus = OrganizationDataExportStatus.NOT_REQUESTED;
         return organization;
     }
 
@@ -106,6 +111,34 @@ class OrganizationEntity extends JpaPortfolioAuditableEntity {
             this.status = OrganizationStatus.INACTIVE;
             touch(actor);
         }
+    }
+
+    void markOffboarding(String actor, java.time.Instant startedAt, java.time.Instant retentionUntil) {
+        this.status = OrganizationStatus.INACTIVE;
+        this.lifecycleState = OrganizationLifecycleState.OFFBOARDING;
+        this.offboardingStartedAt = startedAt;
+        this.retentionUntil = retentionUntil;
+        if (this.tenantType == TenantType.EXTERNAL) {
+            this.dataExportStatus = OrganizationDataExportStatus.READY_FOR_EXPORT;
+            this.dataExportedAt = null;
+        } else {
+            this.dataExportStatus = OrganizationDataExportStatus.NOT_REQUIRED;
+        }
+        touch(actor);
+    }
+
+    void markOffboarded(String actor, java.time.Instant offboardedAt, java.time.Instant retentionUntil) {
+        this.status = OrganizationStatus.INACTIVE;
+        if (this.offboardingStartedAt == null) {
+            this.offboardingStartedAt = offboardedAt;
+        }
+        this.offboardedAt = offboardedAt;
+        this.retentionUntil = retentionUntil;
+        this.lifecycleState = OrganizationLifecycleState.OFFBOARDED;
+        if (this.tenantType == TenantType.EXTERNAL && this.dataExportStatus == OrganizationDataExportStatus.NOT_REQUESTED) {
+            this.dataExportStatus = OrganizationDataExportStatus.READY_FOR_EXPORT;
+        }
+        touch(actor);
     }
 
     @Column(length = 160, nullable = false)
@@ -192,7 +225,60 @@ class OrganizationEntity extends JpaPortfolioAuditableEntity {
     protected void setHierarchyLevel(Integer hierarchyLevel) {
         this.hierarchyLevel = hierarchyLevel;
     }
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "lifecycle_state", length = 32, nullable = false)
+    public OrganizationLifecycleState getLifecycleState() {
+        return lifecycleState;
+    }
+
+    protected void setLifecycleState(OrganizationLifecycleState lifecycleState) {
+        this.lifecycleState = lifecycleState;
+    }
+
+    @Column(name = "offboarding_started_at")
+    public java.time.Instant getOffboardingStartedAt() {
+        return offboardingStartedAt;
+    }
+
+    protected void setOffboardingStartedAt(java.time.Instant offboardingStartedAt) {
+        this.offboardingStartedAt = offboardingStartedAt;
+    }
+
+    @Column(name = "offboarded_at")
+    public java.time.Instant getOffboardedAt() {
+        return offboardedAt;
+    }
+
+    protected void setOffboardedAt(java.time.Instant offboardedAt) {
+        this.offboardedAt = offboardedAt;
+    }
+
+    @Column(name = "retention_until")
+    public java.time.Instant getRetentionUntil() {
+        return retentionUntil;
+    }
+
+    protected void setRetentionUntil(java.time.Instant retentionUntil) {
+        this.retentionUntil = retentionUntil;
+    }
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "data_export_status", length = 32, nullable = false)
+    public OrganizationDataExportStatus getDataExportStatus() {
+        return dataExportStatus;
+    }
+
+    protected void setDataExportStatus(OrganizationDataExportStatus dataExportStatus) {
+        this.dataExportStatus = dataExportStatus;
+    }
+
+    @Column(name = "data_exported_at")
+    public java.time.Instant getDataExportedAt() {
+        return dataExportedAt;
+    }
+
+    protected void setDataExportedAt(java.time.Instant dataExportedAt) {
+        this.dataExportedAt = dataExportedAt;
+    }
 }
-
-
-

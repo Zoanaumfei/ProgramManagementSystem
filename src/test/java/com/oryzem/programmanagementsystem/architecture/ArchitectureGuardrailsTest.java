@@ -4,9 +4,6 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 import com.oryzem.programmanagementsystem.app.bootstrap.BootstrapDataService;
-import com.oryzem.programmanagementsystem.modules.operations.JpaOperationRepository;
-import com.oryzem.programmanagementsystem.modules.operations.SpringDataOperationJpaRepository;
-import com.oryzem.programmanagementsystem.modules.projectmanagement.PortfolioResetService;
 import com.oryzem.programmanagementsystem.platform.audit.SpringDataAuditLogJpaRepository;
 import com.oryzem.programmanagementsystem.platform.tenant.OrganizationDirectoryService;
 import com.oryzem.programmanagementsystem.platform.users.infrastructure.JpaUserRepository;
@@ -28,20 +25,15 @@ class ArchitectureGuardrailsTest {
                             "..app.api..",
                             "..app.config..")
                     .should().dependOnClassesThat().resideInAnyPackage(
-                            "..modules.projectmanagement..",
-                            "..modules.operations..",
-                            "..modules.reports..",
                             "..platform.users..",
-                            "..platform.tenant..",
-                            "..platform.documents..")
+                            "..platform.tenant..")
                     .because("app should stay focused on wiring and cross-cutting concerns");
 
     @ArchTest
-    static final ArchRule bootstrap_should_not_depend_on_concrete_tenant_or_projectmanagement_services =
+    static final ArchRule bootstrap_should_not_depend_on_concrete_tenant_services =
             noClasses()
                     .that().haveFullyQualifiedName(BootstrapDataService.class.getName())
                     .should().dependOnClassesThat().haveFullyQualifiedName(OrganizationDirectoryService.class.getName())
-                    .orShould().dependOnClassesThat().haveFullyQualifiedName(PortfolioResetService.class.getName())
                     .because("bootstrap should consume small module-facing ports when possible");
 
     @ArchTest
@@ -57,13 +49,14 @@ class ArchitectureGuardrailsTest {
             noClasses()
                     .that().resideOutsideOfPackages(
                             "..platform.users.infrastructure..",
-                            "..modules.operations..",
-                            "..platform.audit..")
+                            "..platform.audit..",
+                            "..platform.access..")
                     .should().dependOnClassesThat().haveFullyQualifiedName(JpaUserRepository.class.getName())
                     .orShould().dependOnClassesThat().haveFullyQualifiedName(SpringDataUserJpaRepository.class.getName())
-                    .orShould().dependOnClassesThat().haveFullyQualifiedName(JpaOperationRepository.class.getName())
-                    .orShould().dependOnClassesThat().haveFullyQualifiedName(SpringDataOperationJpaRepository.class.getName())
                     .orShould().dependOnClassesThat().haveFullyQualifiedName(SpringDataAuditLogJpaRepository.class.getName())
+                    .orShould().dependOnClassesThat().haveFullyQualifiedName("com.oryzem.programmanagementsystem.platform.access.SpringDataTenantJpaRepository")
+                    .orShould().dependOnClassesThat().haveFullyQualifiedName("com.oryzem.programmanagementsystem.platform.access.SpringDataUserMembershipJpaRepository")
+                    .orShould().dependOnClassesThat().haveFullyQualifiedName("com.oryzem.programmanagementsystem.platform.access.SpringDataMembershipRoleJpaRepository")
                     .because("cross-module code should use ports and domain contracts instead of concrete repositories");
 
     @ArchTest

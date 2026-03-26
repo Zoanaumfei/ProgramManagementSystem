@@ -2,11 +2,6 @@ package com.oryzem.programmanagementsystem.platform.tenant;
 
 import com.oryzem.programmanagementsystem.platform.authorization.TenantType;
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.OffsetDateTime;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
 
 record OrganizationResponse(
         String id,
@@ -23,7 +18,6 @@ record OrganizationResponse(
         OrganizationStatus status,
         OrganizationSetupStatus setupStatus,
         OrganizationUserSummaryResponse userSummary,
-        OrganizationProgramSummaryResponse programSummary,
         boolean canInactivate,
         String inactivationBlockedReason,
         Instant createdAt,
@@ -34,7 +28,6 @@ record OrganizationResponse(
             int childrenCount,
             OrganizationSetupStatus setupStatus,
             OrganizationUserSummaryResponse userSummary,
-            OrganizationProgramSummaryResponse programSummary,
             boolean canInactivate,
             String inactivationBlockedReason) {
         return new OrganizationResponse(
@@ -52,7 +45,6 @@ record OrganizationResponse(
                 organization.getStatus(),
                 setupStatus,
                 userSummary,
-                programSummary,
                 canInactivate,
                 inactivationBlockedReason,
                 organization.getCreatedAt(),
@@ -66,9 +58,7 @@ record OrganizationPurgeResponse(
         Instant performedAt,
         String status,
         int purgedOrganizations,
-        int purgedPrograms,
-        int purgedUsers,
-        int purgedDocuments) {
+        int purgedUsers) {
 }
 
 record OrganizationUserSummaryResponse(
@@ -81,15 +71,3 @@ record OrganizationUserSummaryResponse(
         return new OrganizationUserSummaryResponse(0, 0, 0, 0);
     }
 }
-
-record OrganizationProgramSummaryResponse(
-        int ownedCount,
-        int participatingCount,
-        int totalCount) {
-
-    static OrganizationProgramSummaryResponse empty() {
-        return new OrganizationProgramSummaryResponse(0, 0, 0);
-    }
-}
-
-

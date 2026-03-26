@@ -1,7 +1,7 @@
 package com.oryzem.programmanagementsystem.platform.tenant;
 
-import com.oryzem.programmanagementsystem.platform.authorization.TenantType;
 import com.oryzem.programmanagementsystem.platform.access.TenantProvisioningService;
+import com.oryzem.programmanagementsystem.platform.authorization.TenantType;
 import java.util.ArrayDeque;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -13,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional(readOnly = true)
-public class OrganizationDirectoryService implements OrganizationLookup, OrganizationBootstrapPort {
+public class OrganizationDirectoryService implements OrganizationLookup, OrganizationBootstrapPort, OrganizationResetPort {
 
     private final OrganizationRepository organizationRepository;
     private final TenantUserQueryPort tenantUserQueryPort;
@@ -158,6 +158,12 @@ public class OrganizationDirectoryService implements OrganizationLookup, Organiz
             }
             return toEntry(saved);
         });
+    }
+
+    @Override
+    @Transactional
+    public void clearOrganizations() {
+        organizationRepository.deleteAll();
     }
 
     private OrganizationView toEntry(OrganizationEntity organization) {

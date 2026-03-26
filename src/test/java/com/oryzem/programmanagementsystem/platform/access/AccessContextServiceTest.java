@@ -74,7 +74,9 @@ class AccessContextServiceTest {
         Assertions.assertThat(context.activeTenantId()).isEqualTo("TEN-tenant-a");
         Assertions.assertThat(context.activeOrganizationId()).isEqualTo("tenant-a");
         Assertions.assertThat(context.roles()).containsExactly(Role.MANAGER);
-        Assertions.assertThat(context.permissions()).contains("portfolio.view", "operations.view");
+        Assertions.assertThat(context.permissions())
+                .contains("audit.view", "support.view")
+                .allMatch(permission -> permission.startsWith("audit.") || permission.startsWith("support."));
     }
 
     @Test
@@ -228,3 +230,4 @@ class AccessContextServiceTest {
         Assertions.assertThat(context.roles()).containsExactly(Role.ADMIN);
     }
 }
+

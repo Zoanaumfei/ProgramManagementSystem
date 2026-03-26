@@ -2,6 +2,7 @@ package com.oryzem.programmanagementsystem.platform.auth;
 
 import com.oryzem.programmanagementsystem.platform.audit.RequestCorrelationFilter;
 import com.oryzem.programmanagementsystem.platform.audit.RequestCorrelationContext;
+import com.oryzem.programmanagementsystem.platform.access.TenantRateLimitingFilter;
 import com.oryzem.programmanagementsystem.platform.auth.AuthenticationLoggingFilter;
 import com.oryzem.programmanagementsystem.platform.auth.CognitoAudienceValidator;
 import com.oryzem.programmanagementsystem.platform.auth.CognitoJwtAuthenticationConverter;
@@ -43,6 +44,7 @@ public class SecurityConfig {
             RequestCorrelationFilter requestCorrelationFilter,
             RequestCorrelationContext requestCorrelationContext,
             AuthenticatedUserSynchronizationFilter authenticatedUserSynchronizationFilter,
+            TenantRateLimitingFilter tenantRateLimitingFilter,
             ObjectMapper objectMapper) throws Exception {
 
         http
@@ -66,6 +68,7 @@ public class SecurityConfig {
                 .exceptionHandling(exceptionHandling(objectMapper, requestCorrelationContext))
                 .addFilterBefore(requestCorrelationFilter, BearerTokenAuthenticationFilter.class)
                 .addFilterAfter(authenticatedUserSynchronizationFilter, BearerTokenAuthenticationFilter.class)
+                .addFilterAfter(tenantRateLimitingFilter, AuthenticatedUserSynchronizationFilter.class)
                 .addFilterAfter(new AuthenticationLoggingFilter(requestCorrelationContext), AuthenticatedUserSynchronizationFilter.class);
 
         return http.build();

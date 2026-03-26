@@ -20,13 +20,13 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/access/organizations")
 public class TenantOrganizationController {
 
-    private final PortfolioOrganizationService portfolioOrganizationService;
+    private final OrganizationManagementService organizationManagementService;
     private final AuthenticatedUserMapper authenticatedUserMapper;
 
     public TenantOrganizationController(
-            PortfolioOrganizationService portfolioOrganizationService,
+            OrganizationManagementService organizationManagementService,
             AuthenticatedUserMapper authenticatedUserMapper) {
-        this.portfolioOrganizationService = portfolioOrganizationService;
+        this.organizationManagementService = organizationManagementService;
         this.authenticatedUserMapper = authenticatedUserMapper;
     }
 
@@ -40,7 +40,7 @@ public class TenantOrganizationController {
             @RequestParam(required = false) Integer hierarchyLevel,
             @RequestParam(required = false) String search) {
         AuthenticatedUser actor = authenticatedUserMapper.from(authentication);
-        return portfolioOrganizationService.listOrganizations(
+        return organizationManagementService.listOrganizations(
                 actor,
                 status,
                 setupStatus,
@@ -55,7 +55,7 @@ public class TenantOrganizationController {
             Authentication authentication,
             @PathVariable String organizationId) {
         AuthenticatedUser actor = authenticatedUserMapper.from(authentication);
-        return portfolioOrganizationService.getOrganization(organizationId, actor);
+        return organizationManagementService.getOrganization(organizationId, actor);
     }
 
     @PostMapping
@@ -63,7 +63,7 @@ public class TenantOrganizationController {
             Authentication authentication,
             @Valid @RequestBody CreateOrganizationRequest request) {
         AuthenticatedUser actor = authenticatedUserMapper.from(authentication);
-        return ResponseEntity.ok(portfolioOrganizationService.createOrganization(request, actor));
+        return ResponseEntity.ok(organizationManagementService.createOrganization(request, actor));
     }
 
     @PutMapping("/{organizationId}")
@@ -72,7 +72,7 @@ public class TenantOrganizationController {
             @PathVariable String organizationId,
             @Valid @RequestBody UpdateOrganizationRequest request) {
         AuthenticatedUser actor = authenticatedUserMapper.from(authentication);
-        return ResponseEntity.ok(portfolioOrganizationService.updateOrganization(organizationId, request, actor));
+        return ResponseEntity.ok(organizationManagementService.updateOrganization(organizationId, request, actor));
     }
 
     @DeleteMapping("/{organizationId}")
@@ -80,7 +80,7 @@ public class TenantOrganizationController {
             Authentication authentication,
             @PathVariable String organizationId) {
         AuthenticatedUser actor = authenticatedUserMapper.from(authentication);
-        return ResponseEntity.ok(portfolioOrganizationService.inactivateOrganization(organizationId, actor));
+        return ResponseEntity.ok(organizationManagementService.inactivateOrganization(organizationId, actor));
     }
 
     @PostMapping("/{organizationId}/purge-subtree")
@@ -90,7 +90,7 @@ public class TenantOrganizationController {
             @RequestParam(defaultValue = "false") boolean supportOverride,
             @RequestParam(required = false) String justification) {
         AuthenticatedUser actor = authenticatedUserMapper.from(authentication);
-        return ResponseEntity.ok(portfolioOrganizationService.purgeOrganizationSubtree(
+        return ResponseEntity.ok(organizationManagementService.purgeOrganizationSubtree(
                 organizationId,
                 actor,
                 supportOverride,

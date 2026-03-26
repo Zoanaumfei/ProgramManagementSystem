@@ -43,18 +43,6 @@
           "value": "require"
         },
         {
-          "name": "APP_PORTFOLIO_DOCUMENTS_PROVIDER",
-          "value": "s3"
-        },
-        {
-          "name": "APP_PORTFOLIO_DOCUMENTS_BUCKET_NAME",
-          "value": "program-management-system-documents-dev-439533253319-sa-east-1"
-        },
-        {
-          "name": "APP_PORTFOLIO_DOCUMENTS_KEY_PREFIX",
-          "value": "portfolio"
-        },
-        {
           "name": "APP_SECURITY_IDENTITY_PROVIDER",
           "value": "cognito"
         },

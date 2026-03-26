@@ -91,8 +91,7 @@ Write-Host "  client_id: $($claims.client_id)"
 Write-Host "  audience: $(@($claims.aud) -join ', ')"
 Write-Host "  groups: $($groups -join ', ')"
 Write-Host "  derived roles: $($roles -join ', ')"
-Write-Host "  tenant_id: $($claims.tenant_id)"
-Write-Host "  tenant_type: $($claims.tenant_type)"
+Write-Host "  user_status: $($claims.user_status)"
 Write-Host ''
 
 if ($claims.token_use -and $claims.token_use -ne 'access') {
@@ -127,8 +126,8 @@ $checks = @(
         expectedStatus = $(if ($hasAdminRole) { 200 } else { 403 })
     },
     [PSCustomObject]@{
-        name = 'authz check operations view'
-        url  = "$normalizedBaseUrl/api/authz/check?module=OPERATIONS&action=VIEW"
+        name = 'authz check users view'
+        url  = "$normalizedBaseUrl/api/authz/check?module=USERS&action=VIEW"
         expectedStatus = 200
     }
 )
@@ -151,10 +150,10 @@ foreach ($result in $results) {
     Write-Host ("  [{0}] {1} -> expected {2}, got {3}" -f $status, $result.name, $result.expectedStatus, $result.actualStatus)
 
     if ($result.name -eq 'auth me' -and $result.body) {
-        Write-Host ("    username={0}; roles={1}; groups={2}" -f $result.body.username, ($result.body.roles -join ','), ($result.body.groups -join ','))
+        Write-Host ("    username={0}; membershipId={1}; activeTenantId={2}; activeOrganizationId={3}; roles={4}" -f $result.body.username, $result.body.membershipId, $result.body.activeTenantId, $result.body.activeOrganizationId, ($result.body.roles -join ','))
     }
 
-    if ($result.name -eq 'authz check operations view' -and $result.body) {
+    if ($result.name -eq 'authz check users view' -and $result.body) {
         Write-Host ("    allowed={0}; reason={1}" -f $result.body.allowed, $result.body.reason)
     }
 }

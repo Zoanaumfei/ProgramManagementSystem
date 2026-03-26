@@ -85,17 +85,16 @@ class AuthorizationServiceTest {
     }
 
     @Test
-    void memberCanEditOwnDraftOperation() {
+    void memberHasNoAdministrativeTenantPermission() {
         AuthenticatedUser user = new AuthenticatedUser("user-1", "member", Set.of(Role.MEMBER), "tenant-a", TenantType.EXTERNAL);
-        AuthorizationContext context = AuthorizationContext.builder(AppModule.OPERATIONS, Action.EDIT)
+        AuthorizationContext context = AuthorizationContext.builder(AppModule.TENANT, Action.VIEW)
                 .resourceTenantId("tenant-a")
-                .resourceOwnerUserId("user-1")
-                .resourceStatus("DRAFT")
                 .build();
 
         AuthorizationDecision decision = authorizationService.decide(user, context);
 
-        assertThat(decision.allowed()).isTrue();
+        assertThat(decision.allowed()).isFalse();
+        assertThat(decision.reason()).contains("No base permission");
     }
 
     @Test
@@ -124,9 +123,9 @@ class AuthorizationServiceTest {
     }
 
     @Test
-    void auditorCannotEditOperations() {
+    void auditorCannotEditTenants() {
         AuthenticatedUser user = new AuthenticatedUser("user-1", "auditor", Set.of(Role.AUDITOR), "tenant-a", TenantType.EXTERNAL);
-        AuthorizationContext context = AuthorizationContext.builder(AppModule.OPERATIONS, Action.EDIT)
+        AuthorizationContext context = AuthorizationContext.builder(AppModule.TENANT, Action.EDIT)
                 .resourceTenantId("tenant-a")
                 .build();
 
@@ -137,9 +136,9 @@ class AuthorizationServiceTest {
     }
 
     @Test
-    void supportSensitiveExportRequiresMaskedView() {
+    void supportSensitiveAuditExportRequiresMaskedView() {
         AuthenticatedUser user = new AuthenticatedUser("user-1", "support", Set.of(Role.SUPPORT), "tenant-a", TenantType.INTERNAL);
-        AuthorizationContext deniedContext = AuthorizationContext.builder(AppModule.REPORTS, Action.EXPORT)
+        AuthorizationContext deniedContext = AuthorizationContext.builder(AppModule.AUDIT, Action.EXPORT)
                 .resourceTenantId("tenant-a")
                 .sensitiveDataRequested(true)
                 .build();
@@ -148,7 +147,7 @@ class AuthorizationServiceTest {
 
         assertThat(denied.allowed()).isFalse();
 
-        AuthorizationContext allowedContext = AuthorizationContext.builder(AppModule.REPORTS, Action.EXPORT)
+        AuthorizationContext allowedContext = AuthorizationContext.builder(AppModule.AUDIT, Action.EXPORT)
                 .resourceTenantId("tenant-a")
                 .sensitiveDataRequested(true)
                 .maskedViewRequested(true)
@@ -160,4 +159,3 @@ class AuthorizationServiceTest {
         assertThat(allowed.maskedViewRequired()).isTrue();
     }
 }
-

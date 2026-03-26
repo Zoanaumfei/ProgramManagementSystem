@@ -26,7 +26,6 @@ class OrganizationPurgeService {
     private final OrganizationAccessService accessService;
     private final OrganizationDirectoryService organizationDirectoryService;
     private final TenantUserPurgePort tenantUserPurgePort;
-    private final TenantProjectPortfolioPort tenantProjectPortfolioPort;
 
     OrganizationPurgeService(
             OrganizationRepository organizationRepository,
@@ -34,15 +33,13 @@ class OrganizationPurgeService {
             AuditTrailService auditTrailService,
             OrganizationAccessService accessService,
             OrganizationDirectoryService organizationDirectoryService,
-            TenantUserPurgePort tenantUserPurgePort,
-            TenantProjectPortfolioPort tenantProjectPortfolioPort) {
+            TenantUserPurgePort tenantUserPurgePort) {
         this.organizationRepository = organizationRepository;
         this.authorizationService = authorizationService;
         this.auditTrailService = auditTrailService;
         this.accessService = accessService;
         this.organizationDirectoryService = organizationDirectoryService;
         this.tenantUserPurgePort = tenantUserPurgePort;
-        this.tenantProjectPortfolioPort = tenantProjectPortfolioPort;
     }
 
     OrganizationPurgeResponse purgeOrganizationSubtree(
@@ -50,14 +47,14 @@ class OrganizationPurgeService {
             AuthenticatedUser actor,
             boolean supportOverride,
             String justification) {
-        OrganizationEntity organization = accessService.findPortfolioOrganization(organizationId);
+        OrganizationEntity organization = accessService.findManagedOrganization(organizationId);
         accessService.ensureSupportInternalPurgeActor(actor);
         ensureOrganizationPurgeExplicitlyConfirmed(supportOverride, justification);
 
         AuthorizationDecision decision = authorizationService.decide(
                 actor,
                 AuthorizationContext.builder(AppModule.TENANT, Action.PURGE)
-                        .resourceTenantId(organization.getId())
+                        .resourceTenantId(organization.getTenantId())
                         .resourceTenantType(organization.getTenantType())
                         .auditTrailEnabled(true)
                         .supportOverride(supportOverride)
@@ -66,13 +63,7 @@ class OrganizationPurgeService {
         accessService.assertAllowed(decision);
 
         Set<String> subtreeOrganizationIds = organizationDirectoryService.collectSubtreeIds(organization.getId());
-        List<TenantProjectPortfolioPort.ProgramReference> programReferences =
-                tenantProjectPortfolioPort.listProgramReferences();
-        ensureSubtreeHasNoExternalProgramReferences(subtreeOrganizationIds, programReferences);
-
         int purgedUsers = tenantUserPurgePort.purgeUsersByOrganizationIds(subtreeOrganizationIds);
-        TenantProjectPortfolioPort.PurgeProgramsResult purgeProgramsResult =
-                tenantProjectPortfolioPort.purgeOwnedPrograms(subtreeOrganizationIds);
         List<OrganizationEntity> organizationsToPurge = organizationRepository.findAllById(subtreeOrganizationIds).stream()
                 .sorted(Comparator.comparing(OrganizationEntity::getHierarchyLevel).reversed()
                         .thenComparing(OrganizationEntity::getCreatedAt).reversed())
@@ -86,9 +77,7 @@ class OrganizationPurgeService {
                 Instant.now(),
                 "OK",
                 organizationsToPurge.size(),
-                purgeProgramsResult.purgedPrograms(),
-                purgedUsers,
-                purgeProgramsResult.purgedDocuments());
+                purgedUsers);
     }
 
     private void ensureOrganizationPurgeExplicitlyConfirmed(boolean supportOverride, String justification) {
@@ -97,18 +86,6 @@ class OrganizationPurgeService {
         }
         if (justification == null || justification.isBlank()) {
             throw new IllegalArgumentException("Organization purge requires a justification.");
-        }
-    }
-
-    private void ensureSubtreeHasNoExternalProgramReferences(
-            Set<String> subtreeOrganizationIds,
-            List<TenantProjectPortfolioPort.ProgramReference> allPrograms) {
-        boolean hasExternalReferences = allPrograms.stream()
-                .filter(program -> !subtreeOrganizationIds.contains(program.ownerOrganizationId()))
-                .anyMatch(program -> program.participantOrganizationIds().stream().anyMatch(subtreeOrganizationIds::contains));
-        if (hasExternalReferences) {
-            throw new IllegalArgumentException(
-                    "Organization subtree cannot be purged while it still participates in programs owned outside the subtree.");
         }
     }
 
@@ -122,7 +99,7 @@ class OrganizationPurgeService {
         auditTrailService.record(new AuditTrailEvent(
                 null,
                 eventType,
-                actor.subject(),
+                actor.userId() != null ? actor.userId() : actor.subject(),
                 highestRole(actor),
                 actor.tenantId(),
                 targetTenantId,
@@ -137,8 +114,8 @@ class OrganizationPurgeService {
     }
 
     private Role highestRole(AuthenticatedUser actor) {
-        return actor.roles().stream()
-                .sorted(Comparator.comparing(Enum::name))
+        return java.util.List.of(Role.ADMIN, Role.SUPPORT, Role.MANAGER, Role.AUDITOR, Role.MEMBER).stream()
+                .filter(actor.roles()::contains)
                 .findFirst()
                 .orElse(Role.MEMBER);
     }

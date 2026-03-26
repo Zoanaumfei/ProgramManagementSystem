@@ -39,6 +39,7 @@ public class TenantProvisioningService {
                             tenantType,
                             DEFAULT_DATA_REGION,
                             organizationId,
+                            defaultServiceTier(tenantType),
                             updatedAt != null ? updatedAt : Instant.now());
                     return tenantRepository.save(existing);
                 })
@@ -50,7 +51,12 @@ public class TenantProvisioningService {
                         tenantType,
                         DEFAULT_DATA_REGION,
                         organizationId,
+                        defaultServiceTier(tenantType),
                         createdAt != null ? createdAt : Instant.now(),
                         updatedAt != null ? updatedAt : createdAt != null ? createdAt : Instant.now())));
+    }
+
+    private TenantServiceTier defaultServiceTier(TenantType tenantType) {
+        return tenantType == TenantType.INTERNAL ? TenantServiceTier.INTERNAL : TenantServiceTier.STANDARD;
     }
 }

@@ -69,6 +69,32 @@ class TenantUserPortAdapter implements TenantUserQueryPort, TenantUserPurgePort 
         return usersToPurge.size();
     }
 
+    @Override
+    @Transactional
+    public OffboardingSummary offboardUsersByOrganizationIds(Set<String> organizationIds, java.time.Instant retentionUntil) {
+        AccessContextService.MembershipOffboardingResult membershipResult =
+                accessContextService.offboardMembershipsByOrganizations(organizationIds, retentionUntil);
+
+        int disabledUsers = 0;
+        for (ManagedUser user : userRepository.findAll().stream()
+                .filter(candidate -> membershipResult.affectedUserIds().contains(candidate.id()))
+                .toList()) {
+            if (accessContextService.hasActiveMemberships(user.id())) {
+                continue;
+            }
+            if (user.status() != UserStatus.INACTIVE) {
+                ManagedUser disabledUser = userRepository.save(user.withStatus(UserStatus.INACTIVE));
+                userIdentityGateway.disableUser(disabledUser);
+                disabledUsers++;
+            }
+        }
+
+        return new OffboardingSummary(
+                membershipResult.affectedUserIds().size(),
+                disabledUsers,
+                membershipResult.offboardedMemberships());
+    }
+
     private OrganizationUserStats toStats(java.util.List<ManagedUser> users) {
         long invitedCount = users.stream().filter(user -> user.status() == UserStatus.INVITED).count();
         long activeCount = users.stream().filter(user -> user.status() == UserStatus.ACTIVE).count();

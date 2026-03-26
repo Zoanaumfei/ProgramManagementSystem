@@ -26,6 +26,18 @@
 - `POST /api/access/tenants/{tenantId}/markets`
 - `PUT /api/access/tenants/{tenantId}/markets/{marketId}`
 - `DELETE /api/access/tenants/{tenantId}/markets/{marketId}`
+- `GET /api/authz/check`
+
+Removed endpoint families:
+- `/api/portfolio/**`
+- `/api/operations/**`
+- `/api/reports/**`
+- legacy `/api/users/**`
+
+## Core contract guarantees
+- `/api/auth/me` and `/api/access/*` remain the supported public core surface.
+- hardening changes preserve route shape and payload compatibility for the active core.
+- lifecycle, retention, quota and export state are internal server-side controls unless noted otherwise below.
 
 ## Auth me
 `GET /api/auth/me` returns the authenticated identity plus resolved access context.
@@ -53,10 +65,14 @@ Fields:
 - `authorities`
 - `timestamp`
 
-Legacy claim echo fields were removed. The access context is always resolved from local membership data.
+Important behavior:
+- legacy claim echo fields were removed
+- access context is always resolved from local membership data
+- invalid `X-Access-Context` values now return `400 Bad Request`
+- tenant rate limiting may return `429 Too Many Requests`
 
 ## User account admin
-`/api/access/users` manages the global user account lifecycle only.
+`/api/access/users` manages global user lifecycle only.
 
 Request shape for create/update:
 ```json
@@ -80,12 +96,6 @@ Response shape:
 }
 ```
 
-Important:
-- effective authorization is not read from `app_user`
-- `app_user` is identity-only and does not persist tenant or role snapshots
-- the membership APIs remain the source of truth for contextual access
-- `membershipAssigned` indicates whether the user already has at least one resolvable membership
-
 ## Membership admin
 Membership is the first-class access resource.
 
@@ -105,6 +115,12 @@ Membership is the first-class access resource.
 - `roles`
 - `permissions`
 
+Important behavior:
+- `DELETE /api/access/users/{userId}/memberships/{membershipId}` now performs membership offboarding
+- offboarding revokes access immediately and audits the operation
+- if the user loses the last active membership, the user account is inactivated as part of the same flow
+- active membership creation can return `409 Conflict` when tenant quota is exhausted
+
 ## First membership bootstrap
 `POST /api/access/users/{userId}/bootstrap-membership` assigns the first membership to a lifecycle-only user.
 
@@ -119,23 +135,57 @@ Request shape:
 ```
 
 Important:
-- this route is valid only when the target user has no memberships yet
+- valid only when the target user has no memberships yet
 - after the first assignment, further access changes happen through `/api/access/users/{userId}/memberships`
+- bootstrap can return `409 Conflict` when the target tenant has reached its active-membership quota
 
 ## Organization admin
 Organization hierarchy management is part of the active access core.
 
-Supported route family:
-- `/api/access/organizations`
+`OrganizationResponse` includes:
+- `id`
+- `name`
+- `code`
+- `tenantId`
+- `marketId`
+- `tenantType`
+- `parentOrganizationId`
+- `customerOrganizationId`
+- `hierarchyLevel`
+- `childrenCount`
+- `hasChildren`
+- `status`
+- `setupStatus`
+- `userSummary`
+- `canInactivate`
+- `inactivationBlockedReason`
+- `createdAt`
+- `updatedAt`
 
-Important:
-- organization administration no longer lives under the portfolio namespace
-- organization responses may still expose setup/program summary fields, but the portfolio runtime itself is frozen
-- legacy `/api/portfolio/**` requests now return `503 Service Unavailable`
+`OrganizationPurgeResponse` includes:
+- `organizationId`
+- `action`
+- `performedAt`
+- `status`
+- `purgedOrganizations`
+- `purgedUsers`
+
+Important behavior:
+- `DELETE /api/access/organizations/{organizationId}` now performs subtree offboarding instead of requiring prior manual user revocation
+- offboarding revokes memberships, disables users that lose all active memberships and marks the organization subtree for retention/export handling internally
+- destructive deletion is still explicit through `POST /api/access/organizations/{organizationId}/purge-subtree`
+- child organization creation can return `409 Conflict` when tenant organization quota is exhausted
 
 ## Markets
 Markets are tenant-scoped and can be inactivated only when not referenced by active memberships or organizations.
 
+Important behavior:
+- market creation can return `409 Conflict` when the tenant market quota is exhausted
+
 ## Breaking contract notes
 - `POST /api/access/users` and `PUT /api/access/users/{userId}` no longer accept `role` or `organizationId`
-- clients that previously created a user and membership in one payload must now call `/api/access/users` first and `/api/access/users/{userId}/bootstrap-membership` second
+- clients that previously created a user and membership in one payload must call `/api/access/users` first and `/api/access/users/{userId}/bootstrap-membership` second
+- `OrganizationResponse` no longer exposes any program or portfolio summary block
+- `OrganizationPurgeResponse` no longer exposes purged program or document counters
+- callers must stop using `/api/portfolio/**`, `/api/operations/**` and `/api/reports/**`
+- permission lists returned by `/api/auth/me` and membership endpoints no longer include `portfolio.*`, `operations.*` or `reports.*`

@@ -22,7 +22,7 @@ class AuthorizationControllerSecurityTest {
     @Test
     void authzCheckShouldRequireAuthentication() throws Exception {
         mockMvc.perform(get("/api/authz/check")
-                        .param("module", "OPERATIONS")
+                        .param("module", "TENANT")
                         .param("action", "VIEW"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.error").value("Unauthorized"));
@@ -77,4 +77,3 @@ class AuthorizationControllerSecurityTest {
                 .andExpect(jsonPath("$.crossTenant").value(true));
     }
 }
-

@@ -3,13 +3,10 @@ package com.oryzem.programmanagementsystem.app.bootstrap;
 import com.oryzem.programmanagementsystem.platform.audit.AuditTrailService;
 import com.oryzem.programmanagementsystem.platform.authorization.Role;
 import com.oryzem.programmanagementsystem.platform.authorization.TenantType;
-import com.oryzem.programmanagementsystem.modules.projectmanagement.PortfolioResetPort;
-import com.oryzem.programmanagementsystem.modules.operations.OperationRecord;
-import com.oryzem.programmanagementsystem.modules.operations.OperationRepository;
-import com.oryzem.programmanagementsystem.modules.operations.OperationStatus;
-import com.oryzem.programmanagementsystem.platform.access.AccessContextService;
 import com.oryzem.programmanagementsystem.platform.access.AccessContextResetService;
+import com.oryzem.programmanagementsystem.platform.access.AccessContextService;
 import com.oryzem.programmanagementsystem.platform.tenant.OrganizationBootstrapPort;
+import com.oryzem.programmanagementsystem.platform.tenant.OrganizationResetPort;
 import com.oryzem.programmanagementsystem.platform.users.domain.ManagedUser;
 import com.oryzem.programmanagementsystem.platform.users.domain.UserIdentityGateway;
 import com.oryzem.programmanagementsystem.platform.users.domain.UserRepository;
@@ -36,32 +33,29 @@ public class BootstrapDataService {
             EnumSet.of(Role.ADMIN, Role.SUPPORT, Role.AUDITOR);
 
     private final UserRepository userRepository;
-    private final OperationRepository operationRepository;
     private final AuditTrailService auditTrailService;
-    private final PortfolioResetPort portfolioResetPort;
     private final AccessContextService accessContextService;
     private final AccessContextResetService accessContextResetService;
     private final OrganizationBootstrapPort organizationBootstrapPort;
+    private final OrganizationResetPort organizationResetPort;
     private final UserIdentityGateway userIdentityGateway;
     private final BootstrapProperties bootstrapProperties;
 
     public BootstrapDataService(
             UserRepository userRepository,
-            OperationRepository operationRepository,
             AuditTrailService auditTrailService,
-            PortfolioResetPort portfolioResetPort,
             AccessContextService accessContextService,
             AccessContextResetService accessContextResetService,
             OrganizationBootstrapPort organizationBootstrapPort,
+            OrganizationResetPort organizationResetPort,
             UserIdentityGateway userIdentityGateway,
             BootstrapProperties bootstrapProperties) {
         this.userRepository = userRepository;
-        this.operationRepository = operationRepository;
         this.auditTrailService = auditTrailService;
-        this.portfolioResetPort = portfolioResetPort;
         this.accessContextService = accessContextService;
         this.accessContextResetService = accessContextResetService;
         this.organizationBootstrapPort = organizationBootstrapPort;
+        this.organizationResetPort = organizationResetPort;
         this.userIdentityGateway = userIdentityGateway;
         this.bootstrapProperties = bootstrapProperties;
     }
@@ -71,11 +65,8 @@ public class BootstrapDataService {
     public void seedIfEmpty() {
         ensureInternalCoreOrganization();
 
-        if (bootstrapProperties.seedData()) {
-            if (userRepository.findAll().isEmpty() && operationRepository.findAll().isEmpty()) {
-                seedUsers();
-                seedOperations();
-            }
+        if (bootstrapProperties.seedData() && userRepository.findAll().isEmpty()) {
+            seedUsers();
         }
 
         ensureBootstrapInternalAdmin();
@@ -84,14 +75,13 @@ public class BootstrapDataService {
     @Transactional
     public void reset() {
         auditTrailService.clear();
-        operationRepository.deleteAll();
+        accessContextResetService.clearMemberships();
         userRepository.deleteAll();
-        portfolioResetPort.clearAll();
-        accessContextResetService.clearTenantStructures();
+        organizationResetPort.clearOrganizations();
+        accessContextResetService.clearTenantsAndMarkets();
         ensureInternalCoreOrganization();
         if (bootstrapProperties.seedData()) {
             seedUsers();
-            seedOperations();
         }
         ensureBootstrapInternalAdmin();
     }
@@ -110,55 +100,6 @@ public class BootstrapDataService {
         seedUserWithMembership(user("USR-EXT-B-MGR-001", "Tenant B Manager", "manager.b@tenant.com", UserStatus.ACTIVE, baseTime.plusSeconds(420)), "tenant-b", Set.of(Role.MANAGER));
         seedUserWithMembership(user("USR-EXT-B-MEM-001", "Tenant B Member", "member.b@tenant.com", UserStatus.ACTIVE, baseTime.plusSeconds(480)), "tenant-b", Set.of(Role.MEMBER));
         seedUserWithMembership(user("USR-EXT-B-AUD-001", "Tenant B Auditor", "auditor.b@tenant.com", UserStatus.ACTIVE, baseTime.plusSeconds(540)), "tenant-b", Set.of(Role.AUDITOR));
-    }
-
-    private void seedOperations() {
-        Instant baseTime = Instant.parse("2026-03-07T12:30:00Z");
-        operationRepository.save(operation(
-                "OP-TA-001",
-                "APQP Kickoff",
-                "Initial kickoff for supplier A",
-                accessContextService.resolveTenantBoundaryId("tenant-a"),
-                TenantType.EXTERNAL,
-                "manager-123",
-                OperationStatus.DRAFT,
-                baseTime));
-        operationRepository.save(operation(
-                "OP-TA-002",
-                "PPAP Package",
-                "Prepare PPAP package for approval",
-                accessContextService.resolveTenantBoundaryId("tenant-a"),
-                TenantType.EXTERNAL,
-                "member-123",
-                OperationStatus.SUBMITTED,
-                baseTime.plusSeconds(120)));
-        operationRepository.save(operation(
-                "OP-TA-003",
-                "Run @ Rate",
-                "Capacity validation for tenant A",
-                accessContextService.resolveTenantBoundaryId("tenant-a"),
-                TenantType.EXTERNAL,
-                "member-123",
-                OperationStatus.DRAFT,
-                baseTime.plusSeconds(180)));
-        operationRepository.save(operation(
-                "OP-TB-001",
-                "Line Trial",
-                "Production line trial for tenant B",
-                accessContextService.resolveTenantBoundaryId("tenant-b"),
-                TenantType.EXTERNAL,
-                "manager-b",
-                OperationStatus.APPROVED,
-                baseTime.plusSeconds(240)));
-        operationRepository.save(operation(
-                "OP-TB-002",
-                "Corrective Action",
-                "Corrective action follow-up",
-                accessContextService.resolveTenantBoundaryId("tenant-b"),
-                TenantType.EXTERNAL,
-                "member-b",
-                OperationStatus.REJECTED,
-                baseTime.plusSeconds(360)));
     }
 
     private void seedOrganizations() {
@@ -358,35 +299,4 @@ public class BootstrapDataService {
                 roles,
                 saved.createdAt());
     }
-
-    private OperationRecord operation(
-            String id,
-            String title,
-            String description,
-            String tenantId,
-            TenantType tenantType,
-            String createdBy,
-            OperationStatus status,
-            Instant createdAt) {
-        Instant submittedAt = status == OperationStatus.SUBMITTED ? createdAt.plusSeconds(30) : null;
-        Instant approvedAt = status == OperationStatus.APPROVED ? createdAt.plusSeconds(60) : null;
-        Instant rejectedAt = status == OperationStatus.REJECTED ? createdAt.plusSeconds(60) : null;
-        return new OperationRecord(
-                id,
-                title,
-                description,
-                tenantId,
-                tenantType,
-                createdBy,
-                status,
-                createdAt,
-                createdAt,
-                submittedAt,
-                approvedAt,
-                rejectedAt,
-                null,
-                null);
-    }
 }
-
-

@@ -35,13 +35,13 @@ class OrganizationAccessService {
     List<OrganizationEntity> visibleOrganizations(AuthenticatedUser actor) {
         if (canViewAllOrganizations(actor)) {
             return organizationRepository.findAllByOrderByNameAsc().stream()
-                    .filter(this::isPortfolioOrganization)
+                    .filter(this::isManagedOrganization)
                     .toList();
         }
 
         Set<String> visibleOrganizationIds = visibleOrganizationIds(actor);
         return organizationRepository.findAllByOrderByNameAsc().stream()
-                .filter(this::isPortfolioOrganization)
+                .filter(this::isManagedOrganization)
                 .filter(organization -> visibleOrganizationIds.contains(organization.getId()))
                 .toList();
     }
@@ -53,7 +53,7 @@ class OrganizationAccessService {
 
         if (canViewAllOrganizations(actor)) {
             return organizationRepository.findAllByOrderByNameAsc().stream()
-                    .filter(this::isPortfolioOrganization)
+                    .filter(this::isManagedOrganization)
                     .map(OrganizationEntity::getId)
                     .collect(Collectors.toCollection(LinkedHashSet::new));
         }
@@ -65,10 +65,10 @@ class OrganizationAccessService {
         return organizationDirectoryService.collectSubtreeIds(actor.organizationId());
     }
 
-    OrganizationEntity findPortfolioOrganization(String organizationId) {
+    OrganizationEntity findManagedOrganization(String organizationId) {
         OrganizationEntity organization = organizationRepository.findById(organizationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Organization", organizationId));
-        if (!isPortfolioOrganization(organization)) {
+        if (!isManagedOrganization(organization)) {
             throw new ResourceNotFoundException("Organization", organizationId);
         }
         return organization;
@@ -171,7 +171,7 @@ class OrganizationAccessService {
                 && (actor.hasRole(Role.ADMIN) || actor.hasRole(Role.SUPPORT));
     }
 
-    private boolean isPortfolioOrganization(OrganizationEntity organization) {
+    private boolean isManagedOrganization(OrganizationEntity organization) {
         return organization.getTenantType() == TenantType.EXTERNAL;
     }
 }

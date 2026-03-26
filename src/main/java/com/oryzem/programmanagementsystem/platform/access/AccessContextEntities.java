@@ -36,6 +36,10 @@ class TenantEntity {
     @Column(name = "root_organization_id", length = 64)
     private String rootOrganizationId;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "service_tier", length = 32, nullable = false)
+    private TenantServiceTier serviceTier;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -53,6 +57,7 @@ class TenantEntity {
             com.oryzem.programmanagementsystem.platform.authorization.TenantType tenantType,
             String dataRegion,
             String rootOrganizationId,
+            TenantServiceTier serviceTier,
             Instant createdAt,
             Instant updatedAt) {
         TenantEntity tenant = new TenantEntity();
@@ -63,6 +68,7 @@ class TenantEntity {
         tenant.tenantType = tenantType;
         tenant.dataRegion = dataRegion;
         tenant.rootOrganizationId = rootOrganizationId;
+        tenant.serviceTier = serviceTier;
         tenant.createdAt = createdAt;
         tenant.updatedAt = updatedAt;
         return tenant;
@@ -96,6 +102,10 @@ class TenantEntity {
         return rootOrganizationId;
     }
 
+    TenantServiceTier getServiceTier() {
+        return serviceTier;
+    }
+
     Instant getCreatedAt() {
         return createdAt;
     }
@@ -111,6 +121,7 @@ class TenantEntity {
             com.oryzem.programmanagementsystem.platform.authorization.TenantType tenantType,
             String dataRegion,
             String rootOrganizationId,
+            TenantServiceTier serviceTier,
             Instant updatedAt) {
         this.name = name;
         this.code = code;
@@ -118,6 +129,7 @@ class TenantEntity {
         this.tenantType = tenantType;
         this.dataRegion = dataRegion;
         this.rootOrganizationId = rootOrganizationId;
+        this.serviceTier = serviceTier;
         this.updatedAt = updatedAt;
     }
 }
@@ -282,6 +294,19 @@ class UserMembershipEntity {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "lifecycle_state", length = 32, nullable = false)
+    private MembershipLifecycleState lifecycleState;
+
+    @Column(name = "access_revoked_at")
+    private Instant accessRevokedAt;
+
+    @Column(name = "offboarded_at")
+    private Instant offboardedAt;
+
+    @Column(name = "retention_until")
+    private Instant retentionUntil;
+
     protected UserMembershipEntity() {
     }
 
@@ -305,6 +330,9 @@ class UserMembershipEntity {
         membership.defaultMembership = defaultMembership;
         membership.joinedAt = joinedAt;
         membership.updatedAt = updatedAt;
+        membership.lifecycleState = status == MembershipStatus.INACTIVE
+                ? MembershipLifecycleState.REVOKED
+                : MembershipLifecycleState.ACTIVE;
         return membership;
     }
 
@@ -356,6 +384,22 @@ class UserMembershipEntity {
         return updatedAt;
     }
 
+    MembershipLifecycleState getLifecycleState() {
+        return lifecycleState;
+    }
+
+    Instant getAccessRevokedAt() {
+        return accessRevokedAt;
+    }
+
+    Instant getOffboardedAt() {
+        return offboardedAt;
+    }
+
+    Instant getRetentionUntil() {
+        return retentionUntil;
+    }
+
     void updateContext(
             String tenantId,
             String organizationId,
@@ -369,6 +413,12 @@ class UserMembershipEntity {
         this.status = status;
         this.defaultMembership = defaultMembership;
         this.updatedAt = updatedAt;
+        if (status == MembershipStatus.ACTIVE) {
+            this.lifecycleState = MembershipLifecycleState.ACTIVE;
+            this.accessRevokedAt = null;
+            this.offboardedAt = null;
+            this.retentionUntil = null;
+        }
     }
 
     void synchronizeDefaultContext(
@@ -383,6 +433,12 @@ class UserMembershipEntity {
         this.status = status;
         this.defaultMembership = true;
         this.updatedAt = updatedAt;
+        if (status == MembershipStatus.ACTIVE) {
+            this.lifecycleState = MembershipLifecycleState.ACTIVE;
+            this.accessRevokedAt = null;
+            this.offboardedAt = null;
+            this.retentionUntil = null;
+        }
     }
 
     void clearDefault(Instant updatedAt) {
@@ -399,6 +455,23 @@ class UserMembershipEntity {
         this.status = MembershipStatus.INACTIVE;
         this.defaultMembership = false;
         this.updatedAt = updatedAt;
+        this.lifecycleState = MembershipLifecycleState.REVOKED;
+        this.accessRevokedAt = updatedAt;
+    }
+
+    void revokeAccess(Instant updatedAt, Instant retentionUntil) {
+        this.status = MembershipStatus.INACTIVE;
+        this.defaultMembership = false;
+        this.updatedAt = updatedAt;
+        this.lifecycleState = MembershipLifecycleState.REVOKED;
+        this.accessRevokedAt = updatedAt;
+        this.retentionUntil = retentionUntil;
+    }
+
+    void offboard(Instant updatedAt, Instant retentionUntil) {
+        revokeAccess(updatedAt, retentionUntil);
+        this.lifecycleState = MembershipLifecycleState.OFFBOARDED;
+        this.offboardedAt = updatedAt;
     }
 }
 

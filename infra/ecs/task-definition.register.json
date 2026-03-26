@@ -51,10 +51,6 @@
           "value": "rds"
         },
         {
-          "name": "APP_PORTFOLIO_DOCUMENTS_PROVIDER",
-          "value": "stub"
-        },
-        {
           "name": "APP_SECURITY_IDENTITY_PROVIDER",
           "value": "cognito"
         },

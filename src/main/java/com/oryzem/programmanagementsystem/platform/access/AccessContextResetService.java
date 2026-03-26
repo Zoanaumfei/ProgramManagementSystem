@@ -23,9 +23,12 @@ public class AccessContextResetService {
         this.tenantRepository = tenantRepository;
     }
 
-    public void clearTenantStructures() {
+    public void clearMemberships() {
         membershipRoleRepository.deleteAll();
         membershipRepository.deleteAll();
+    }
+
+    public void clearTenantsAndMarkets() {
         tenantMarketRepository.deleteAll();
         tenantRepository.deleteAll();
     }

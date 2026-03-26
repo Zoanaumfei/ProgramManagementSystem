@@ -1,35 +1,94 @@
 # Architecture
 
 ## Product direction
-Oryzem is a SaaS platform for PMEs with multi-tenant and multi-market operation, simple collaboration between customer and supplier organizations, and shared visibility over delivery risk and execution.
+Oryzem currently ships a core SaaS administration surface centered on user identity, organization hierarchy and membership-based access control.
 
-The current implementation focus is temporarily constrained to the User + Organization core. Portfolio execution capabilities stay modeled in the backend, but their active routes and data are frozen until a later reactivation phase.
+Active backend scope:
+- user lifecycle
+- membership-based access control
+- tenant and market administration
+- organization hierarchy management
+- authentication, authorization and audit support for the core
+- tenant isolation, quotas and operational rate limiting
+
+Removed from runtime:
+- portfolio
+- program
+- project
+- product, item and deliverable execution
+- operations
+- reports
+- portfolio document storage
 
 ## Core access model
-The backend now operates with this access chain:
+The backend operates with this access chain:
 
 `User -> Membership -> Tenant / Organization / Market -> Role -> Permission`
 
 Definitions:
-- `User`: global identity record
-- `Tenant`: SaaS boundary and isolation root
+- `User`: global identity and lifecycle record
+- `Tenant`: SaaS isolation boundary
 - `Organization`: hierarchical business structure inside a tenant
-- `Market`: commercial or operational dimension inside the tenant
-- `Membership`: contextual access binding for a user
+- `Market`: optional commercial or regional slice inside a tenant
+- `Membership`: contextual binding between a user and a tenant scope
 - `Role`: contextual role granted inside a membership
-- `Permission`: atomic capability derived from membership roles
+- `Permission`: capability materialized from membership roles
 
 ## Runtime rules
-- Cognito authenticates the identity.
+- Cognito authenticates identity.
 - The application resolves authorization from local memberships.
 - `AuthenticatedUser` is always built from `ResolvedMembershipContext`.
 - `X-Access-Context` selects the active membership per request.
-- `/api/auth/me` exposes the active context already resolved.
+- invalid `X-Access-Context` hints fail closed instead of silently falling back to another tenant context.
+- `/api/auth/me` exposes the resolved active context.
+- authenticated core routes are rate limited per tenant.
+
+## Isolation and ownership
+- cross-tenant authorization decisions are evaluated from the actor membership and the resource tenant boundary.
+- organization-scoped user listing is filtered by organization subtree, never by raw tenant-wide fallback when a narrower organization filter is requested.
+- concrete tenant and membership repositories stay encapsulated in `platform.access` behind application services and ports.
+- support cross-tenant actions require explicit override + audit-friendly justification where applicable.
+
+## Lifecycle and offboarding
+Organizations and memberships now have internal lifecycle state beyond the public `ACTIVE/INACTIVE` contract.
+
+Organization lifecycle:
+- `ACTIVE`
+- `OFFBOARDING`
+- `OFFBOARDED`
+- `PURGED`
+
+Membership lifecycle:
+- `ACTIVE`
+- `REVOKED`
+- `OFFBOARDED`
+
+Operational behavior:
+- deleting an organization triggers offboarding for the whole subtree.
+- offboarding revokes memberships, disables users that lose their last active membership and records audit events.
+- offboarded organizations retain a controlled retention deadline and an internal export-ready marker.
+- purge remains an explicit support-only destructive step.
+
+## Enterprise controls
+- rate limits are enforced per tenant tier.
+- quotas are enforced for child organizations, tenant markets and active memberships.
+- tenant tier is stored on `tenant.service_tier`.
+- current tiers are `INTERNAL`, `STANDARD` and `ENTERPRISE`.
+- export is defined as an audited organization-scoped extraction workflow prepared during offboarding, not as a separate public API yet.
+
+## Administrative surfaces
+- `/api/auth/me`
+- `/api/access/users`
+- `/api/access/users/{userId}/bootstrap-membership`
+- `/api/access/users/{userId}/memberships`
+- `/api/access/organizations`
+- `/api/access/tenants`
+- `/api/access/tenants/{tenantId}/markets`
 
 ## User model boundary
-`app_user` is now an identity-and-lifecycle record only.
+`app_user` is identity-and-lifecycle data only.
 
-It is no longer treated as the source of truth for tenant, organization, market, role or tenant type during authorization.
+It is not the source of truth for tenant, organization, market, role or tenant type during authorization.
 Membership data drives:
 - active tenant
 - active organization
@@ -37,38 +96,29 @@ Membership data drives:
 - effective roles
 - effective permissions
 
-## Administrative surfaces
-- `/api/access/users` manages user-account lifecycle only.
-- `/api/access/users/{userId}/bootstrap-membership` bootstraps the first membership for a newly created user.
-- `/api/access/users/{userId}/memberships` manages contextual access explicitly.
-- `/api/access/organizations` manages the organization hierarchy as a core surface, independent from portfolio execution.
-- `/api/access/tenants/{tenantId}/markets` manages tenant markets.
+## Schema boundary
+Authoritative schema after the hardening:
+- `organization`
+- `tenant`
+- `tenant_market`
+- `user_membership`
+- `membership_role`
+- `app_role`
+- `app_permission`
+- `role_permission`
+- `app_user`
+- `audit_log`
 
-## Portfolio freeze
-- all `/api/portfolio/**` routes are intentionally disabled with `503 Service Unavailable`
-- the freeze message directs clients to keep organization management on `/api/access/organizations`
-- Flyway migration `V9__freeze_portfolio_and_reset_data.sql` removes portfolio runtime data without dropping schema or touching the membership-first access core
-- `organization`, `tenant`, `tenant_market`, `user_membership`, `membership_role`, `app_role`, `app_permission` and `role_permission` remain authoritative and preserved
+Important migrations:
+- `V10__remove_legacy_app_user_access_columns.sql` removes `app_user.role`, `app_user.tenant_id` and `app_user.tenant_type`
+- `V11__remove_dormant_domain_surfaces.sql` drops dormant portfolio/program/project/operations tables and deletes obsolete permission codes
+- `V12__enterprise_hardening_core_lifecycle.sql` adds tenant tier, lifecycle state, retention and export metadata for the active core
 
 ## Removed legacy concerns
 Removed from the backend:
 - legacy `/api/users` route family
-- deprecation flags for legacy users flow
-- legacy adoption telemetry/report endpoints
-- legacy deprecation headers
-- auth fallback based on Cognito tenant claims
-
-## Current shape
-- `/api/access/users` handles user-account lifecycle only.
-- `/api/access/users/{userId}/bootstrap-membership` is the explicit first-membership onboarding step.
-- `/api/access/users/{userId}/memberships` is the authoritative access-management surface.
-- authorization and active context resolution do not read legacy `/api/users` flows or Cognito tenant claims.
-
-## Schema boundary
-- Flyway `V10__remove_legacy_app_user_access_columns.sql` removes `app_user.role`, `app_user.tenant_id` and `app_user.tenant_type`
-- this is a breaking schema change for any direct SQL, ETL or local tooling that still reads those legacy columns
-- all authorization paths must read tenant, organization, market and role context from `user_membership` plus `membership_role`
-
-## Pending cleanup
-- some persisted operational records may still contain historical organization-root tenant ids and should be normalized by data migration
-- portfolio services, entities and storage integrations are intentionally kept compiled but dormant during the freeze so future retomada can happen incrementally
+- legacy portfolio/program/project runtime routes
+- legacy operations and reports runtime routes
+- temporary portfolio freeze controller and `503` response path
+- document-storage wiring dedicated to the removed portfolio runtime
+- authorization fallback based on Cognito tenant claims

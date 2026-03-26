@@ -62,9 +62,12 @@ public class AccessContextService {
             return Optional.empty();
         }
 
-        UserMembershipEntity selectedMembership = selectMembership(memberships, requestedContextHint)
-                .orElse(memberships.getFirst());
-        Set<Role> roles = membershipRoleRepository.findByMembershipId(selectedMembership.getId()).stream()
+        Optional<UserMembershipEntity> selectedMembership = selectMembership(memberships, requestedContextHint);
+        if (hasText(requestedContextHint) && selectedMembership.isEmpty()) {
+            throw new IllegalArgumentException("Requested access context is not available to the authenticated user.");
+        }
+        UserMembershipEntity resolvedMembership = selectedMembership.orElse(memberships.getFirst());
+        Set<Role> roles = membershipRoleRepository.findByMembershipId(resolvedMembership.getId()).stream()
                 .map(MembershipRoleEntity::getRoleCode)
                 .map(this::toRole)
                 .flatMap(Optional::stream)
@@ -75,22 +78,22 @@ public class AccessContextService {
                 .map(RolePermissionEntity::getPermissionCode)
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
 
-        Optional<TenantType> tenantTypeFromOrganization = selectedMembership.getOrganizationId() == null
+        Optional<TenantType> tenantTypeFromOrganization = resolvedMembership.getOrganizationId() == null
                 ? Optional.empty()
-                : organizationBoundaryResolver.findBoundary(selectedMembership.getOrganizationId())
+                : organizationBoundaryResolver.findBoundary(resolvedMembership.getOrganizationId())
                         .map(OrganizationBoundaryResolver.OrganizationBoundaryView::tenantType);
-        TenantType tenantType = tenantRepository.findById(selectedMembership.getTenantId())
+        TenantType tenantType = tenantRepository.findById(resolvedMembership.getTenantId())
                 .map(TenantEntity::getTenantType)
                 .or(() -> tenantTypeFromOrganization)
                 .orElseThrow(() -> new IllegalStateException(
-                        "Membership '%s' does not resolve a tenant type.".formatted(selectedMembership.getId())));
+                        "Membership '%s' does not resolve a tenant type.".formatted(resolvedMembership.getId())));
 
         return Optional.of(new ResolvedMembershipContext(
                 user.id(),
-                selectedMembership.getId(),
-                selectedMembership.getTenantId(),
-                selectedMembership.getOrganizationId(),
-                selectedMembership.getMarketId(),
+                resolvedMembership.getId(),
+                resolvedMembership.getTenantId(),
+                resolvedMembership.getOrganizationId(),
+                resolvedMembership.getMarketId(),
                 tenantType,
                 Set.copyOf(roles),
                 Set.copyOf(permissions)));
@@ -117,6 +120,36 @@ public class AccessContextService {
         membershipRepository.findByUserIdOrderByDefaultMembershipDescJoinedAtAsc(userId)
                 .forEach(membership -> membershipRoleRepository.deleteByMembershipId(membership.getId()));
         membershipRepository.deleteByUserId(userId);
+    }
+
+    @Transactional
+    public MembershipOffboardingResult offboardMembershipsByOrganizations(Set<String> organizationIds, java.time.Instant retentionUntil) {
+        if (organizationIds == null || organizationIds.isEmpty()) {
+            return new MembershipOffboardingResult(Set.of(), 0);
+        }
+
+        java.time.Instant now = java.time.Instant.now();
+        Set<String> affectedUserIds = new LinkedHashSet<>();
+        int offboardedMemberships = 0;
+        for (UserMembershipEntity membership : membershipRepository.findAllByOrganizationIdIn(organizationIds)) {
+            if (membership.getStatus() == MembershipStatus.INACTIVE
+                    && membership.getLifecycleState() == MembershipLifecycleState.OFFBOARDED) {
+                continue;
+            }
+            membership.offboard(now, retentionUntil);
+            membershipRepository.save(membership);
+            affectedUserIds.add(membership.getUserId());
+            offboardedMemberships++;
+        }
+        return new MembershipOffboardingResult(Set.copyOf(affectedUserIds), offboardedMemberships);
+    }
+
+    public boolean hasActiveMemberships(String userId) {
+        if (!hasText(userId)) {
+            return false;
+        }
+        return membershipRepository.findByUserIdOrderByDefaultMembershipDescJoinedAtAsc(userId).stream()
+                .anyMatch(membership -> membership.getStatus() == MembershipStatus.ACTIVE);
     }
 
     public Optional<String> resolvePrimaryOrganizationId(ManagedUser user) {
@@ -185,6 +218,16 @@ public class AccessContextService {
             return Set.of();
         }
         return membershipRepository.findAllByOrganizationId(organizationId).stream()
+                .filter(membership -> membership.getStatus() != MembershipStatus.INACTIVE)
+                .map(UserMembershipEntity::getUserId)
+                .collect(java.util.stream.Collectors.toSet());
+    }
+
+    public Set<String> findUserIdsByOrganizations(Set<String> organizationIds) {
+        if (organizationIds == null || organizationIds.isEmpty()) {
+            return Set.of();
+        }
+        return membershipRepository.findAllByOrganizationIdIn(organizationIds).stream()
                 .filter(membership -> membership.getStatus() != MembershipStatus.INACTIVE)
                 .map(UserMembershipEntity::getUserId)
                 .collect(java.util.stream.Collectors.toSet());
@@ -310,6 +353,7 @@ public class AccessContextService {
             if (exactMatch.isPresent()) {
                 return exactMatch;
             }
+            return Optional.empty();
         }
 
         return memberships.stream()
@@ -345,5 +389,10 @@ public class AccessContextService {
                 .filter(roles::contains)
                 .findFirst()
                 .orElseGet(() -> roles.stream().sorted(Comparator.comparing(Enum::name)).findFirst().orElse(null));
+    }
+
+    public record MembershipOffboardingResult(
+            Set<String> affectedUserIds,
+            int offboardedMemberships) {
     }
 }

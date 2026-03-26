@@ -1,14 +1,14 @@
 package com.oryzem.programmanagementsystem.platform.tenant;
 
-import java.time.Instant;
-import java.util.UUID;
 import jakarta.persistence.Column;
 import jakarta.persistence.Id;
 import jakarta.persistence.MappedSuperclass;
+import java.time.Instant;
+import java.util.UUID;
 
-final class PortfolioIds {
+final class OrganizationIds {
 
-    private PortfolioIds() {
+    private OrganizationIds() {
     }
 
     static String newId(String prefix) {
@@ -16,7 +16,7 @@ final class PortfolioIds {
     }
 }
 
-abstract class PortfolioAuditableEntity {
+abstract class AuditableEntity {
 
     private String id;
     private Instant createdAt;
@@ -80,7 +80,7 @@ abstract class PortfolioAuditableEntity {
 }
 
 @MappedSuperclass
-abstract class JpaPortfolioAuditableEntity extends PortfolioAuditableEntity {
+abstract class JpaAuditableEntity extends AuditableEntity {
 
     @Id
     @Column(length = 64, nullable = false)

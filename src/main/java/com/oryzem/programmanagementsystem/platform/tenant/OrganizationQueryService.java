@@ -47,7 +47,7 @@ class OrganizationQueryService {
     }
 
     OrganizationResponse getOrganization(String organizationId, AuthenticatedUser actor) {
-        OrganizationEntity organization = accessService.findPortfolioOrganization(organizationId);
+        OrganizationEntity organization = accessService.findManagedOrganization(organizationId);
         accessService.assertCanAccessOrganization(actor, organization, Action.VIEW);
         accessService.assertCanViewOrganization(actor, organization);
         return snapshotService.toResponse(organization);
