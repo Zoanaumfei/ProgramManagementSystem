@@ -22,10 +22,14 @@
 - `DELETE /api/access/organizations/{organizationId}`
 - `POST /api/access/organizations/{organizationId}/purge-subtree`
 - `GET /api/access/tenants`
+- `PATCH /api/access/tenants/{tenantId}/service-tier`
 - `GET /api/access/tenants/{tenantId}/markets`
 - `POST /api/access/tenants/{tenantId}/markets`
 - `PUT /api/access/tenants/{tenantId}/markets/{marketId}`
 - `DELETE /api/access/tenants/{tenantId}/markets/{marketId}`
+- `GET /api/access/organizations/{organizationId}/exports`
+- `POST /api/access/organizations/{organizationId}/exports`
+- `PATCH /api/access/organizations/{organizationId}/exports`
 - `GET /api/authz/check`
 
 Removed endpoint families:
@@ -70,6 +74,7 @@ Important behavior:
 - access context is always resolved from local membership data
 - invalid `X-Access-Context` values now return `400 Bad Request`
 - tenant rate limiting may return `429 Too Many Requests`
+- tenant rate limiting is backed by a shared counter store in production and falls back to local counters only when `app.multitenancy.rate-limit.store=local`
 
 ## User account admin
 `/api/access/users` manages global user lifecycle only.
@@ -181,6 +186,68 @@ Markets are tenant-scoped and can be inactivated only when not referenced by act
 
 Important behavior:
 - market creation can return `409 Conflict` when the tenant market quota is exhausted
+
+## Tenant service tier
+`PATCH /api/access/tenants/{tenantId}/service-tier` updates the tenant tier through an audited backoffice flow.
+
+Request shape:
+```json
+{
+  "serviceTier": "ENTERPRISE",
+  "justification": "Increase tenant capacity for seasonal load."
+}
+```
+
+Response shape:
+```json
+{
+  "tenantId": "TEN-tenant-a",
+  "tenantName": "Tenant A",
+  "previousServiceTier": "STANDARD",
+  "serviceTier": "ENTERPRISE",
+  "updatedAt": "..."
+}
+```
+
+Important behavior:
+- the endpoint is restricted to authorized `ADMIN` and `SUPPORT` actors
+- `SUPPORT` requests require audit trail support and a justification
+- invalid transitions return `409 Conflict`
+- no-op changes to the current tier return `409 Conflict`
+- the change is audited with actor, tenant target, previous tier, new tier and justification
+- the updated tier is used immediately for quota and rate-limit policy resolution
+
+## Organization export operations
+`/api/access/organizations/{organizationId}/exports` exposes the audited operator-facing export surface for offboarded organizations.
+
+Request shape:
+```json
+{
+  "justification": "Manual export requested for retention handling."
+}
+```
+
+Response shape:
+```json
+{
+  "organizationId": "tenant-b",
+  "lifecycleState": "OFFBOARDED",
+  "dataExportStatus": "EXPORT_IN_PROGRESS",
+  "eligible": true,
+  "offboardedAt": "...",
+  "retentionUntil": "...",
+  "dataExportedAt": null,
+  "updatedAt": "..."
+}
+```
+
+Important behavior:
+- `GET` returns the current export status snapshot for an organization
+- `POST` transitions `READY_FOR_EXPORT -> EXPORT_IN_PROGRESS`
+- `PATCH` transitions `EXPORT_IN_PROGRESS -> EXPORTED`
+- the organization must be `OFFBOARDED` and still inside the retention window
+- each transition is audited with actor, target organization and justification
+- attempts outside the eligibility window return `409 Conflict`
 
 ## Breaking contract notes
 - `POST /api/access/users` and `PUT /api/access/users/{userId}` no longer accept `role` or `organizationId`

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-03-27
+- added a shared tenant rate-limit counter abstraction with Redis-backed fixed-window counters for production and explicit local mode for dev/test
+- added an audited `PATCH /api/access/tenants/{tenantId}/service-tier` backoffice flow to change tenant tier with immediate policy impact
+- added audited operator-facing organization export endpoints for offboarded organizations with eligibility checks and staged completion
+- updated the core contract, architecture notes and open-gap tracking to reflect the closed high-priority hardening work
+
 ## 2026-03-26
 - permanently removed portfolio/program/project, operations and reports runtime modules from the application
 - deleted dormant document-storage wiring that existed only for the removed portfolio runtime

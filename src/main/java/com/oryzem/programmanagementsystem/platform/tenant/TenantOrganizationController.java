@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -21,12 +22,15 @@ import org.springframework.web.bind.annotation.RestController;
 public class TenantOrganizationController {
 
     private final OrganizationManagementService organizationManagementService;
+    private final OrganizationExportService organizationExportService;
     private final AuthenticatedUserMapper authenticatedUserMapper;
 
     public TenantOrganizationController(
             OrganizationManagementService organizationManagementService,
+            OrganizationExportService organizationExportService,
             AuthenticatedUserMapper authenticatedUserMapper) {
         this.organizationManagementService = organizationManagementService;
+        this.organizationExportService = organizationExportService;
         this.authenticatedUserMapper = authenticatedUserMapper;
     }
 
@@ -81,6 +85,32 @@ public class TenantOrganizationController {
             @PathVariable String organizationId) {
         AuthenticatedUser actor = authenticatedUserMapper.from(authentication);
         return ResponseEntity.ok(organizationManagementService.inactivateOrganization(organizationId, actor));
+    }
+
+    @GetMapping("/{organizationId}/exports")
+    public OrganizationExportResponse getOrganizationExportStatus(
+            Authentication authentication,
+            @PathVariable String organizationId) {
+        AuthenticatedUser actor = authenticatedUserMapper.from(authentication);
+        return organizationExportService.getExportStatus(organizationId, actor);
+    }
+
+    @PostMapping("/{organizationId}/exports")
+    public ResponseEntity<OrganizationExportResponse> requestOrganizationExport(
+            Authentication authentication,
+            @PathVariable String organizationId,
+            @Valid @RequestBody OrganizationExportRequest request) {
+        AuthenticatedUser actor = authenticatedUserMapper.from(authentication);
+        return ResponseEntity.ok(organizationExportService.requestExport(organizationId, request, actor));
+    }
+
+    @PatchMapping("/{organizationId}/exports")
+    public OrganizationExportResponse completeOrganizationExport(
+            Authentication authentication,
+            @PathVariable String organizationId,
+            @Valid @RequestBody OrganizationExportRequest request) {
+        AuthenticatedUser actor = authenticatedUserMapper.from(authentication);
+        return organizationExportService.completeExport(organizationId, request, actor);
     }
 
     @PostMapping("/{organizationId}/purge-subtree")

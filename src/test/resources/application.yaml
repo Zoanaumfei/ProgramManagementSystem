@@ -32,6 +32,7 @@ app:
     offboarding:
       retention-days: 15
     rate-limit:
+      store: local
       window-seconds: 60
       internal-max-requests: 1000
       standard-max-requests: 1000

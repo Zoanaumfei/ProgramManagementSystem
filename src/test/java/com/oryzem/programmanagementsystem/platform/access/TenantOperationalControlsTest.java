@@ -59,7 +59,10 @@ class TenantOperationalControlsTest {
         mockMvc.perform(get("/api/auth/me")
                         .with(jwtFor("member.a@tenant.com", "ROLE_MEMBER")))
                 .andExpect(status().isTooManyRequests())
-                .andExpect(jsonPath("$.message").value("Tenant rate limit exceeded."));
+                .andExpect(jsonPath("$.message").value("Tenant rate limit exceeded."))
+                .andExpect(jsonPath("$.status").value(429))
+                .andExpect(jsonPath("$.path").value("/api/auth/me"))
+                .andExpect(jsonPath("$.correlationId").isNotEmpty());
     }
 
     @Test

@@ -3,6 +3,7 @@ package com.oryzem.programmanagementsystem.platform.access;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.oryzem.programmanagementsystem.app.bootstrap.BootstrapDataService;
+import com.oryzem.programmanagementsystem.platform.audit.AuditTrailService;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,6 +19,7 @@ import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -32,6 +34,12 @@ class AccessAdministrationControllerTest {
 
     @Autowired
     private BootstrapDataService bootstrapDataService;
+
+    @Autowired
+    private TenantGovernanceService tenantGovernanceService;
+
+    @Autowired
+    private AuditTrailService auditTrailService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -345,6 +353,46 @@ class AccessAdministrationControllerTest {
                 .andExpect(jsonPath("$.status").value("INACTIVE"));
     }
 
+    @Test
+    void shouldChangeTenantServiceTierAndRecordAudit() throws Exception {
+        mockMvc.perform(patch("/api/access/tenants/TEN-tenant-a/service-tier")
+                        .with(internalAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "serviceTier": "ENTERPRISE",
+                                  "justification": "Increase tenant capacity for seasonal load."
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tenantId").value("TEN-tenant-a"))
+                .andExpect(jsonPath("$.previousServiceTier").value("STANDARD"))
+                .andExpect(jsonPath("$.serviceTier").value("ENTERPRISE"));
+
+        Assertions.assertThat(tenantGovernanceService.resolveTier("TEN-tenant-a"))
+                .isEqualTo(TenantServiceTier.ENTERPRISE);
+        Assertions.assertThat(auditTrailService.findAll())
+                .extracting(event -> event.eventType())
+                .contains("TENANT_SERVICE_TIER_CHANGE");
+    }
+
+    @Test
+    void supportShouldChangeTenantServiceTierWithJustification() throws Exception {
+        mockMvc.perform(patch("/api/access/tenants/TEN-tenant-b/service-tier")
+                        .with(internalSupport())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "serviceTier": "ENTERPRISE",
+                                  "justification": "Support-approved upgrade after incident review."
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tenantId").value("TEN-tenant-b"))
+                .andExpect(jsonPath("$.previousServiceTier").value("STANDARD"))
+                .andExpect(jsonPath("$.serviceTier").value("ENTERPRISE"));
+    }
+
     private RequestPostProcessor internalAdmin() {
         return jwt().jwt(jwt -> jwt
                         .claim("sub", "admin@oryzem.com-sub")
@@ -359,6 +407,15 @@ class AccessAdministrationControllerTest {
                         .claim("cognito:username", "admin.a@tenant.com")
                         .claim("email", "admin.a@tenant.com"))
                 .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
+    }
+
+    private RequestPostProcessor internalSupport() {
+        return jwt().jwt(jwt -> jwt
+                        .claim("sub", "support@oryzem.com-sub")
+                        .claim("cognito:username", "support@oryzem.com")
+                        .claim("email", "support@oryzem.com")
+                        .claim("token_use", "access"))
+                .authorities(new SimpleGrantedAuthority("ROLE_SUPPORT"));
     }
 
     private RequestPostProcessor tenantAUser() {

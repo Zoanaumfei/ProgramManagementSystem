@@ -27,6 +27,9 @@ spring:
       resourceserver:
         jwt:
           issuer-uri: ${COGNITO_ISSUER_URI:https://cognito-idp.sa-east-1.amazonaws.com/sa-east-1_aA4I3tEmF}
+  data:
+    redis:
+      url: ${REDIS_URL:redis://localhost:6379}
 
 app:
   bootstrap:
@@ -55,6 +58,8 @@ app:
     offboarding:
       retention-days: ${APP_MULTITENANCY_OFFBOARDING_RETENTION_DAYS:30}
     rate-limit:
+      store: ${APP_MULTITENANCY_RATE_LIMIT_STORE:redis}
+      redis-key-prefix: ${APP_MULTITENANCY_RATE_LIMIT_REDIS_KEY_PREFIX:pms:tenant-rate-limit}
       window-seconds: ${APP_MULTITENANCY_RATE_LIMIT_WINDOW_SECONDS:60}
       internal-max-requests: ${APP_MULTITENANCY_RATE_LIMIT_INTERNAL_MAX_REQUESTS:240}
       standard-max-requests: ${APP_MULTITENANCY_RATE_LIMIT_STANDARD_MAX_REQUESTS:120}

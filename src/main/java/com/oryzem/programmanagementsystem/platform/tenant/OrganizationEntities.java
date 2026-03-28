@@ -141,6 +141,32 @@ class OrganizationEntity extends JpaAuditableEntity {
         touch(actor);
     }
 
+    void markExportInProgress(String actor, java.time.Instant updatedAt) {
+        if (this.lifecycleState != OrganizationLifecycleState.OFFBOARDED) {
+            throw new IllegalArgumentException("Only offboarded organizations can start export.");
+        }
+        if (this.dataExportStatus != OrganizationDataExportStatus.READY_FOR_EXPORT) {
+            throw new IllegalStateException("Organization export is not ready to start.");
+        }
+        this.dataExportStatus = OrganizationDataExportStatus.EXPORT_IN_PROGRESS;
+        this.dataExportedAt = null;
+        touch(actor);
+        setUpdatedAt(updatedAt);
+    }
+
+    void markExported(String actor, java.time.Instant exportedAt) {
+        if (this.lifecycleState != OrganizationLifecycleState.OFFBOARDED) {
+            throw new IllegalArgumentException("Only offboarded organizations can complete export.");
+        }
+        if (this.dataExportStatus != OrganizationDataExportStatus.EXPORT_IN_PROGRESS) {
+            throw new IllegalStateException("Organization export is not in progress.");
+        }
+        this.dataExportStatus = OrganizationDataExportStatus.EXPORTED;
+        this.dataExportedAt = exportedAt;
+        touch(actor);
+        setUpdatedAt(exportedAt);
+    }
+
     @Column(length = 160, nullable = false)
     public String getName() {
         return name;

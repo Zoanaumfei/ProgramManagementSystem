@@ -1,9 +1,9 @@
 # Open Gaps
 
-## High priority
-- move tenant rate limiting from the current in-memory node-local counter to a shared store before multi-instance production scale-out
-- add an explicit operator-facing export execution surface if the manual audited export workflow becomes a frequent operational path
-- define a controlled backoffice flow to change `tenant.service_tier` without direct database maintenance
+## Closed high priority gaps
+- tenant rate limiting now uses a shared store abstraction with Redis as the production default and local mode only for dev/test
+- a controlled backoffice/API flow now exists to change `tenant.service_tier` with authorization and audit trail
+- an operator-facing organization export surface now exists for offboarded tenants with audited start/complete transitions
 
 ## Medium priority
 - expose richer tenant directory data if the client needs more than the current tenant summary response

@@ -70,11 +70,14 @@ Operational behavior:
 - purge remains an explicit support-only destructive step.
 
 ## Enterprise controls
-- rate limits are enforced per tenant tier.
+- rate limits are enforced per tenant tier through a `TenantRateLimitCounterStore` abstraction.
+- production uses Redis-backed fixed-window counters so rate limiting remains consistent across instances.
+- local counter mode is available only for development and tests through `app.multitenancy.rate-limit.store=local`.
 - quotas are enforced for child organizations, tenant markets and active memberships.
 - tenant tier is stored on `tenant.service_tier`.
 - current tiers are `INTERNAL`, `STANDARD` and `ENTERPRISE`.
-- export is defined as an audited organization-scoped extraction workflow prepared during offboarding, not as a separate public API yet.
+- tenant tier changes flow through an audited backoffice/API endpoint and immediately affect quota and rate-limit policy resolution.
+- export is defined as an audited organization-scoped extraction workflow prepared during offboarding and exposed through an operator-facing `/api/access/organizations/{organizationId}/exports` surface.
 
 ## Administrative surfaces
 - `/api/auth/me`
@@ -82,7 +85,9 @@ Operational behavior:
 - `/api/access/users/{userId}/bootstrap-membership`
 - `/api/access/users/{userId}/memberships`
 - `/api/access/organizations`
+- `/api/access/organizations/{organizationId}/exports`
 - `/api/access/tenants`
+- `/api/access/tenants/{tenantId}/service-tier`
 - `/api/access/tenants/{tenantId}/markets`
 
 ## User model boundary

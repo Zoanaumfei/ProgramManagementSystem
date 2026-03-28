@@ -3,6 +3,7 @@ package com.oryzem.programmanagementsystem.platform.access;
 import com.oryzem.programmanagementsystem.platform.audit.RequestCorrelationContext;
 import com.oryzem.programmanagementsystem.platform.authorization.AuthenticatedUser;
 import com.oryzem.programmanagementsystem.platform.authorization.AuthenticatedUserMapper;
+import com.oryzem.programmanagementsystem.platform.shared.FeatureTemporarilyUnavailableException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -11,8 +12,6 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -23,19 +22,21 @@ import tools.jackson.databind.ObjectMapper;
 @Component
 public class TenantRateLimitingFilter extends OncePerRequestFilter {
 
-    private final ConcurrentHashMap<String, FixedWindowCounter> counters = new ConcurrentHashMap<>();
     private final AuthenticatedUserMapper authenticatedUserMapper;
     private final TenantGovernanceService tenantGovernanceService;
+    private final TenantRateLimitCounterStore tenantRateLimitCounterStore;
     private final RequestCorrelationContext requestCorrelationContext;
     private final ObjectMapper objectMapper;
 
     public TenantRateLimitingFilter(
             AuthenticatedUserMapper authenticatedUserMapper,
             TenantGovernanceService tenantGovernanceService,
+            TenantRateLimitCounterStore tenantRateLimitCounterStore,
             RequestCorrelationContext requestCorrelationContext,
             ObjectMapper objectMapper) {
         this.authenticatedUserMapper = authenticatedUserMapper;
         this.tenantGovernanceService = tenantGovernanceService;
+        this.tenantRateLimitCounterStore = tenantRateLimitCounterStore;
         this.requestCorrelationContext = requestCorrelationContext;
         this.objectMapper = objectMapper;
     }
@@ -81,19 +82,16 @@ public class TenantRateLimitingFilter extends OncePerRequestFilter {
     }
 
     private boolean allow(String tenantId, TenantGovernanceService.RateLimitPolicy policy) {
-        long windowMillis = policy.window().toMillis();
-        long now = System.currentTimeMillis();
-        FixedWindowCounter counter = counters.compute(tenantId, (key, current) -> {
-            if (current == null || now >= current.windowEndsAtEpochMillis) {
-                return new FixedWindowCounter(now + windowMillis);
-            }
-            return current;
-        });
-        return counter.requests.incrementAndGet() <= policy.maxRequests();
+        try {
+            long counter = tenantRateLimitCounterStore.increment(tenantId, policy.window());
+            return counter <= policy.maxRequests();
+        } catch (RuntimeException exception) {
+            throw new FeatureTemporarilyUnavailableException("Tenant rate limit store is unavailable.");
+        }
     }
 
     void clearCounters() {
-        counters.clear();
+        tenantRateLimitCounterStore.clear();
     }
 
     private void writeTooManyRequests(HttpServletResponse response, HttpServletRequest request) throws IOException {
@@ -108,14 +106,5 @@ public class TenantRateLimitingFilter extends OncePerRequestFilter {
         body.put("path", request.getRequestURI());
         body.put("correlationId", correlationId);
         objectMapper.writeValue(response.getWriter(), body);
-    }
-
-    private static final class FixedWindowCounter {
-        private final long windowEndsAtEpochMillis;
-        private final AtomicInteger requests = new AtomicInteger();
-
-        private FixedWindowCounter(long windowEndsAtEpochMillis) {
-            this.windowEndsAtEpochMillis = windowEndsAtEpochMillis;
-        }
     }
 }

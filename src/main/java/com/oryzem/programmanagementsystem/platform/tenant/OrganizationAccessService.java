@@ -81,9 +81,21 @@ class OrganizationAccessService {
     }
 
     void assertCanAccessOrganization(AuthenticatedUser actor, OrganizationEntity organization, Action action) {
+        assertCanAccessOrganization(actor, organization, action, false, null);
+    }
+
+    void assertCanAccessOrganization(
+            AuthenticatedUser actor,
+            OrganizationEntity organization,
+            Action action,
+            boolean supportOverride,
+            String justification) {
         AuthorizationContext context = AuthorizationContext.builder(AppModule.TENANT, action)
                 .resourceTenantId(organization.getTenantId())
                 .resourceTenantType(organization.getTenantType())
+                .supportOverride(supportOverride)
+                .justification(justification)
+                .auditTrailEnabled(true)
                 .build();
         assertAllowed(authorizationService.decide(actor, context));
     }

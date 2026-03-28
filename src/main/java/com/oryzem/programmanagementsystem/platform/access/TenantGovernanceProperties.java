@@ -36,10 +36,28 @@ public class TenantGovernanceProperties {
     }
 
     public static class RateLimit {
+        private Store store = Store.REDIS;
+        private String redisKeyPrefix = "pms:tenant-rate-limit";
         private int windowSeconds = 60;
         private int internalMaxRequests = 240;
         private int standardMaxRequests = 120;
         private int enterpriseMaxRequests = 300;
+
+        public Store getStore() {
+            return store;
+        }
+
+        public void setStore(Store store) {
+            this.store = store;
+        }
+
+        public String getRedisKeyPrefix() {
+            return redisKeyPrefix;
+        }
+
+        public void setRedisKeyPrefix(String redisKeyPrefix) {
+            this.redisKeyPrefix = redisKeyPrefix;
+        }
 
         public int getWindowSeconds() {
             return windowSeconds;
@@ -72,6 +90,11 @@ public class TenantGovernanceProperties {
         public void setEnterpriseMaxRequests(int enterpriseMaxRequests) {
             this.enterpriseMaxRequests = enterpriseMaxRequests;
         }
+    }
+
+    public enum Store {
+        REDIS,
+        LOCAL
     }
 
     public static class Quota {

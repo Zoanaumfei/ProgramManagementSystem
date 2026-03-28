@@ -3,10 +3,12 @@ package com.oryzem.programmanagementsystem.platform.access;
 import com.oryzem.programmanagementsystem.platform.access.api.ActivateMembershipRequest;
 import com.oryzem.programmanagementsystem.platform.access.api.ActiveAccessContextResponse;
 import com.oryzem.programmanagementsystem.platform.access.api.BootstrapMembershipRequest;
+import com.oryzem.programmanagementsystem.platform.access.api.ChangeTenantServiceTierRequest;
 import com.oryzem.programmanagementsystem.platform.access.api.CreateMembershipRequest;
 import com.oryzem.programmanagementsystem.platform.access.api.CreateTenantMarketRequest;
 import com.oryzem.programmanagementsystem.platform.access.api.MembershipResponse;
 import com.oryzem.programmanagementsystem.platform.access.api.TenantMarketResponse;
+import com.oryzem.programmanagementsystem.platform.access.api.TenantServiceTierChangeResponse;
 import com.oryzem.programmanagementsystem.platform.access.api.UpdateMembershipRequest;
 import com.oryzem.programmanagementsystem.platform.access.api.UpdateTenantMarketRequest;
 import com.oryzem.programmanagementsystem.platform.audit.AuditTrailEvent;
@@ -25,6 +27,7 @@ import com.oryzem.programmanagementsystem.platform.users.domain.ManagedUser;
 import com.oryzem.programmanagementsystem.platform.users.domain.UserNotFoundException;
 import com.oryzem.programmanagementsystem.platform.users.domain.UserRepository;
 import com.oryzem.programmanagementsystem.platform.users.domain.UserStatus;
+import com.oryzem.programmanagementsystem.platform.shared.ConflictException;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
@@ -430,6 +433,49 @@ public class AccessAdministrationService {
         return response;
     }
 
+    public TenantServiceTierChangeResponse changeTenantServiceTier(
+            AuthenticatedUser actor,
+            String tenantId,
+            ChangeTenantServiceTierRequest request) {
+        TenantEntity tenant = findRequiredTenant(tenantId);
+        AuthorizationDecision decision = assertTenantActionAllowed(
+                actor,
+                tenant,
+                Action.CONFIGURE,
+                actor.hasRole(Role.SUPPORT),
+                request.justification());
+
+        validateTenantServiceTierTransition(tenant, request.serviceTier());
+
+        TenantServiceTier previousTier = tenant.getServiceTier();
+        tenant.updateFromRootOrganization(
+                tenant.getName(),
+                tenant.getCode(),
+                tenant.getStatus(),
+                tenant.getTenantType(),
+                tenant.getDataRegion(),
+                tenant.getRootOrganizationId(),
+                request.serviceTier(),
+                Instant.now());
+        TenantEntity saved = tenantRepository.save(tenant);
+        recordAudit(
+                actor,
+                tenantId,
+                "TENANT_SERVICE_TIER_CHANGE",
+                "TENANT",
+                tenantId,
+                decision.crossTenant(),
+                "{\"previousServiceTier\":\"" + previousTier + "\",\"serviceTier\":\""
+                        + request.serviceTier() + "\",\"justification\":\"" + escapeJson(request.justification())
+                        + "\"}");
+        return new TenantServiceTierChangeResponse(
+                saved.getId(),
+                saved.getName(),
+                previousTier,
+                saved.getServiceTier(),
+                saved.getUpdatedAt());
+    }
+
     private ManagedUser findRequiredUser(String userId) {
         return userRepository.findById(userId).orElseThrow(() -> new UserNotFoundException(userId));
     }
@@ -613,11 +659,22 @@ public class AccessAdministrationService {
     }
 
     private AuthorizationDecision assertTenantActionAllowed(AuthenticatedUser actor, TenantEntity tenant, Action action) {
+        return assertTenantActionAllowed(actor, tenant, action, false, null);
+    }
+
+    private AuthorizationDecision assertTenantActionAllowed(
+            AuthenticatedUser actor,
+            TenantEntity tenant,
+            Action action,
+            boolean supportOverride,
+            String justification) {
         AuthorizationDecision decision = authorizationService.decide(
                 actor,
                 AuthorizationContext.builder(AppModule.TENANT, action)
                         .resourceTenantId(tenant.getId())
                         .resourceTenantType(tenant.getTenantType())
+                        .supportOverride(supportOverride)
+                        .justification(justification)
                         .auditTrailEnabled(true)
                         .build());
         assertAllowed(decision);
@@ -625,7 +682,7 @@ public class AccessAdministrationService {
         if (actor.hasRole(Role.ADMIN) && actor.tenantType() == TenantType.INTERNAL) {
             return decision;
         }
-        if (action == Action.VIEW && actor.hasRole(Role.SUPPORT) && actor.tenantType() == TenantType.INTERNAL) {
+        if (actor.hasRole(Role.SUPPORT)) {
             return decision;
         }
         if (actor.activeTenantId() != null && actor.activeTenantId().equals(tenant.getId()) && actor.hasRole(Role.ADMIN)) {
@@ -633,6 +690,30 @@ public class AccessAdministrationService {
         }
 
         throw new AccessDeniedException("Tenant scope mismatch for requested operation.");
+    }
+
+    private void validateTenantServiceTierTransition(TenantEntity tenant, TenantServiceTier requestedTier) {
+        if (tenant.getServiceTier() == requestedTier) {
+            throw new ConflictException("Tenant is already on the requested service tier.");
+        }
+        if (tenant.getTenantType() == TenantType.INTERNAL && requestedTier != TenantServiceTier.INTERNAL) {
+            throw new ConflictException("Internal tenants must remain on the INTERNAL service tier.");
+        }
+        if (tenant.getTenantType() == TenantType.EXTERNAL && requestedTier == TenantServiceTier.INTERNAL) {
+            throw new ConflictException("External tenants cannot be moved to the INTERNAL service tier.");
+        }
+    }
+
+    private String escapeJson(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t");
     }
 
     private boolean canViewTenant(AuthenticatedUser actor, TenantEntity tenant) {
