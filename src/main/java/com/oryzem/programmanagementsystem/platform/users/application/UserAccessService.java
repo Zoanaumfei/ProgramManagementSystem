@@ -293,6 +293,12 @@ class UserAccessService {
 
         if (effectiveOrganizationId != null) {
             Set<String> visibleOrganizationIds = organizationLookup.collectSubtreeIds(effectiveOrganizationId);
+            if (actor != null
+                    && actor.organizationId() != null
+                    && !organizationLookup.isSameOrDescendant(actor.organizationId(), effectiveOrganizationId)
+                    && organizationLookup.isDirectPartner(actor.organizationId(), effectiveOrganizationId)) {
+                visibleOrganizationIds = Set.of(effectiveOrganizationId);
+            }
             Set<String> visibleUserIds = accessContextService.findUserIdsByOrganizations(visibleOrganizationIds);
             return userRepository.findAll().stream()
                     .filter(user -> visibleUserIds.contains(user.id()))
@@ -302,7 +308,9 @@ class UserAccessService {
         if (actor.hasRole(Role.ADMIN)
                 && actor.tenantType() == TenantType.EXTERNAL
                 && actor.organizationId() != null) {
-            Set<String> visibleOrganizationIds = organizationLookup.collectSubtreeIds(actor.organizationId());
+            Set<String> visibleOrganizationIds = new java.util.LinkedHashSet<>(
+                    organizationLookup.collectSubtreeIds(actor.organizationId()));
+            visibleOrganizationIds.addAll(organizationLookup.collectDirectPartnerIds(actor.organizationId()));
             return userRepository.findAll().stream()
                     .filter(user -> {
                         String organizationId = resolveRequiredUserContext(user).activeOrganizationId();
@@ -312,6 +320,41 @@ class UserAccessService {
         }
 
         return List.of();
+    }
+
+    List<ManagedUser> selectOrphanUsersForScope(AuthenticatedUser actor) {
+        if (!actor.hasRole(Role.ADMIN)) {
+            throw new AccessDeniedException("Only admins can list users without memberships.");
+        }
+
+        Set<String> usersWithMemberships = accessContextService.findUserIdsWithMemberships();
+        if (actor.tenantType() == TenantType.INTERNAL) {
+            return userRepository.findAll().stream()
+                    .filter(user -> !usersWithMemberships.contains(user.id()))
+                    .toList();
+        }
+
+        String tenantId = actor.tenantId();
+        if (tenantId == null || tenantId.isBlank()) {
+            return List.of();
+        }
+
+        Set<String> createdUserIds = auditTrailService.findByEventTypeAndTargetTenantAndResourceType(
+                        "USER_CREATE",
+                        tenantId,
+                        "USER").stream()
+                .map(AuditTrailEvent::targetResourceId)
+                .filter(id -> id != null && !id.isBlank())
+                .collect(java.util.stream.Collectors.toSet());
+
+        if (createdUserIds.isEmpty()) {
+            return List.of();
+        }
+
+        return userRepository.findAll().stream()
+                .filter(user -> createdUserIds.contains(user.id()))
+                .filter(user -> !usersWithMemberships.contains(user.id()))
+                .toList();
     }
 
     void enforceListScope(
@@ -335,7 +378,8 @@ class UserAccessService {
 
         if (actor.hasRole(Role.ADMIN) && actor.tenantType() == TenantType.EXTERNAL) {
             if (actor.organizationId() != null
-                    && organizationLookup.isSameOrDescendant(actor.organizationId(), requestedTenantId)) {
+                    && (organizationLookup.isSameOrDescendant(actor.organizationId(), requestedTenantId)
+                    || organizationLookup.isDirectPartner(actor.organizationId(), requestedTenantId))) {
                 return;
             }
             throw new AccessDeniedException("Tenant scope mismatch for requested operation.");

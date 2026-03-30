@@ -25,23 +25,13 @@ class OrganizationQueryService {
             AuthenticatedUser actor,
             OrganizationStatus status,
             OrganizationSetupStatus setupStatus,
-            String customerOrganizationId,
-            String parentOrganizationId,
-            Integer hierarchyLevel,
             String search) {
         accessService.assertCanViewOrganizations(actor);
         List<OrganizationResponse> responses = snapshotService.toResponses(accessService.visibleOrganizations(actor));
-        String normalizedCustomerOrganizationId = trimToNull(customerOrganizationId);
-        String normalizedParentOrganizationId = trimToNull(parentOrganizationId);
 
         return responses.stream()
                 .filter(organization -> status == null || organization.status() == status)
                 .filter(organization -> setupStatus == null || organization.setupStatus() == setupStatus)
-                .filter(organization -> normalizedCustomerOrganizationId == null
-                        || normalizedCustomerOrganizationId.equals(organization.customerOrganizationId()))
-                .filter(organization -> normalizedParentOrganizationId == null
-                        || normalizedParentOrganizationId.equals(organization.parentOrganizationId()))
-                .filter(organization -> hierarchyLevel == null || hierarchyLevel.equals(organization.hierarchyLevel()))
                 .filter(organization -> matchesSearch(organization, search))
                 .toList();
     }
@@ -64,11 +54,5 @@ class OrganizationQueryService {
                 || organization.id().toLowerCase(Locale.ROOT).contains(normalizedSearch);
     }
 
-    private String trimToNull(String value) {
-        if (value == null) {
-            return null;
-        }
-        String trimmedValue = value.trim();
-        return trimmedValue.isEmpty() ? null : trimmedValue;
-    }
+    // No hierarchy filters in the relationship-based model.
 }

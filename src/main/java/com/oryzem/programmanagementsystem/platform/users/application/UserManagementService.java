@@ -41,6 +41,11 @@ public class UserManagementService {
         return queryService.listUsers(actor, organizationId, supportOverride, justification);
     }
 
+    @Transactional(readOnly = true)
+    public List<UserSummaryResponse> listOrphanUsers(AuthenticatedUser actor) {
+        return queryService.listOrphanUsers(actor);
+    }
+
     public UserSummaryResponse createUser(AuthenticatedUser actor, CreateUserRequest request) {
         return commandService.createUser(actor, request);
     }

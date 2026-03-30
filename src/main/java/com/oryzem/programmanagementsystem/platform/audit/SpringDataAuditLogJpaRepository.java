@@ -11,4 +11,9 @@ public interface SpringDataAuditLogJpaRepository extends JpaRepository<AuditLogE
     List<AuditLogEntity> findAllByEventTypeInAndCreatedAtGreaterThanEqualOrderByCreatedAtAscIdAsc(
             List<String> eventTypes,
             Instant createdAt);
+
+    List<AuditLogEntity> findAllByEventTypeAndTargetTenantIdAndTargetResourceTypeOrderByCreatedAtAscIdAsc(
+            String eventType,
+            String targetTenantId,
+            String targetResourceType);
 }

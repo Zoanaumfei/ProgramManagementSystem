@@ -73,6 +73,7 @@ Operational behavior:
 - rate limits are enforced per tenant tier through a `TenantRateLimitCounterStore` abstraction.
 - production uses Redis-backed fixed-window counters so rate limiting remains consistent across instances.
 - local counter mode is available only for development and tests through `app.multitenancy.rate-limit.store=local`.
+- the ECS test deployment currently uses `local` counter mode until a shared Redis endpoint is provisioned for that environment.
 - quotas are enforced for child organizations, tenant markets and active memberships.
 - tenant tier is stored on `tenant.service_tier`.
 - current tiers are `INTERNAL`, `STANDARD` and `ENTERPRISE`.

@@ -43,16 +43,28 @@
           "value": "require"
         },
         {
+          "name": "APP_MULTITENANCY_RATE_LIMIT_STORE",
+          "value": "local"
+        },
+        {
           "name": "APP_SECURITY_IDENTITY_PROVIDER",
           "value": "cognito"
         },
         {
           "name": "APP_BOOTSTRAP_INTERNAL_ADMIN_ENABLED",
-          "value": "false"
+          "value": "true"
         },
         {
           "name": "APP_BOOTSTRAP_INTERNAL_ADMIN_PRUNE_OTHER_INTERNAL_USERS",
-          "value": "false"
+          "value": "true"
+        },
+        {
+          "name": "APP_BOOTSTRAP_INTERNAL_ADMIN_EMAIL",
+          "value": "vanderson.verza@gmail.com"
+        },
+        {
+          "name": "APP_BOOTSTRAP_INTERNAL_ADMIN_DISPLAY_NAME",
+          "value": "Vanderson Verza"
         },
         {
           "name": "APP_SECURITY_IDENTITY_USER_POOL_ID",

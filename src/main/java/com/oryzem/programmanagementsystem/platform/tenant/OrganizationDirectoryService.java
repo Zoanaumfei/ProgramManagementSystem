@@ -18,14 +18,17 @@ public class OrganizationDirectoryService implements OrganizationLookup, Organiz
     private final OrganizationRepository organizationRepository;
     private final TenantUserQueryPort tenantUserQueryPort;
     private final TenantProvisioningService tenantProvisioningService;
+    private final OrganizationRelationshipRepository relationshipRepository;
 
     public OrganizationDirectoryService(
             OrganizationRepository organizationRepository,
             TenantUserQueryPort tenantUserQueryPort,
-            TenantProvisioningService tenantProvisioningService) {
+            TenantProvisioningService tenantProvisioningService,
+            OrganizationRelationshipRepository relationshipRepository) {
         this.organizationRepository = organizationRepository;
         this.tenantUserQueryPort = tenantUserQueryPort;
         this.tenantProvisioningService = tenantProvisioningService;
+        this.relationshipRepository = relationshipRepository;
     }
 
     @Override
@@ -42,14 +45,16 @@ public class OrganizationDirectoryService implements OrganizationLookup, Organiz
 
     @Override
     public Set<String> collectSubtreeIds(String organizationId) {
-        Map<String, List<OrganizationEntity>> childrenByParentId = new java.util.HashMap<>();
-        for (OrganizationEntity organization : organizationRepository.findAllByOrderByNameAsc()) {
-            if (organization.getParentOrganization() == null) {
-                continue;
-            }
+        if (organizationId == null || organizationId.isBlank()) {
+            return Set.of();
+        }
+        Map<String, List<String>> childrenByParentId = new java.util.HashMap<>();
+        for (OrganizationRelationshipEntity relationship : relationshipRepository.findAllByRelationshipTypeAndStatus(
+                OrganizationRelationshipType.CUSTOMER_SUPPLIER,
+                OrganizationRelationshipStatus.ACTIVE)) {
             childrenByParentId
-                    .computeIfAbsent(organization.getParentOrganization().getId(), ignored -> new java.util.ArrayList<>())
-                    .add(organization);
+                    .computeIfAbsent(relationship.getSourceOrganizationId(), ignored -> new java.util.ArrayList<>())
+                    .add(relationship.getTargetOrganizationId());
         }
 
         LinkedHashSet<String> visibleIds = new LinkedHashSet<>();
@@ -61,8 +66,8 @@ public class OrganizationDirectoryService implements OrganizationLookup, Organiz
                 continue;
             }
 
-            for (OrganizationEntity child : childrenByParentId.getOrDefault(currentOrganizationId, List.of())) {
-                stack.push(child.getId());
+            for (String childId : childrenByParentId.getOrDefault(currentOrganizationId, List.of())) {
+                stack.push(childId);
             }
         }
         return visibleIds;
@@ -75,7 +80,35 @@ public class OrganizationDirectoryService implements OrganizationLookup, Organiz
 
     @Override
     public long countDirectChildren(String organizationId) {
-        return organizationRepository.findAllByParentOrganizationIdOrderByNameAsc(organizationId).size();
+        if (organizationId == null || organizationId.isBlank()) {
+            return 0;
+        }
+        return relationshipRepository.findAllBySourceOrganizationIdAndRelationshipTypeAndStatus(
+                organizationId,
+                OrganizationRelationshipType.CUSTOMER_SUPPLIER,
+                OrganizationRelationshipStatus.ACTIVE).size();
+    }
+
+    @Override
+    public Set<String> collectDirectPartnerIds(String organizationId) {
+        if (organizationId == null || organizationId.isBlank()) {
+            return Set.of();
+        }
+        return relationshipRepository.findAllBySourceOrganizationIdAndRelationshipTypeAndStatus(
+                        organizationId,
+                        OrganizationRelationshipType.PARTNER,
+                        OrganizationRelationshipStatus.ACTIVE).stream()
+                .map(OrganizationRelationshipEntity::getTargetOrganizationId)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    @Override
+    public boolean isDirectPartner(String sourceOrganizationId, String targetOrganizationId) {
+        if (sourceOrganizationId == null || sourceOrganizationId.isBlank()
+                || targetOrganizationId == null || targetOrganizationId.isBlank()) {
+            return false;
+        }
+        return collectDirectPartnerIds(sourceOrganizationId).contains(targetOrganizationId);
     }
 
     @Override
@@ -91,7 +124,6 @@ public class OrganizationDirectoryService implements OrganizationLookup, Organiz
             String name,
             String code,
             TenantType tenantType,
-            String parentOrganizationId,
             boolean active) {
         return findById(organizationId).orElseGet(() -> {
             OrganizationEntity organization;
@@ -112,16 +144,6 @@ public class OrganizationDirectoryService implements OrganizationLookup, Organiz
                         name.trim(),
                         code.trim().toUpperCase(),
                         active ? OrganizationStatus.ACTIVE : OrganizationStatus.INACTIVE);
-            } else if (parentOrganizationId != null && !parentOrganizationId.isBlank()) {
-                OrganizationEntity parentOrganization = organizationRepository.findById(parentOrganizationId)
-                        .orElseThrow(() -> new IllegalArgumentException("Organization not found: " + parentOrganizationId));
-                organization = OrganizationEntity.createChild(
-                        organizationId,
-                        actor,
-                        name.trim(),
-                        code.trim().toUpperCase(),
-                        active ? OrganizationStatus.ACTIVE : OrganizationStatus.INACTIVE,
-                        parentOrganization);
             } else {
                 tenantProvisioningService.ensureTenantForRootOrganization(
                         organizationId,
@@ -140,11 +162,6 @@ public class OrganizationDirectoryService implements OrganizationLookup, Organiz
                         active ? OrganizationStatus.ACTIVE : OrganizationStatus.INACTIVE);
             }
 
-            if (organization.getTenantType() == TenantType.EXTERNAL
-                    && organization.getParentOrganization() == null
-                    && organization.getCustomerOrganization() == organization) {
-                organization.setCustomerOrganization(organization);
-            }
             OrganizationEntity saved = organizationRepository.save(organization);
             if (saved.getParentOrganization() == null) {
                 tenantProvisioningService.ensureTenantForRootOrganization(
@@ -175,8 +192,8 @@ public class OrganizationDirectoryService implements OrganizationLookup, Organiz
                 organization.getMarketId(),
                 organization.getTenantType(),
                 organization.getStatus() == OrganizationStatus.ACTIVE,
-                organization.getParentOrganization() != null ? organization.getParentOrganization().getId() : null,
-                organization.getCustomerOrganization() != null ? organization.getCustomerOrganization().getId() : null,
-                organization.getHierarchyLevel());
+                null,
+                null,
+                null);
     }
 }

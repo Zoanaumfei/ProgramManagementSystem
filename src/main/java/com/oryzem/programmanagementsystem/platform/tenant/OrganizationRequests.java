@@ -5,7 +5,6 @@ import jakarta.validation.constraints.NotBlank;
 record CreateOrganizationRequest(
         @NotBlank String name,
         @NotBlank String code,
-        String parentOrganizationId,
         OrganizationStatus status) {
 }
 

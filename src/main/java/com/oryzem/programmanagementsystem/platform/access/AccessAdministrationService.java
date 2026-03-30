@@ -648,7 +648,8 @@ public class AccessAdministrationService {
             }
             return membership.getOrganizationId() == null
                     || (actor.organizationId() != null
-                            && organizationLookup.isSameOrDescendant(actor.organizationId(), membership.getOrganizationId()));
+                            && (organizationLookup.isSameOrDescendant(actor.organizationId(), membership.getOrganizationId())
+                            || organizationLookup.isDirectPartner(actor.organizationId(), membership.getOrganizationId())));
         }
         if (actor.hasRole(Role.SUPPORT) && actor.tenantType() == TenantType.EXTERNAL) {
             return membership.getOrganizationId() != null

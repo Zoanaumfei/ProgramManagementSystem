@@ -111,10 +111,14 @@ final class CognitoUserIdentityGateway implements UserIdentityGateway, CurrentUs
 
     @Override
     public void disableUser(ManagedUser user) {
-        client.adminDisableUser(AdminDisableUserRequest.builder()
-                .userPoolId(properties.userPoolId())
-                .username(requiredIdentityUsername(user))
-                .build());
+        try {
+            client.adminDisableUser(AdminDisableUserRequest.builder()
+                    .userPoolId(properties.userPoolId())
+                    .username(requiredIdentityUsername(user))
+                    .build());
+        } catch (software.amazon.awssdk.services.cognitoidentityprovider.model.UserNotFoundException exception) {
+            // Idempotent cleanup: absence in Cognito is acceptable during inactivation flows.
+        }
     }
 
     @Override

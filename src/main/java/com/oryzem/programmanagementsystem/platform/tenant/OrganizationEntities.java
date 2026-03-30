@@ -54,6 +54,29 @@ class OrganizationEntity extends JpaAuditableEntity {
         return organization;
     }
 
+    static OrganizationEntity createExternalForTenant(
+            String organizationId,
+            String tenantId,
+            String marketId,
+            String actor,
+            String name,
+            String code,
+            OrganizationStatus status) {
+        OrganizationEntity organization = new OrganizationEntity();
+        organization.initialize(organizationId, actor);
+        organization.name = name;
+        organization.code = code;
+        organization.status = status;
+        organization.tenantType = TenantType.EXTERNAL;
+        organization.tenantId = tenantId;
+        organization.marketId = marketId;
+        organization.hierarchyLevel = 0;
+        organization.customerOrganization = organization;
+        organization.lifecycleState = OrganizationLifecycleState.ACTIVE;
+        organization.dataExportStatus = OrganizationDataExportStatus.NOT_REQUESTED;
+        return organization;
+    }
+
     static OrganizationEntity createRootInternal(
             String organizationId,
             String tenantId,

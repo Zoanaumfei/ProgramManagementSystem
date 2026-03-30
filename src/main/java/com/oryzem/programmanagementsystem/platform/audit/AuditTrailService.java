@@ -31,6 +31,22 @@ public class AuditTrailService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<AuditTrailEvent> findByEventTypeAndTargetTenantAndResourceType(
+            String eventType,
+            String targetTenantId,
+            String targetResourceType) {
+        if (!hasText(eventType) || !hasText(targetTenantId) || !hasText(targetResourceType)) {
+            return List.of();
+        }
+        return repository.findAllByEventTypeAndTargetTenantIdAndTargetResourceTypeOrderByCreatedAtAscIdAsc(
+                        eventType,
+                        targetTenantId,
+                        targetResourceType).stream()
+                .map(AuditLogEntity::toDomain)
+                .toList();
+    }
+
     public void clear() {
         repository.deleteAll();
     }

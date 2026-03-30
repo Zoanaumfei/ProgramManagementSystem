@@ -33,12 +33,12 @@ spring:
 
 app:
   bootstrap:
-    seed-data: ${APP_BOOTSTRAP_SEED_DATA:true}
+    seed-data: ${APP_BOOTSTRAP_SEED_DATA:false}
     internal-admin:
-      enabled: ${APP_BOOTSTRAP_INTERNAL_ADMIN_ENABLED:false}
-      email: ${APP_BOOTSTRAP_INTERNAL_ADMIN_EMAIL:}
-      display-name: ${APP_BOOTSTRAP_INTERNAL_ADMIN_DISPLAY_NAME:}
-      prune-other-internal-users: ${APP_BOOTSTRAP_INTERNAL_ADMIN_PRUNE_OTHER_INTERNAL_USERS:false}
+      enabled: ${APP_BOOTSTRAP_INTERNAL_ADMIN_ENABLED:true}
+      email: ${APP_BOOTSTRAP_INTERNAL_ADMIN_EMAIL:vanderson.verza@gmail.com.br}
+      display-name: ${APP_BOOTSTRAP_INTERNAL_ADMIN_DISPLAY_NAME:Vanderson Verza}
+      prune-other-internal-users: ${APP_BOOTSTRAP_INTERNAL_ADMIN_PRUNE_OTHER_INTERNAL_USERS:true}
       password: ${APP_BOOTSTRAP_INTERNAL_ADMIN_PASSWORD:}
       temporary-password: ${APP_BOOTSTRAP_INTERNAL_ADMIN_TEMPORARY_PASSWORD:}
   security:

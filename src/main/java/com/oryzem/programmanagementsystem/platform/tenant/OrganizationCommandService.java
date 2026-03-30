@@ -60,8 +60,27 @@ class OrganizationCommandService {
         }
 
         OrganizationEntity organization;
-        String parentOrganizationId = trimToNull(request.parentOrganizationId());
-        if (parentOrganizationId == null) {
+        if (actor != null && actor.tenantType() == TenantType.EXTERNAL) {
+            if (!actor.hasRole(Role.ADMIN)) {
+                throw new org.springframework.security.access.AccessDeniedException(
+                        "Only admins can create supplier organizations.");
+            }
+            String tenantId = actor.tenantId();
+            if (tenantId == null || tenantId.isBlank()) {
+                throw new IllegalArgumentException("Authenticated user does not have an active tenant context.");
+            }
+            OrganizationEntity managedOrganization = accessService.findManagedOrganization(actor.organizationId());
+            accessService.assertCanManageOrganization(actor, managedOrganization);
+            tenantGovernanceService.assertOrganizationQuotaAvailable(tenantId);
+            organization = OrganizationEntity.createExternalForTenant(
+                    OrganizationIds.newId("ORG"),
+                    tenantId,
+                    managedOrganization.getMarketId(),
+                    actor.username(),
+                    normalizeName(request.name()),
+                    normalizedCode,
+                    defaultValue(request.status(), OrganizationStatus.ACTIVE));
+        } else {
             accessService.assertAllowed(authorizationService.decide(
                     actor,
                     AuthorizationContext.builder(AppModule.TENANT, Action.CREATE).build()));
@@ -83,22 +102,9 @@ class OrganizationCommandService {
                     normalizeName(request.name()),
                     normalizedCode,
                     defaultValue(request.status(), OrganizationStatus.ACTIVE));
-        } else {
-            OrganizationEntity parentOrganization = accessService.findManagedOrganization(parentOrganizationId);
-            accessService.assertCanAccessOrganization(actor, parentOrganization, Action.CREATE);
-            accessService.assertCanCreateChildOrganization(actor, parentOrganization);
-            accessService.assertOrganizationCanOwnChildren(parentOrganization);
-            tenantGovernanceService.assertOrganizationQuotaAvailable(parentOrganization.getTenantId());
-            organization = OrganizationEntity.createChild(
-                    OrganizationIds.newId("ORG"),
-                    actor.username(),
-                    normalizeName(request.name()),
-                    normalizedCode,
-                    defaultValue(request.status(), OrganizationStatus.ACTIVE),
-                    parentOrganization);
         }
         OrganizationEntity saved = organizationRepository.save(organization);
-        if (saved.getParentOrganization() == null) {
+        if (tenantProvisioningService.tenantIdForRootOrganization(saved.getId()).equals(saved.getTenantId())) {
             tenantProvisioningService.ensureTenantForRootOrganization(
                     saved.getId(),
                     saved.getName(),
@@ -143,13 +149,11 @@ class OrganizationCommandService {
         Instant now = Instant.now();
         Instant retentionUntil = tenantGovernanceService.retentionDeadlineFrom(now);
         java.util.Set<String> subtreeIds = organizationDirectoryService.collectSubtreeIds(organization.getId());
-        List<OrganizationEntity> subtree = organizationRepository.findAllById(subtreeIds).stream()
-                .sorted(Comparator.comparing(OrganizationEntity::getHierarchyLevel).reversed())
-                .toList();
+        List<OrganizationEntity> subtree = organizationRepository.findAllById(subtreeIds);
         TenantUserPurgePort.OffboardingSummary offboardingSummary =
                 tenantUserPurgePort.offboardUsersByOrganizationIds(subtreeIds, retentionUntil);
 
-        for (OrganizationEntity node : subtree.stream().sorted(Comparator.comparing(OrganizationEntity::getHierarchyLevel).reversed()).toList()) {
+        for (OrganizationEntity node : subtree) {
             node.markOffboarding(actor.username(), now, retentionUntil);
             node.markOffboarded(actor.username(), now, retentionUntil);
             organizationRepository.save(node);

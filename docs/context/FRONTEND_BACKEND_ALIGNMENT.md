@@ -17,3 +17,13 @@ This repository now exposes only the core membership-first backend contract.
 - frontend should remove portfolio, operations and reports menus that depended on removed backend routes
 - frontend should not call `/api/portfolio/**`, `/api/operations/**` or `/api/reports/**`
 - frontend should send `X-Access-Context` when operating under a request-scoped selected membership
+- frontend should render organization-scoped orphan users from `/api/access/users/orphans` once the backend exposes the dedicated read model for bootstrap discovery
+- frontend should rely on structured `401`/`403` payloads with `message`, `path` and `correlationId` to explain authorization failures to admins
+
+## Current frontend status
+- the main `/workspace` shell has been migrated to the access-first flow
+- users, organizations, markets and session diagnostics now route through the access shell
+- the legacy `src/features/portfolio` subtree was removed from the frontend source tree during the cleanup
+- the users page no longer depends on an organization directory query to render its main workflow
+- the backend contract already defines `GET /api/access/users`, but the published environment used during frontend testing still returned a static-resource-style 404 for that route
+- the users page now includes a dedicated `Usuários sem membership` section that will consume `/api/access/users/orphans` when the backend read model is available

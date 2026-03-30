@@ -46,6 +46,12 @@ public class UserManagementController {
                 justification);
     }
 
+    @GetMapping("/orphans")
+    public List<UserSummaryResponse> listOrphanUsers(Authentication authentication) {
+        AuthenticatedUser actor = authenticatedUserMapper.from(authentication);
+        return userManagementService.listOrphanUsers(actor);
+    }
+
     @PostMapping
     public ResponseEntity<UserSummaryResponse> createUser(
             Authentication authentication,

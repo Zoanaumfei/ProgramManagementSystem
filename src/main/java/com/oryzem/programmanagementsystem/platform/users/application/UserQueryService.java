@@ -50,4 +50,18 @@ class UserQueryService {
                 .map(accessService::toSummary)
                 .toList();
     }
+
+    List<UserSummaryResponse> listOrphanUsers(AuthenticatedUser actor) {
+        AuthorizationContext context = AuthorizationContext.builder(AppModule.USERS, Action.VIEW)
+                .resourceTenantId(actor.tenantId())
+                .resourceTenantType(actor.tenantType())
+                .build();
+
+        AuthorizationDecision decision = authorizationService.decide(actor, context);
+        accessService.assertAllowed(decision);
+
+        return accessService.selectOrphanUsersForScope(actor).stream()
+                .map(accessService::toSummary)
+                .toList();
+    }
 }

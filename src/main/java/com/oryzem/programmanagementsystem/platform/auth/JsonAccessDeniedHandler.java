@@ -55,14 +55,21 @@ public class JsonAccessDeniedHandler implements AccessDeniedHandler {
 
         response.setStatus(HttpStatus.FORBIDDEN.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        objectMapper.writeValue(response.getOutputStream(), errorBody(request, HttpStatus.FORBIDDEN, "Forbidden"));
+        objectMapper.writeValue(
+                response.getOutputStream(),
+                errorBody(request, HttpStatus.FORBIDDEN, "Forbidden", accessDeniedException.getMessage()));
     }
 
-    private Map<String, Object> errorBody(HttpServletRequest request, HttpStatus status, String error) {
+    private Map<String, Object> errorBody(
+            HttpServletRequest request,
+            HttpStatus status,
+            String error,
+            String message) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("timestamp", Instant.now().toString());
         body.put("status", status.value());
         body.put("error", error);
+        body.put("message", message);
         body.put("path", request.getRequestURI());
         body.put("correlationId", requestCorrelationContext.getOrCreate());
         return body;

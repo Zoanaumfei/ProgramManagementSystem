@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-03-28
+- documented the RDS-safe bootstrap reset path for non-production environments
+- documented the ECS test-environment rate-limit fallback to local counters while Redis is not provisioned there
+- recorded the operational impact of the shared tenant rate-limit store on the `/api/auth/me` smoke path
+
 ## 2026-03-27
 - added a shared tenant rate-limit counter abstraction with Redis-backed fixed-window counters for production and explicit local mode for dev/test
 - added an audited `PATCH /api/access/tenants/{tenantId}/service-tier` backoffice flow to change tenant tier with immediate policy impact

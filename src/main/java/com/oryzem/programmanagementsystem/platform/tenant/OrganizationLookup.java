@@ -20,6 +20,10 @@ public interface OrganizationLookup {
 
     boolean isSameOrDescendant(String ancestorOrganizationId, String targetOrganizationId);
 
+    Set<String> collectDirectPartnerIds(String organizationId);
+
+    boolean isDirectPartner(String sourceOrganizationId, String targetOrganizationId);
+
     long countDirectChildren(String organizationId);
 
     boolean isSetupComplete(String organizationId);

@@ -9,6 +9,14 @@ Use when requests start returning `429 Too Many Requests` unexpectedly or when a
 4. If Redis is unavailable, treat the issue as a production incident; do not switch to local counters in production.
 5. Temporary mitigation is to restore Redis connectivity or reduce inbound request volume at the edge.
 
+## ECS test environment note
+Use when the shared ECS test stack returns `500` on authenticated core routes immediately after a deploy.
+
+1. Verify whether `APP_MULTITENANCY_RATE_LIMIT_STORE` is set to `local` for the test task definition.
+2. If the task definition still points to `redis`, confirm a real shared Redis endpoint is available and exported as `REDIS_URL`.
+3. If Redis is not provisioned for that stack yet, keep the task definition on `local` counters so `/api/auth/me` and related authenticated routes stay available for smoke testing.
+4. Do not carry the local fallback into production task definitions.
+
 ## Tenant tier change
 Use when a tenant must be moved between `STANDARD` and `ENTERPRISE`, or when an internal tenant must be confirmed as `INTERNAL`.
 

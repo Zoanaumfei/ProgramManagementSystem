@@ -250,6 +250,12 @@ public class AccessContextService {
                 .collect(java.util.stream.Collectors.toSet());
     }
 
+    public Set<String> findUserIdsWithMemberships() {
+        return membershipRepository.findAll().stream()
+                .map(UserMembershipEntity::getUserId)
+                .collect(java.util.stream.Collectors.toSet());
+    }
+
     public boolean hasInvitedOrActiveAdmin(String organizationId) {
         if (!hasText(organizationId)) {
             return false;

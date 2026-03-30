@@ -10,6 +10,5 @@ public interface OrganizationBootstrapPort {
             String name,
             String code,
             TenantType tenantType,
-            String parentOrganizationId,
             boolean active);
 }

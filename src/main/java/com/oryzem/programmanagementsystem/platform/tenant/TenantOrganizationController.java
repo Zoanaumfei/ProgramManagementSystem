@@ -39,18 +39,12 @@ public class TenantOrganizationController {
             Authentication authentication,
             @RequestParam(required = false) OrganizationStatus status,
             @RequestParam(required = false) OrganizationSetupStatus setupStatus,
-            @RequestParam(required = false) String customerOrganizationId,
-            @RequestParam(required = false) String parentOrganizationId,
-            @RequestParam(required = false) Integer hierarchyLevel,
             @RequestParam(required = false) String search) {
         AuthenticatedUser actor = authenticatedUserMapper.from(authentication);
         return organizationManagementService.listOrganizations(
                 actor,
                 status,
                 setupStatus,
-                customerOrganizationId,
-                parentOrganizationId,
-                hierarchyLevel,
                 search);
     }
 

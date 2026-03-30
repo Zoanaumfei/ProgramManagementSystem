@@ -109,7 +109,6 @@ public class BootstrapDataService {
                 "Oryzem Internal Core",
                 "CORE-INT",
                 TenantType.INTERNAL,
-                null,
                 true);
         organizationBootstrapPort.ensureSeeded(
                 "tenant-a",
@@ -117,7 +116,6 @@ public class BootstrapDataService {
                 "Tenant A",
                 "TENANT-A",
                 TenantType.EXTERNAL,
-                null,
                 true);
         organizationBootstrapPort.ensureSeeded(
                 "tenant-b",
@@ -125,7 +123,6 @@ public class BootstrapDataService {
                 "Tenant B",
                 "TENANT-B",
                 TenantType.EXTERNAL,
-                null,
                 true);
     }
 
@@ -136,7 +133,6 @@ public class BootstrapDataService {
                 "Oryzem Internal Core",
                 "CORE-INT",
                 TenantType.INTERNAL,
-                null,
                 true);
     }
 

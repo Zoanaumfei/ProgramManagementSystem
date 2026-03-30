@@ -106,7 +106,6 @@ class AccessContextServiceTest {
                 "Tenant B",
                 "TENANT-B",
                 TenantType.EXTERNAL,
-                null,
                 true);
 
         membershipRepository.save(UserMembershipEntity.create(

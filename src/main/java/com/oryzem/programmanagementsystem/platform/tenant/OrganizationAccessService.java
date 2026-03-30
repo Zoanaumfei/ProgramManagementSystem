@@ -39,14 +39,14 @@ class OrganizationAccessService {
                     .toList();
         }
 
-        Set<String> visibleOrganizationIds = visibleOrganizationIds(actor);
+        Set<String> visibleOrganizationIds = visibleOrganizationIds(actor, true);
         return organizationRepository.findAllByOrderByNameAsc().stream()
                 .filter(this::isManagedOrganization)
                 .filter(organization -> visibleOrganizationIds.contains(organization.getId()))
                 .toList();
     }
 
-    Set<String> visibleOrganizationIds(AuthenticatedUser actor) {
+    Set<String> visibleOrganizationIds(AuthenticatedUser actor, boolean includePartners) {
         if (actor == null || actor.organizationId() == null || actor.organizationId().isBlank()) {
             return Set.of();
         }
@@ -62,7 +62,11 @@ class OrganizationAccessService {
             return Set.of(actor.organizationId());
         }
 
-        return organizationDirectoryService.collectSubtreeIds(actor.organizationId());
+        LinkedHashSet<String> visibleIds = new LinkedHashSet<>(organizationDirectoryService.collectSubtreeIds(actor.organizationId()));
+        if (includePartners) {
+            visibleIds.addAll(organizationDirectoryService.collectDirectPartnerIds(actor.organizationId()));
+        }
+        return visibleIds;
     }
 
     OrganizationEntity findManagedOrganization(String organizationId) {
@@ -75,8 +79,8 @@ class OrganizationAccessService {
     }
 
     void assertCanViewOrganization(AuthenticatedUser actor, OrganizationEntity organization) {
-        if (!visibleOrganizationIds(actor).contains(organization.getId())) {
-            throw new AccessDeniedException("Organization is outside the visible hierarchy for the authenticated user.");
+        if (!visibleOrganizationIds(actor, true).contains(organization.getId())) {
+            throw new AccessDeniedException("Organization is outside the visible relationship scope for the authenticated user.");
         }
     }
 
@@ -122,11 +126,11 @@ class OrganizationAccessService {
         }
 
         if (actor.tenantType() == TenantType.EXTERNAL
-                && visibleOrganizationIds(actor).contains(parentOrganization.getId())) {
+                && visibleOrganizationIds(actor, false).contains(parentOrganization.getId())) {
             return;
         }
 
-        throw new AccessDeniedException("Organization is outside the manageable hierarchy for the authenticated user.");
+        throw new AccessDeniedException("Organization is outside the manageable relationship scope for the authenticated user.");
     }
 
     void assertCanManageOrganization(AuthenticatedUser actor, OrganizationEntity organization) {
@@ -139,11 +143,11 @@ class OrganizationAccessService {
         }
 
         if (actor.tenantType() == TenantType.EXTERNAL
-                && visibleOrganizationIds(actor).contains(organization.getId())) {
+                && visibleOrganizationIds(actor, false).contains(organization.getId())) {
             return;
         }
 
-        throw new AccessDeniedException("Organization is outside the manageable hierarchy for the authenticated user.");
+        throw new AccessDeniedException("Organization is outside the manageable relationship scope for the authenticated user.");
     }
 
     void ensureSupportInternalPurgeActor(AuthenticatedUser actor) {

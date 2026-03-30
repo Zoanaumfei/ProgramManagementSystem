@@ -27,17 +27,11 @@ public class OrganizationManagementService {
             AuthenticatedUser actor,
             OrganizationStatus status,
             OrganizationSetupStatus setupStatus,
-            String customerOrganizationId,
-            String parentOrganizationId,
-            Integer hierarchyLevel,
             String search) {
         return queryService.listOrganizations(
                 actor,
                 status,
                 setupStatus,
-                customerOrganizationId,
-                parentOrganizationId,
-                hierarchyLevel,
                 search);
     }
 
