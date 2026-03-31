@@ -8,7 +8,7 @@ public record BootstrapProperties(
         InternalAdminProperties internalAdmin) {
 
     public BootstrapProperties {
-        internalAdmin = internalAdmin != null ? internalAdmin : new InternalAdminProperties(false, null, null, false, null, null);
+        internalAdmin = internalAdmin != null ? internalAdmin : new InternalAdminProperties(false, null, null, false, false, null, null);
     }
 
     public record InternalAdminProperties(
@@ -16,6 +16,7 @@ public record BootstrapProperties(
             String email,
             String displayName,
             boolean pruneOtherInternalUsers,
+            boolean pruneToInternalCore,
             String password,
             String temporaryPassword) {
     }

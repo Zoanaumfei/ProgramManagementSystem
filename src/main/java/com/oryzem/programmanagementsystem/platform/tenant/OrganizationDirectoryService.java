@@ -123,6 +123,7 @@ public class OrganizationDirectoryService implements OrganizationLookup, Organiz
             String actor,
             String name,
             String code,
+            String cnpj,
             TenantType tenantType,
             boolean active) {
         return findById(organizationId).orElseGet(() -> {
@@ -143,6 +144,7 @@ public class OrganizationDirectoryService implements OrganizationLookup, Organiz
                         actor,
                         name.trim(),
                         code.trim().toUpperCase(),
+                        OrganizationCnpj.normalize(cnpj),
                         active ? OrganizationStatus.ACTIVE : OrganizationStatus.INACTIVE);
             } else {
                 tenantProvisioningService.ensureTenantForRootOrganization(
@@ -159,20 +161,19 @@ public class OrganizationDirectoryService implements OrganizationLookup, Organiz
                         actor,
                         name.trim(),
                         code.trim().toUpperCase(),
+                        OrganizationCnpj.normalize(cnpj),
                         active ? OrganizationStatus.ACTIVE : OrganizationStatus.INACTIVE);
             }
 
             OrganizationEntity saved = organizationRepository.save(organization);
-            if (saved.getParentOrganization() == null) {
-                tenantProvisioningService.ensureTenantForRootOrganization(
-                        saved.getId(),
-                        saved.getName(),
-                        saved.getCode(),
-                        saved.getTenantType(),
-                        saved.getStatus() == OrganizationStatus.ACTIVE,
-                        saved.getCreatedAt(),
-                        saved.getUpdatedAt());
-            }
+            tenantProvisioningService.ensureTenantForRootOrganization(
+                    saved.getId(),
+                    saved.getName(),
+                    saved.getCode(),
+                    saved.getTenantType(),
+                    saved.getStatus() == OrganizationStatus.ACTIVE,
+                    saved.getCreatedAt(),
+                    saved.getUpdatedAt());
             return toEntry(saved);
         });
     }
@@ -180,6 +181,7 @@ public class OrganizationDirectoryService implements OrganizationLookup, Organiz
     @Override
     @Transactional
     public void clearOrganizations() {
+        relationshipRepository.deleteAll();
         organizationRepository.deleteAll();
     }
 
@@ -188,12 +190,10 @@ public class OrganizationDirectoryService implements OrganizationLookup, Organiz
                 organization.getId(),
                 organization.getName(),
                 organization.getCode(),
+                organization.getCnpj(),
                 organization.getTenantId(),
                 organization.getMarketId(),
                 organization.getTenantType(),
-                organization.getStatus() == OrganizationStatus.ACTIVE,
-                null,
-                null,
-                null);
+                organization.getStatus() == OrganizationStatus.ACTIVE);
     }
 }

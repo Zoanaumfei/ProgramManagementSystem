@@ -11,6 +11,7 @@ spring:
   flyway:
     enabled: true
     baseline-on-migrate: true
+    locations: classpath:db/test-migration
   security:
     oauth2:
       resourceserver:
@@ -20,6 +21,8 @@ spring:
 app:
   bootstrap:
     seed-data: true
+    internal-admin:
+      prune-to-internal-core: false
   security:
     cognito:
       issuer-uri: https://cognito-idp.sa-east-1.amazonaws.com/sa-east-1_aA4I3tEmF

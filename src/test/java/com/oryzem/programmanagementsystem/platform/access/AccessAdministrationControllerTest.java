@@ -80,38 +80,24 @@ class AccessAdministrationControllerTest {
     }
 
     @Test
-    void shouldBootstrapFirstMembershipThroughExplicitFlow() throws Exception {
+    void shouldCreateUserAlreadyProvisionedWithInitialMembership() throws Exception {
         String createUserResponse = mockMvc.perform(post("/api/access/users")
                         .with(externalAdminTenantA())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
                                   "displayName": "Bootstrap Pending",
-                                  "email": "bootstrap.pending@tenant.com"
+                                  "email": "bootstrap.pending@tenant.com",
+                                  "organizationId": "tenant-a",
+                                  "roles": ["MEMBER"]
                                 }
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.membershipAssigned").value(false))
+                .andExpect(jsonPath("$.membershipAssigned").value(true))
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
         String userId = objectMapper.readTree(createUserResponse).get("id").asText();
-
-        mockMvc.perform(post("/api/access/users/" + userId + "/bootstrap-membership")
-                        .with(externalAdminTenantA())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "organizationId": "tenant-a",
-                                  "roles": ["MEMBER"],
-                                  "status": "ACTIVE"
-                                }
-                                """))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.userId").value(userId))
-                .andExpect(jsonPath("$.organizationId").value("tenant-a"))
-                .andExpect(jsonPath("$.defaultMembership").value(true))
-                .andExpect(jsonPath("$.roles[0]").value("MEMBER"));
 
         mockMvc.perform(post("/api/access/users/" + userId + "/bootstrap-membership")
                         .with(externalAdminTenantA())

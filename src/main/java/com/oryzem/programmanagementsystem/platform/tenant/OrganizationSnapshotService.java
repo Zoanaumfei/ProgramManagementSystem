@@ -11,16 +11,12 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @Transactional(readOnly = true)
 class OrganizationSnapshotService {
-
-    private final OrganizationRepository organizationRepository;
     private final OrganizationDirectoryService organizationDirectoryService;
     private final TenantUserQueryPort tenantUserQueryPort;
 
     OrganizationSnapshotService(
-            OrganizationRepository organizationRepository,
             OrganizationDirectoryService organizationDirectoryService,
             TenantUserQueryPort tenantUserQueryPort) {
-        this.organizationRepository = organizationRepository;
         this.organizationDirectoryService = organizationDirectoryService;
         this.tenantUserQueryPort = tenantUserQueryPort;
     }
@@ -33,12 +29,23 @@ class OrganizationSnapshotService {
     }
 
     OrganizationResponse toResponse(OrganizationEntity organization) {
-        return toResponse(organization, buildSnapshot(List.of(organization)));
+        return toResponse(organization, false);
+    }
+
+    OrganizationResponse toResponse(OrganizationEntity organization, boolean reused) {
+        return toResponse(organization, buildSnapshot(List.of(organization)), reused);
     }
 
     private OrganizationResponse toResponse(
             OrganizationEntity organization,
             OrganizationManagementSnapshot snapshot) {
+        return toResponse(organization, snapshot, false);
+    }
+
+    private OrganizationResponse toResponse(
+            OrganizationEntity organization,
+            OrganizationManagementSnapshot snapshot,
+            boolean reused) {
         String organizationId = organization.getId();
         OrganizationSetupStatus setupStatus = snapshot.setupStatuses()
                 .getOrDefault(organizationId, OrganizationSetupStatus.INCOMPLETED);
@@ -63,7 +70,8 @@ class OrganizationSnapshotService {
                 setupStatus,
                 userSummary,
                 canInactivate,
-                inactivationBlockedReason);
+                inactivationBlockedReason,
+                reused);
     }
 
     private OrganizationManagementSnapshot buildSnapshot(List<OrganizationEntity> organizations) {
@@ -76,11 +84,7 @@ class OrganizationSnapshotService {
 
         Map<String, OrganizationSetupStatus> setupStatuses = new HashMap<>();
         Map<String, OrganizationUserSummaryResponse> userSummaries = new HashMap<>();
-        Map<String, Long> childrenCountByOrganizationId = organizations.stream()
-                .filter(organization -> organization.getParentOrganization() != null)
-                .collect(Collectors.groupingBy(
-                        organization -> organization.getParentOrganization().getId(),
-                        Collectors.counting()));
+        Map<String, Long> childrenCountByOrganizationId = new HashMap<>();
         for (String organizationId : organizationIds) {
             TenantUserQueryPort.OrganizationUserStats userStats = userStatsByOrganization.getOrDefault(
                     organizationId,

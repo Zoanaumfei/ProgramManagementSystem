@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-03-31
+- introduced canonical tenant-scoped `cnpj` identity for organizations and removed the legacy parent/customer/hierarchy organization tree fields from the active public contract
+- changed external organization creation to create-or-reuse by `tenant + cnpj` and automatically create or reactivate the `CUSTOMER_SUPPLIER` relationship from the actor organization
+- added cycle and self-link protection for `CUSTOMER_SUPPLIER` relationship management
+- added Flyway `V14__replace_organization_hierarchy_with_cnpj_identity.sql` to replace stored hierarchy metadata with canonical `cnpj` identity
+- fixed Flyway `V13__introduce_organization_relationships_and_reset_access_core.sql` so integration tests can run on the H2 test environment
+- aligned the bootstrap internal break-glass membership with local roles `ADMIN`, `SUPPORT` and `AUDITOR` so runtime authorization matches the Cognito bootstrap groups
+- allowed internal `ADMIN` actors to execute the user purge flow in the authorization matrix
+- fixed organization subtree purge so persisted `organization_relationship` rows, including inactive ones, are removed before physical organization deletion
+- updated context and contract notes to document the difference between relationship inactivation and purge-time cleanup
+
 ## 2026-03-28
 - documented the RDS-safe bootstrap reset path for non-production environments
 - documented the ECS test-environment rate-limit fallback to local counters while Redis is not provisioned there

@@ -67,7 +67,8 @@ Operational behavior:
 - deleting an organization triggers offboarding for the whole subtree.
 - offboarding revokes memberships, disables users that lose their last active membership and records audit events.
 - offboarded organizations retain a controlled retention deadline and an internal export-ready marker.
-- purge remains an explicit support-only destructive step.
+- user purge is an explicit destructive step available to internal `ADMIN` and `SUPPORT` actors under the audited authorization flow.
+- organization subtree purge still requires the support-style explicit confirmation path, and now clears relationship edges that reference the subtree before deleting organizations.
 
 ## Enterprise controls
 - rate limits are enforced per tenant tier through a `TenantRateLimitCounterStore` abstraction.

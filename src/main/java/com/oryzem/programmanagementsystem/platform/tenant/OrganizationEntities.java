@@ -5,9 +5,6 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
 @Entity
@@ -20,9 +17,7 @@ class OrganizationEntity extends JpaAuditableEntity {
     private TenantType tenantType;
     private String tenantId;
     private String marketId;
-    private OrganizationEntity parentOrganization;
-    private OrganizationEntity customerOrganization;
-    private Integer hierarchyLevel;
+    private String cnpj;
     private OrganizationLifecycleState lifecycleState;
     private java.time.Instant offboardingStartedAt;
     private java.time.Instant offboardedAt;
@@ -39,16 +34,16 @@ class OrganizationEntity extends JpaAuditableEntity {
             String actor,
             String name,
             String code,
+            String cnpj,
             OrganizationStatus status) {
         OrganizationEntity organization = new OrganizationEntity();
         organization.initialize(organizationId, actor);
         organization.name = name;
         organization.code = code;
+        organization.cnpj = cnpj;
         organization.status = status;
         organization.tenantType = TenantType.EXTERNAL;
         organization.tenantId = tenantId;
-        organization.hierarchyLevel = 0;
-        organization.customerOrganization = organization;
         organization.lifecycleState = OrganizationLifecycleState.ACTIVE;
         organization.dataExportStatus = OrganizationDataExportStatus.NOT_REQUESTED;
         return organization;
@@ -61,17 +56,17 @@ class OrganizationEntity extends JpaAuditableEntity {
             String actor,
             String name,
             String code,
+            String cnpj,
             OrganizationStatus status) {
         OrganizationEntity organization = new OrganizationEntity();
         organization.initialize(organizationId, actor);
         organization.name = name;
         organization.code = code;
+        organization.cnpj = cnpj;
         organization.status = status;
         organization.tenantType = TenantType.EXTERNAL;
         organization.tenantId = tenantId;
         organization.marketId = marketId;
-        organization.hierarchyLevel = 0;
-        organization.customerOrganization = organization;
         organization.lifecycleState = OrganizationLifecycleState.ACTIVE;
         organization.dataExportStatus = OrganizationDataExportStatus.NOT_REQUESTED;
         return organization;
@@ -83,49 +78,25 @@ class OrganizationEntity extends JpaAuditableEntity {
             String actor,
             String name,
             String code,
+            String cnpj,
             OrganizationStatus status) {
         OrganizationEntity organization = new OrganizationEntity();
         organization.initialize(organizationId, actor);
         organization.name = name;
         organization.code = code;
+        organization.cnpj = cnpj;
         organization.status = status;
         organization.tenantType = TenantType.INTERNAL;
         organization.tenantId = tenantId;
-        organization.hierarchyLevel = 0;
-        organization.customerOrganization = null;
         organization.lifecycleState = OrganizationLifecycleState.ACTIVE;
         organization.dataExportStatus = OrganizationDataExportStatus.NOT_REQUIRED;
         return organization;
     }
 
-    static OrganizationEntity createChild(
-            String organizationId,
-            String actor,
-            String name,
-            String code,
-            OrganizationStatus status,
-            OrganizationEntity parentOrganization) {
-        OrganizationEntity organization = new OrganizationEntity();
-        organization.initialize(organizationId, actor);
-        organization.name = name;
-        organization.code = code;
-        organization.status = status;
-        organization.tenantType = TenantType.EXTERNAL;
-        organization.tenantId = parentOrganization.getTenantId();
-        organization.marketId = parentOrganization.getMarketId();
-        organization.parentOrganization = parentOrganization;
-        organization.customerOrganization = parentOrganization.getCustomerOrganization() != null
-                ? parentOrganization.getCustomerOrganization()
-                : parentOrganization;
-        organization.hierarchyLevel = parentOrganization.getHierarchyLevel() + 1;
-        organization.lifecycleState = OrganizationLifecycleState.ACTIVE;
-        organization.dataExportStatus = OrganizationDataExportStatus.NOT_REQUESTED;
-        return organization;
-    }
-
-    void updateDetails(String actor, String name, String code) {
+    void updateDetails(String actor, String name, String code, String cnpj) {
         this.name = name;
         this.code = code;
+        this.cnpj = cnpj;
         touch(actor);
     }
 
@@ -246,33 +217,13 @@ class OrganizationEntity extends JpaAuditableEntity {
         this.marketId = marketId;
     }
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "parent_organization_id")
-    public OrganizationEntity getParentOrganization() {
-        return parentOrganization;
+    @Column(name = "cnpj", length = 14)
+    public String getCnpj() {
+        return cnpj;
     }
 
-    protected void setParentOrganization(OrganizationEntity parentOrganization) {
-        this.parentOrganization = parentOrganization;
-    }
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "customer_organization_id")
-    public OrganizationEntity getCustomerOrganization() {
-        return customerOrganization;
-    }
-
-    protected void setCustomerOrganization(OrganizationEntity customerOrganization) {
-        this.customerOrganization = customerOrganization;
-    }
-
-    @Column(name = "hierarchy_level", nullable = false)
-    public Integer getHierarchyLevel() {
-        return hierarchyLevel;
-    }
-
-    protected void setHierarchyLevel(Integer hierarchyLevel) {
-        this.hierarchyLevel = hierarchyLevel;
+    protected void setCnpj(String cnpj) {
+        this.cnpj = cnpj;
     }
 
     @Enumerated(EnumType.STRING)

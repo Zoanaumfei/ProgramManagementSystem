@@ -56,10 +56,12 @@ class TenantUserPortAdapter implements TenantUserQueryPort, TenantUserPurgePort 
     @Override
     @Transactional
     public int purgeUsersByOrganizationIds(Set<String> organizationIds) {
+        AccessContextService.MembershipPurgeResult membershipPurgeResult =
+                accessContextService.deleteMembershipsByOrganizations(organizationIds);
+
         java.util.List<ManagedUser> usersToPurge = userRepository.findAll().stream()
-                .filter(user -> accessContextService.resolvePrimaryOrganizationId(user)
-                        .filter(organizationIds::contains)
-                        .isPresent())
+                .filter(user -> membershipPurgeResult.affectedUserIds().contains(user.id()))
+                .filter(user -> !accessContextService.hasMemberships(user.id()))
                 .toList();
 
         for (ManagedUser user : usersToPurge) {

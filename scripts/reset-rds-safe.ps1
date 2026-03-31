@@ -2,7 +2,7 @@ param(
     [string]$AwsProfile = 'oryzem',
     [string]$AwsRegion = 'sa-east-1',
     [string]$SecretId = 'program-management-system/rds/master',
-    [string]$BootstrapEmail = 'vanderson.verza@gmail.com.br',
+    [string]$BootstrapEmail = 'vanderson.verza@gmail.com',
     [string]$BootstrapDisplayName = 'Vanderson Verza'
 )
 

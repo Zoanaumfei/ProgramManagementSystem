@@ -413,6 +413,37 @@ class UserAccessService {
         return organizationId.trim();
     }
 
+    MembershipAssignment resolveInitialMembershipAssignment(
+            AuthenticatedUser actor,
+            String organizationId,
+            String marketId,
+            Set<Role> roles) {
+        String normalizedOrganizationId = normalizeOrganizationId(organizationId);
+        OrganizationLookup.OrganizationView organization = organizationLookup.getRequired(normalizedOrganizationId);
+        String resolvedTenantId = resolveBoundaryTenantId(normalizedOrganizationId, actor);
+        TenantType resolvedTenantType = organization.tenantType();
+
+        String normalizedMarketId = null;
+        if (marketId != null && !marketId.isBlank()) {
+            normalizedMarketId = marketId.trim();
+            if (organization.marketId() == null || !organization.marketId().equals(normalizedMarketId)) {
+                throw new IllegalArgumentException("Market does not belong to the provided organization.");
+            }
+        } else if (organization.marketId() != null && !organization.marketId().isBlank()) {
+            normalizedMarketId = organization.marketId();
+        }
+
+        if (roles != null) {
+            roles.forEach(role -> assertOrganizationCanReceiveRole(normalizedOrganizationId, role));
+        }
+
+        return new MembershipAssignment(
+                resolvedTenantId,
+                normalizedOrganizationId,
+                normalizedMarketId,
+                resolvedTenantType);
+    }
+
     private Role primaryRole(AuthenticatedUser actor) {
         java.util.List<Role> precedence = java.util.List.of(Role.ADMIN, Role.SUPPORT, Role.MANAGER, Role.AUDITOR, Role.MEMBER);
         return precedence.stream()
@@ -423,5 +454,12 @@ class UserAccessService {
 
     private String metadataJson(boolean crossTenant) {
         return "{\"crossTenant\":" + crossTenant + "}";
+    }
+
+    record MembershipAssignment(
+            String tenantId,
+            String organizationId,
+            String marketId,
+            TenantType tenantType) {
     }
 }

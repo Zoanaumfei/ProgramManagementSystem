@@ -127,7 +127,9 @@ class CoreSaasHardeningIntegrationTest {
                         .content("""
                                 {
                                   "displayName": "Escalation Target",
-                                  "email": "escalation.target@tenant.com"
+                                  "email": "escalation.target@tenant.com",
+                                  "organizationId": "tenant-a",
+                                  "roles": ["MEMBER"]
                                 }
                                 """))
                 .andExpect(status().isCreated())
@@ -136,13 +138,15 @@ class CoreSaasHardeningIntegrationTest {
                 .getContentAsString();
         String userId = objectMapper.readTree(createUserResponse).get("id").asText();
 
-        mockMvc.perform(post("/api/access/users/" + userId + "/bootstrap-membership")
+        mockMvc.perform(put("/api/access/users/" + userId + "/memberships/MBR-" + userId)
                         .with(jwtFor("support.a@tenant.com", "ROLE_SUPPORT"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
+                                  "tenantId": "TEN-tenant-a",
                                   "organizationId": "tenant-a",
                                   "roles": ["ADMIN"],
+                                  "defaultMembership": true,
                                   "status": "ACTIVE"
                                 }
                                 """))
@@ -158,7 +162,7 @@ class CoreSaasHardeningIntegrationTest {
                                 {
                                   "name": "Tenant A Subsidiary",
                                   "code": "TENANT-A-SUB",
-                                  "parentOrganizationId": "tenant-a"
+                                  "cnpj": "55.666.777/0001-81"
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -173,26 +177,16 @@ class CoreSaasHardeningIntegrationTest {
                         .content("""
                                 {
                                   "displayName": "Subsidiary User",
-                                  "email": "subsidiary.user@tenant.com"
+                                  "email": "subsidiary.user@tenant.com",
+                                  "organizationId": "%s",
+                                  "roles": ["ADMIN"]
                                 }
-                                """))
+                                """.formatted(organizationId)))
                 .andExpect(status().isCreated())
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
         String userId = objectMapper.readTree(createUserResponse).get("id").asText();
-
-        mockMvc.perform(post("/api/access/users/" + userId + "/bootstrap-membership")
-                        .with(jwtFor("admin.a@tenant.com", "ROLE_ADMIN"))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "organizationId": "%s",
-                                  "roles": ["MEMBER"],
-                                  "status": "ACTIVE"
-                                }
-                                """.formatted(organizationId)))
-                .andExpect(status().isCreated());
 
         mockMvc.perform(get("/api/access/users")
                         .param("organizationId", organizationId)

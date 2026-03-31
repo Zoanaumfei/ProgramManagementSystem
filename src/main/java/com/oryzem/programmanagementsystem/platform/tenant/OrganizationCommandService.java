@@ -11,10 +11,12 @@ import com.oryzem.programmanagementsystem.platform.authorization.AuthorizationCo
 import com.oryzem.programmanagementsystem.platform.authorization.Role;
 import com.oryzem.programmanagementsystem.platform.authorization.AuthorizationService;
 import com.oryzem.programmanagementsystem.platform.authorization.TenantType;
+import com.oryzem.programmanagementsystem.platform.shared.BusinessRuleException;
 import java.time.Instant;
-import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +28,7 @@ class OrganizationCommandService {
     private final AuthorizationService authorizationService;
     private final OrganizationAccessService accessService;
     private final OrganizationDirectoryService organizationDirectoryService;
+    private final OrganizationRelationshipRepository relationshipRepository;
     private final OrganizationSnapshotService snapshotService;
     private final TenantUserPurgePort tenantUserPurgePort;
     private final TenantProvisioningService tenantProvisioningService;
@@ -37,6 +40,7 @@ class OrganizationCommandService {
             AuthorizationService authorizationService,
             OrganizationAccessService accessService,
             OrganizationDirectoryService organizationDirectoryService,
+            OrganizationRelationshipRepository relationshipRepository,
             OrganizationSnapshotService snapshotService,
             TenantUserPurgePort tenantUserPurgePort,
             TenantProvisioningService tenantProvisioningService,
@@ -46,6 +50,7 @@ class OrganizationCommandService {
         this.authorizationService = authorizationService;
         this.accessService = accessService;
         this.organizationDirectoryService = organizationDirectoryService;
+        this.relationshipRepository = relationshipRepository;
         this.snapshotService = snapshotService;
         this.tenantUserPurgePort = tenantUserPurgePort;
         this.tenantProvisioningService = tenantProvisioningService;
@@ -54,10 +59,9 @@ class OrganizationCommandService {
     }
 
     OrganizationResponse createOrganization(CreateOrganizationRequest request, AuthenticatedUser actor) {
+        String normalizedName = normalizeName(request.name());
         String normalizedCode = normalizeCode(request.code());
-        if (organizationRepository.existsByCodeIgnoreCase(normalizedCode)) {
-            throw new IllegalArgumentException("Organization code already exists.");
-        }
+        String normalizedCnpj = normalizeCnpj(request.cnpj());
 
         OrganizationEntity organization;
         if (actor != null && actor.tenantType() == TenantType.EXTERNAL) {
@@ -71,16 +75,40 @@ class OrganizationCommandService {
             }
             OrganizationEntity managedOrganization = accessService.findManagedOrganization(actor.organizationId());
             accessService.assertCanManageOrganization(actor, managedOrganization);
+            OrganizationEntity existingOrganization = organizationRepository.findByTenantIdAndCnpj(tenantId, normalizedCnpj)
+                    .orElse(null);
+            if (existingOrganization != null) {
+                accessService.ensureOrganizationIsMutable(existingOrganization);
+                if (existingOrganization.getId().equals(managedOrganization.getId())) {
+                    throw new IllegalArgumentException("The active organization already uses this CNPJ.");
+                }
+                ensureCustomerSupplierRelationship(managedOrganization, existingOrganization, actor.username());
+                recordAudit(
+                        actor,
+                        existingOrganization.getTenantId(),
+                        "ORGANIZATION_LINK_EXISTING",
+                        existingOrganization.getId(),
+                        false,
+                        "{\"reused\":true}");
+                return snapshotService.toResponse(existingOrganization, true);
+            }
+            if (organizationRepository.existsByCodeIgnoreCase(normalizedCode)) {
+                throw organizationCodeAlreadyExists(normalizedCode);
+            }
             tenantGovernanceService.assertOrganizationQuotaAvailable(tenantId);
             organization = OrganizationEntity.createExternalForTenant(
                     OrganizationIds.newId("ORG"),
                     tenantId,
                     managedOrganization.getMarketId(),
                     actor.username(),
-                    normalizeName(request.name()),
+                    normalizedName,
                     normalizedCode,
+                    normalizedCnpj,
                     defaultValue(request.status(), OrganizationStatus.ACTIVE));
         } else {
+            if (organizationRepository.existsByCodeIgnoreCase(normalizedCode)) {
+                throw organizationCodeAlreadyExists(normalizedCode);
+            }
             accessService.assertAllowed(authorizationService.decide(
                     actor,
                     AuthorizationContext.builder(AppModule.TENANT, Action.CREATE).build()));
@@ -89,7 +117,7 @@ class OrganizationCommandService {
             String tenantId = tenantProvisioningService.tenantIdForRootOrganization(organizationId);
             tenantProvisioningService.ensureTenantForRootOrganization(
                     organizationId,
-                    normalizeName(request.name()),
+                    normalizedName,
                     normalizedCode,
                     TenantType.EXTERNAL,
                     defaultValue(request.status(), OrganizationStatus.ACTIVE) == OrganizationStatus.ACTIVE,
@@ -99,11 +127,16 @@ class OrganizationCommandService {
                     organizationId,
                     tenantId,
                     actor.username(),
-                    normalizeName(request.name()),
+                    normalizedName,
                     normalizedCode,
+                    normalizedCnpj,
                     defaultValue(request.status(), OrganizationStatus.ACTIVE));
         }
         OrganizationEntity saved = organizationRepository.save(organization);
+        if (actor != null && actor.tenantType() == TenantType.EXTERNAL) {
+            OrganizationEntity sourceOrganization = accessService.findManagedOrganization(actor.organizationId());
+            ensureCustomerSupplierRelationship(sourceOrganization, saved, actor.username());
+        }
         if (tenantProvisioningService.tenantIdForRootOrganization(saved.getId()).equals(saved.getTenantId())) {
             tenantProvisioningService.ensureTenantForRootOrganization(
                     saved.getId(),
@@ -115,7 +148,7 @@ class OrganizationCommandService {
                     saved.getUpdatedAt());
         }
         recordAudit(actor, saved.getTenantId(), "ORGANIZATION_CREATE", saved.getId(), false, null);
-        return snapshotService.toResponse(saved);
+        return snapshotService.toResponse(saved, false);
     }
 
     OrganizationResponse updateOrganization(
@@ -128,11 +161,15 @@ class OrganizationCommandService {
         accessService.ensureOrganizationIsMutable(organization);
 
         String normalizedCode = normalizeCode(request.code());
+        String normalizedCnpj = normalizeCnpj(request.cnpj());
         if (organizationRepository.existsByCodeIgnoreCaseAndIdNot(normalizedCode, organization.getId())) {
-            throw new IllegalArgumentException("Organization code already exists.");
+            throw organizationCodeAlreadyExists(normalizedCode);
+        }
+        if (organizationRepository.existsByTenantIdAndCnpjAndIdNot(organization.getTenantId(), normalizedCnpj, organization.getId())) {
+            throw organizationCnpjAlreadyExistsInTenant(normalizedCnpj);
         }
 
-        organization.updateDetails(actor.username(), normalizeName(request.name()), normalizedCode);
+        organization.updateDetails(actor.username(), normalizeName(request.name()), normalizedCode, normalizedCnpj);
         OrganizationEntity saved = organizationRepository.save(organization);
         recordAudit(actor, saved.getTenantId(), "ORGANIZATION_UPDATE", saved.getId(), false, null);
         return snapshotService.toResponse(saved);
@@ -187,6 +224,10 @@ class OrganizationCommandService {
         return value == null ? null : value.trim().toUpperCase(Locale.ROOT);
     }
 
+    private String normalizeCnpj(String value) {
+        return OrganizationCnpj.normalize(value);
+    }
+
     private <T> T defaultValue(T value, T fallback) {
         return value != null ? value : fallback;
     }
@@ -221,5 +262,67 @@ class OrganizationCommandService {
                 .filter(actor.roles()::contains)
                 .findFirst()
                 .orElse(Role.MEMBER);
+    }
+
+    private void ensureCustomerSupplierRelationship(
+            OrganizationEntity source,
+            OrganizationEntity target,
+            String actor) {
+        if (source.getId().equals(target.getId())) {
+            return;
+        }
+        if (organizationDirectoryService.collectSubtreeIds(target.getId()).contains(source.getId())) {
+            throw relationshipCycleNotAllowed(source.getId(), target.getId());
+        }
+        OrganizationRelationshipEntity relationship = relationshipRepository
+                .findBySourceOrganizationIdAndTargetOrganizationIdAndRelationshipType(
+                        source.getId(),
+                        target.getId(),
+                        OrganizationRelationshipType.CUSTOMER_SUPPLIER)
+                .orElseGet(() -> OrganizationRelationshipEntity.create(
+                        OrganizationIds.newId("REL"),
+                        actor,
+                        source.getId(),
+                        target.getId(),
+                        OrganizationRelationshipType.CUSTOMER_SUPPLIER,
+                        OrganizationRelationshipStatus.ACTIVE,
+                        Instant.now(),
+                        Instant.now()));
+        if (relationship.getStatus() != OrganizationRelationshipStatus.ACTIVE) {
+            relationship.setStatus(OrganizationRelationshipStatus.ACTIVE);
+            relationship.touch(actor);
+        }
+        relationshipRepository.save(relationship);
+    }
+
+    private BusinessRuleException organizationCodeAlreadyExists(String code) {
+        return new BusinessRuleException(
+                "ORGANIZATION_CODE_ALREADY_EXISTS",
+                "Organization code already exists.",
+                fieldDetails("code", code));
+    }
+
+    private BusinessRuleException organizationCnpjAlreadyExistsInTenant(String cnpj) {
+        return new BusinessRuleException(
+                "ORGANIZATION_CNPJ_ALREADY_EXISTS_IN_TENANT",
+                "Organization CNPJ already exists in this tenant.",
+                fieldDetails("cnpj", cnpj));
+    }
+
+    private BusinessRuleException relationshipCycleNotAllowed(String sourceOrganizationId, String targetOrganizationId) {
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("sourceOrganizationId", sourceOrganizationId);
+        details.put("targetOrganizationId", targetOrganizationId);
+        return new BusinessRuleException(
+                "ORGANIZATION_RELATIONSHIP_CYCLE_NOT_ALLOWED",
+                "Relationship would create a cycle in the customer/supplier graph.",
+                details);
+    }
+
+    private Map<String, Object> fieldDetails(String field, String value) {
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("field", field);
+        details.put("value", value);
+        return details;
     }
 }

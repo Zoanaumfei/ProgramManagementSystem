@@ -12,7 +12,9 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -53,12 +55,15 @@ class AccessOrganizationControllerTest {
                         .content("""
                                 {
                                   "name": "Core Customer",
-                                  "code": "CORE-CUSTOMER"
+                                  "code": "CORE-CUSTOMER",
+                                  "cnpj": "11.222.333/0001-81"
                                 }
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("CORE-CUSTOMER"))
+                .andExpect(jsonPath("$.cnpj").value("11222333000181"))
                 .andExpect(jsonPath("$.tenantType").value("EXTERNAL"))
+                .andExpect(jsonPath("$.reused").value(false))
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
@@ -71,48 +76,217 @@ class AccessOrganizationControllerTest {
                 .content("""
                                 {
                                   "name": "Core Customer Updated",
-                                  "code": "CORE-CUSTOMER-UPD"
+                                  "code": "CORE-CUSTOMER-UPD",
+                                  "cnpj": "22.333.444/0001-81"
                                 }
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(organizationId))
                 .andExpect(jsonPath("$.name").value("Core Customer Updated"))
+                .andExpect(jsonPath("$.cnpj").value("22333444000181"))
                 .andExpect(jsonPath("$.code").value("CORE-CUSTOMER-UPD"));
     }
 
     @Test
-    void externalAdminShouldManageChildOrganizationThroughCoreAccessRoute() throws Exception {
-        String childResponse = mockMvc.perform(post("/api/access/organizations")
+    void externalAdminShouldCreateSupplierRelationshipThroughCoreAccessRoute() throws Exception {
+        String supplierResponse = mockMvc.perform(post("/api/access/organizations")
                         .with(externalAdminTenantA())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "name": "Tenant A Tier 1",
-                                  "code": "TENANT-A-T1",
-                                  "parentOrganizationId": "tenant-a"
+                                  "name": "Gestamp",
+                                  "code": "GESTAMP",
+                                  "cnpj": "33.444.555/0001-81"
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.parentOrganizationId").value("tenant-a"))
+                .andExpect(jsonPath("$.cnpj").value("33444555000181"))
+                .andExpect(jsonPath("$.reused").value(false))
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
 
-        String organizationId = objectMapper.readTree(childResponse).get("id").asText();
+        String organizationId = objectMapper.readTree(supplierResponse).get("id").asText();
 
         mockMvc.perform(put("/api/access/organizations/" + organizationId)
                         .with(externalAdminTenantA())
                         .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                                 {
-                                  "name": "Tenant A Tier 1 Updated",
-                                  "code": "TENANT-A-T1-UPD"
+                                  "name": "Gestamp Updated",
+                                  "code": "GESTAMP-UPD",
+                                  "cnpj": "33.444.555/0001-81"
                                 }
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(organizationId))
-                .andExpect(jsonPath("$.customerOrganizationId").value("tenant-a"))
-                .andExpect(jsonPath("$.code").value("TENANT-A-T1-UPD"));
+                .andExpect(jsonPath("$.code").value("GESTAMP-UPD"));
+
+        mockMvc.perform(get("/api/access/organizations/tenant-a/relationships")
+                        .with(externalAdminTenantA()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].targetOrganizationId", hasItem(organizationId)))
+                .andExpect(jsonPath("$[*].relationshipType", hasItem("CUSTOMER_SUPPLIER")));
+    }
+
+    @Test
+    void externalAdminShouldReuseExistingOrganizationByCnpj() throws Exception {
+        String firstResponse = mockMvc.perform(post("/api/access/organizations")
+                        .with(externalAdminTenantA())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "Delga",
+                                  "code": "DELGA",
+                                  "cnpj": "45.723.174/0001-10"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        String firstOrganizationId = objectMapper.readTree(firstResponse).get("id").asText();
+
+        String secondResponse = mockMvc.perform(post("/api/access/organizations")
+                        .with(externalAdminTenantA())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "Delga Alternative Name",
+                                  "code": "DELGA-ALT",
+                                  "cnpj": "45.723.174/0001-10"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(firstOrganizationId))
+                .andExpect(jsonPath("$.code").value("DELGA"))
+                .andExpect(jsonPath("$.cnpj").value("45723174000110"))
+                .andExpect(jsonPath("$.reused").value(true))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        String secondOrganizationId = objectMapper.readTree(secondResponse).get("id").asText();
+        org.assertj.core.api.Assertions.assertThat(secondOrganizationId).isEqualTo(firstOrganizationId);
+    }
+
+    @Test
+    void shouldReturnStableErrorCodeWhenOrganizationCodeAlreadyExists() throws Exception {
+        mockMvc.perform(post("/api/access/organizations")
+                        .with(internalAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "Customer One",
+                                  "code": "SHARED-CODE",
+                                  "cnpj": "11.222.333/0001-81"
+                                }
+                                """))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/access/organizations")
+                        .with(internalAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "Customer Two",
+                                  "code": "SHARED-CODE",
+                                  "cnpj": "22.333.444/0001-81"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Bad Request"))
+                .andExpect(jsonPath("$.code").value("ORGANIZATION_CODE_ALREADY_EXISTS"))
+                .andExpect(jsonPath("$.details.field").value("code"))
+                .andExpect(jsonPath("$.details.value").value("SHARED-CODE"));
+    }
+
+    @Test
+    void shouldPurgeOrganizationSubtreeEvenWhenRelationshipsAreInactive() throws Exception {
+        String relationshipResponse = mockMvc.perform(post("/api/access/organizations/tenant-b/relationships")
+                        .with(internalAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "targetOrganizationId": "tenant-a",
+                                  "relationshipType": "PARTNER"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        String relationshipId = objectMapper.readTree(relationshipResponse).get("id").asText();
+
+        mockMvc.perform(delete("/api/access/organizations/tenant-b/relationships/" + relationshipId)
+                        .with(internalAdmin()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("INACTIVE"));
+
+        mockMvc.perform(post("/api/access/organizations/tenant-a/purge-subtree")
+                        .with(internalSupport())
+                        .param("supportOverride", "true")
+                        .param("justification", "Cleanup after offboarding"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.organizationId").value("tenant-a"))
+                .andExpect(jsonPath("$.action").value("PURGE"))
+                .andExpect(jsonPath("$.status").value("OK"));
+
+        mockMvc.perform(get("/api/access/organizations")
+                        .with(internalAdmin()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].id", not(hasItem("tenant-a"))));
+    }
+
+    @Test
+    void shouldPurgeOrganizationSubtreeAndRemoveMembershipsThatReferenceIt() throws Exception {
+        String createUserResponse = mockMvc.perform(post("/api/access/users")
+                        .with(internalAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "displayName": "Cross Tenant User",
+                                  "email": "cross.tenant.user@oryzem.com",
+                                  "organizationId": "tenant-b",
+                                  "roles": ["MEMBER"]
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        String userId = objectMapper.readTree(createUserResponse).get("id").asText();
+
+        mockMvc.perform(post("/api/access/users/" + userId + "/memberships")
+                        .with(internalAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "tenantId": "TEN-tenant-a",
+                                  "organizationId": "tenant-a",
+                                  "roles": ["MEMBER"],
+                                  "defaultMembership": false,
+                                  "status": "ACTIVE"
+                                }
+                                """))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/api/access/organizations/tenant-a/purge-subtree")
+                        .with(internalSupport())
+                        .param("supportOverride", "true")
+                        .param("justification", "Cleanup memberships before purge"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.organizationId").value("tenant-a"))
+                .andExpect(jsonPath("$.status").value("OK"));
+
+        mockMvc.perform(get("/api/access/users/" + userId + "/memberships")
+                        .with(internalAdmin()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].organizationId", hasItem("tenant-b")))
+                .andExpect(jsonPath("$[*].organizationId", not(hasItem("tenant-a"))));
     }
 
     private org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor internalAdmin() {
@@ -131,5 +305,14 @@ class AccessOrganizationControllerTest {
                         .claim("email", "admin.a@tenant.com")
                         .claim("token_use", "access"))
                 .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
+    }
+
+    private org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor internalSupport() {
+        return jwt().jwt(jwt -> jwt
+                        .claim("sub", "support@oryzem.com-sub")
+                        .claim("cognito:username", "support@oryzem.com")
+                        .claim("email", "support@oryzem.com")
+                        .claim("token_use", "access"))
+                .authorities(new SimpleGrantedAuthority("ROLE_SUPPORT"));
     }
 }

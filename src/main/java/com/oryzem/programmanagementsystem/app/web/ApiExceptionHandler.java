@@ -3,6 +3,7 @@ package com.oryzem.programmanagementsystem.app.web;
 import com.oryzem.programmanagementsystem.platform.audit.RequestCorrelationContext;
 import com.oryzem.programmanagementsystem.platform.auth.AuthenticationFailedException;
 import com.oryzem.programmanagementsystem.platform.shared.ConflictException;
+import com.oryzem.programmanagementsystem.platform.shared.BusinessRuleException;
 import com.oryzem.programmanagementsystem.platform.shared.FeatureTemporarilyUnavailableException;
 import com.oryzem.programmanagementsystem.platform.shared.RateLimitExceededException;
 import com.oryzem.programmanagementsystem.platform.shared.ResourceNotFoundException;
@@ -14,6 +15,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -69,12 +71,51 @@ public class ApiExceptionHandler {
                 .body(errorBody(request, HttpStatus.BAD_REQUEST, "Bad Request", message, null));
     }
 
+    @ExceptionHandler(BusinessRuleException.class)
+    public ResponseEntity<Map<String, Object>> handleBusinessRule(
+            BusinessRuleException exception,
+            HttpServletRequest request) {
+        Map<String, Object> extras = new LinkedHashMap<>();
+        extras.put("code", exception.code());
+        if (!exception.details().isEmpty()) {
+            extras.put("details", exception.details());
+        }
+        return ResponseEntity.badRequest()
+                .body(errorBody(request, HttpStatus.BAD_REQUEST, "Bad Request", exception.getMessage(), extras));
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> handleIllegalArgument(
             IllegalArgumentException exception,
             HttpServletRequest request) {
         return ResponseEntity.badRequest()
                 .body(errorBody(request, HttpStatus.BAD_REQUEST, "Bad Request", exception.getMessage(), null));
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<Map<String, Object>> handleDataIntegrityViolation(
+            DataIntegrityViolationException exception,
+            HttpServletRequest request) {
+        if (isOrganizationPurgeMembershipConstraint(request, exception)) {
+            Map<String, Object> extras = new LinkedHashMap<>();
+            extras.put("code", "ORGANIZATION_PURGE_BLOCKED_BY_MEMBERSHIPS");
+            extras.put("hint", "Remova ou revise os vínculos de acesso relacionados a esta organização antes de tentar o purge novamente.");
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(errorBody(
+                            request,
+                            HttpStatus.CONFLICT,
+                            "Conflict",
+                            "Quase la: ainda existem vínculos de acesso ligados a esta organização, então não consegui concluir o purge.",
+                            extras));
+        }
+
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(errorBody(
+                        request,
+                        HttpStatus.CONFLICT,
+                        "Conflict",
+                        "Nao foi possivel concluir a operacao porque ainda existem dados relacionados a este registro.",
+                        Map.of("code", "DATA_INTEGRITY_VIOLATION")));
     }
 
     @ExceptionHandler(AuthenticationFailedException.class)
@@ -166,5 +207,19 @@ public class ApiExceptionHandler {
 
     private String formatFieldError(FieldError fieldError) {
         return fieldError.getField() + ": " + fieldError.getDefaultMessage();
+    }
+
+    private boolean isOrganizationPurgeMembershipConstraint(
+            HttpServletRequest request,
+            DataIntegrityViolationException exception) {
+        if (request == null || request.getRequestURI() == null || !request.getRequestURI().contains("/purge-subtree")) {
+            return false;
+        }
+        String message = exception.getMessage();
+        if (message == null) {
+            return false;
+        }
+        return message.contains("fk_user_membership_organization")
+                || message.contains("\"user_membership\"");
     }
 }

@@ -36,9 +36,10 @@ app:
     seed-data: ${APP_BOOTSTRAP_SEED_DATA:false}
     internal-admin:
       enabled: ${APP_BOOTSTRAP_INTERNAL_ADMIN_ENABLED:true}
-      email: ${APP_BOOTSTRAP_INTERNAL_ADMIN_EMAIL:vanderson.verza@gmail.com.br}
+      email: ${APP_BOOTSTRAP_INTERNAL_ADMIN_EMAIL:vanderson.verza@gmail.com}
       display-name: ${APP_BOOTSTRAP_INTERNAL_ADMIN_DISPLAY_NAME:Vanderson Verza}
       prune-other-internal-users: ${APP_BOOTSTRAP_INTERNAL_ADMIN_PRUNE_OTHER_INTERNAL_USERS:true}
+      prune-to-internal-core: ${APP_BOOTSTRAP_INTERNAL_ADMIN_PRUNE_TO_INTERNAL_CORE:true}
       password: ${APP_BOOTSTRAP_INTERNAL_ADMIN_PASSWORD:}
       temporary-password: ${APP_BOOTSTRAP_INTERNAL_ADMIN_TEMPORARY_PASSWORD:}
   security:

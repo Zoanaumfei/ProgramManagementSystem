@@ -82,19 +82,21 @@ class UserManagementControllerSecurityTest {
     }
 
     @Test
-    void externalAdminShouldCreateLifecycleOnlyUser() throws Exception {
+    void externalAdminShouldCreateUserWithInitialMembership() throws Exception {
         mockMvc.perform(post("/api/access/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
                                   "displayName": "New Member",
-                                  "email": "new.member@tenant.com"
+                                  "email": "new.member@tenant.com",
+                                  "organizationId": "tenant-a",
+                                  "roles": ["MEMBER"]
                                 }
                                 """)
                         .with(jwtFor("admin.a@tenant.com", "ROLE_ADMIN")))
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", org.hamcrest.Matchers.containsString("/api/access/users/")))
-                .andExpect(jsonPath("$.membershipAssigned").value(false))
+                .andExpect(jsonPath("$.membershipAssigned").value(true))
                 .andExpect(jsonPath("$.status").value("INVITED"));
 
         StubUserIdentityGateway stubGateway = (StubUserIdentityGateway) userIdentityGateway;
@@ -147,6 +149,22 @@ class UserManagementControllerSecurityTest {
     }
 
     @Test
+    void internalAdminShouldPurgeInactiveUserWhenIdentityIsAlreadyMissing() throws Exception {
+        mockMvc.perform(delete("/api/access/users/USR-EXT-B-MEM-001")
+                        .with(jwtFor("admin@oryzem.com", "ROLE_ADMIN")))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(post("/api/access/users/USR-EXT-B-MEM-001/purge")
+                        .param("supportOverride", "true")
+                        .param("justification", "Cleanup of orphaned user after manual Cognito removal")
+                        .with(jwtFor("admin@oryzem.com", "ROLE_ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.action").value("PURGE"));
+
+        Assertions.assertThat(userRepository.findById("USR-EXT-B-MEM-001")).isEmpty();
+    }
+
+    @Test
     void shouldRequireVerifiedEmailBeforeResetAccess() throws Exception {
         StubUserIdentityGateway stubGateway = (StubUserIdentityGateway) userIdentityGateway;
         stubGateway.markRecoveryChannelUnverified("member.b@tenant.com");
@@ -164,7 +182,9 @@ class UserManagementControllerSecurityTest {
                         .content("""
                                 {
                                   "displayName": "Invited Member",
-                                  "email": "invited.member@tenant.com"
+                                  "email": "invited.member@tenant.com",
+                                  "organizationId": "tenant-a",
+                                  "roles": ["MEMBER"]
                                 }
                                 """)
                         .with(jwtFor("admin.a@tenant.com", "ROLE_ADMIN")))
@@ -174,20 +194,6 @@ class UserManagementControllerSecurityTest {
                 .getContentAsString();
 
         String createdUserId = objectMapper.readTree(response).get("id").asText();
-
-        mockMvc.perform(post("/api/access/users/" + createdUserId + "/bootstrap-membership")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "organizationId": "tenant-a",
-                                  "roles": ["MEMBER"],
-                                  "status": "ACTIVE"
-                                }
-                                """)
-                        .with(jwtFor("admin.a@tenant.com", "ROLE_ADMIN")))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.organizationId").value("tenant-a"))
-                .andExpect(jsonPath("$.roles[0]").value("MEMBER"));
 
         mockMvc.perform(get("/api/auth/me")
                         .with(jwtFor("invited.member@tenant.com", "ROLE_MEMBER")))

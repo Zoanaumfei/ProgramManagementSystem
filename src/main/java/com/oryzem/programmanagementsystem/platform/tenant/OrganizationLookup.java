@@ -32,12 +32,10 @@ public interface OrganizationLookup {
             String id,
             String name,
             String code,
+            String cnpj,
             String tenantId,
             String marketId,
             TenantType tenantType,
-            boolean active,
-            String parentOrganizationId,
-            String customerOrganizationId,
-            Integer hierarchyLevel) {
+            boolean active) {
     }
 }

@@ -1,6 +1,5 @@
 package com.oryzem.programmanagementsystem.platform.access;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.oryzem.programmanagementsystem.app.bootstrap.BootstrapDataService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,8 +37,6 @@ class TenantOperationalControlsTest {
     @Autowired
     private TenantRateLimitingFilter tenantRateLimitingFilter;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
-
     @BeforeEach
     void setUp() {
         bootstrapDataService.reset();
@@ -67,29 +64,15 @@ class TenantOperationalControlsTest {
 
     @Test
     void shouldApplyMembershipQuotaByTenantTier() throws Exception {
-        String createUserResponse = mockMvc.perform(post("/api/access/users")
+        mockMvc.perform(post("/api/access/users")
                         .with(jwtFor("admin.a@tenant.com", "ROLE_ADMIN"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
                                   "displayName": "Quota User",
-                                  "email": "quota.user@tenant.com"
-                                }
-                                """))
-                .andExpect(status().isCreated())
-                .andReturn()
-                .getResponse()
-                .getContentAsString();
-        String userId = objectMapper.readTree(createUserResponse).get("id").asText();
-
-        mockMvc.perform(post("/api/access/users/" + userId + "/bootstrap-membership")
-                        .with(jwtFor("admin.a@tenant.com", "ROLE_ADMIN"))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
+                                  "email": "quota.user@tenant.com",
                                   "organizationId": "tenant-a",
-                                  "roles": ["MEMBER"],
-                                  "status": "ACTIVE"
+                                  "roles": ["MEMBER"]
                                 }
                                 """))
                 .andExpect(status().isConflict())

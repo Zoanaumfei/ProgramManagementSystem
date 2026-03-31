@@ -6,6 +6,7 @@
 - an operator-facing organization export surface now exists for offboarded tenants with audited start/complete transitions
 - organization relationship management now exists with explicit `CUSTOMER_SUPPLIER` and `PARTNER` edges
 - organization-scoped orphan discovery now exists through `GET /api/access/users/orphans`
+- organization subtree purge now clears relationship rows that reference the subtree, including inactive ones, before physical deletion
 - the current ECS test environment intentionally runs tenant rate limiting in local mode until a shared Redis dependency is added for that stack
 
 ## Medium priority

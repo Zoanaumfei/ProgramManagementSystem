@@ -7,12 +7,10 @@ record OrganizationResponse(
         String id,
         String name,
         String code,
+        String cnpj,
         String tenantId,
         String marketId,
         TenantType tenantType,
-        String parentOrganizationId,
-        String customerOrganizationId,
-        Integer hierarchyLevel,
         int childrenCount,
         boolean hasChildren,
         OrganizationStatus status,
@@ -21,7 +19,8 @@ record OrganizationResponse(
         boolean canInactivate,
         String inactivationBlockedReason,
         Instant createdAt,
-        Instant updatedAt) {
+        Instant updatedAt,
+        boolean reused) {
 
     static OrganizationResponse from(
             OrganizationEntity organization,
@@ -30,16 +29,32 @@ record OrganizationResponse(
             OrganizationUserSummaryResponse userSummary,
             boolean canInactivate,
             String inactivationBlockedReason) {
+        return from(
+                organization,
+                childrenCount,
+                setupStatus,
+                userSummary,
+                canInactivate,
+                inactivationBlockedReason,
+                false);
+    }
+
+    static OrganizationResponse from(
+            OrganizationEntity organization,
+            int childrenCount,
+            OrganizationSetupStatus setupStatus,
+            OrganizationUserSummaryResponse userSummary,
+            boolean canInactivate,
+            String inactivationBlockedReason,
+            boolean reused) {
         return new OrganizationResponse(
                 organization.getId(),
                 organization.getName(),
                 organization.getCode(),
+                organization.getCnpj(),
                 organization.getTenantId(),
                 organization.getMarketId(),
                 organization.getTenantType(),
-                null,
-                null,
-                null,
                 childrenCount,
                 childrenCount > 0,
                 organization.getStatus(),
@@ -48,7 +63,8 @@ record OrganizationResponse(
                 canInactivate,
                 inactivationBlockedReason,
                 organization.getCreatedAt(),
-                organization.getUpdatedAt());
+                organization.getUpdatedAt(),
+                reused);
     }
 }
 

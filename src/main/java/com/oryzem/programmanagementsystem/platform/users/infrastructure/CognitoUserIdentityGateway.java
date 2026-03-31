@@ -39,6 +39,7 @@ import software.amazon.awssdk.services.cognitoidentityprovider.model.InvalidPara
 import software.amazon.awssdk.services.cognitoidentityprovider.model.LimitExceededException;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.MessageActionType;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.NotAuthorizedException;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.UsernameExistsException;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.VerifyUserAttributeRequest;
 
 final class CognitoUserIdentityGateway implements UserIdentityGateway, CurrentUserEmailVerificationGateway, AutoCloseable {
@@ -57,12 +58,18 @@ final class CognitoUserIdentityGateway implements UserIdentityGateway, CurrentUs
 
     @Override
     public void createUser(ManagedUser user) {
-        client.adminCreateUser(AdminCreateUserRequest.builder()
-                .userPoolId(properties.userPoolId())
-                .username(requiredIdentityUsername(user))
-                .desiredDeliveryMediums(DeliveryMediumType.EMAIL)
-                .userAttributes(attributes(user))
-                .build());
+        try {
+            client.adminCreateUser(AdminCreateUserRequest.builder()
+                    .userPoolId(properties.userPoolId())
+                    .username(requiredIdentityUsername(user))
+                    .desiredDeliveryMediums(DeliveryMediumType.EMAIL)
+                    .userAttributes(attributes(user))
+                    .build());
+        } catch (UsernameExistsException exception) {
+            throw new ConflictException(
+                    "A user account with this email already exists in Cognito. Use the existing account or clean it up before retrying.",
+                    exception);
+        }
     }
 
     @Override

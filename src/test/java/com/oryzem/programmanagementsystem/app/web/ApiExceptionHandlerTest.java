@@ -4,10 +4,12 @@ import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.blankOrNullString;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -49,6 +51,17 @@ class ApiExceptionHandlerTest {
                 .andExpect(jsonPath("$.correlationId", not(blankOrNullString())));
     }
 
+    @Test
+    void shouldReturnFriendlyConflictForPurgeBlockedByMembershipReferences() throws Exception {
+        mockMvc.perform(post("/api/access/organizations/ORG-123/purge-subtree")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_SUPPORT"))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("Conflict"))
+                .andExpect(jsonPath("$.code").value("ORGANIZATION_PURGE_BLOCKED_BY_MEMBERSHIPS"))
+                .andExpect(jsonPath("$.message").value("Quase la: ainda existem vínculos de acesso ligados a esta organização, então não consegui concluir o purge."))
+                .andExpect(jsonPath("$.hint").value("Remova ou revise os vínculos de acesso relacionados a esta organização antes de tentar o purge novamente."));
+    }
+
     @TestConfiguration
     static class TestConfig {
 
@@ -64,6 +77,13 @@ class ApiExceptionHandlerTest {
         @GetMapping("/api/test/boom")
         String boom() {
             throw new RuntimeException("boom");
+        }
+
+        @org.springframework.web.bind.annotation.PostMapping("/api/access/organizations/ORG-123/purge-subtree")
+        String purgeBoom() {
+            throw new DataIntegrityViolationException(
+                    "ERROR: update or delete on table \"organization\" violates foreign key constraint "
+                            + "\"fk_user_membership_organization\" on table \"user_membership\"");
         }
     }
 }

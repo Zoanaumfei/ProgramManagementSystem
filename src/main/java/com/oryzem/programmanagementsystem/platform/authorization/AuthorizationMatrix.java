@@ -48,7 +48,7 @@ public class AuthorizationMatrix {
 
     private void grantAdmin(EnumMap<Role, Map<AppModule, Map<Action, Set<AuthorizationRestriction>>>> matrix) {
         grant(matrix, Role.ADMIN, AppModule.USERS, Action.VIEW, Action.CREATE, Action.EDIT, Action.DELETE,
-                Action.RESET_ACCESS, Action.RESEND_INVITE, Action.ASSIGN_ROLE);
+                Action.RESET_ACCESS, Action.RESEND_INVITE, Action.ASSIGN_ROLE, Action.PURGE);
         grant(matrix, Role.ADMIN, AppModule.TENANT, Action.VIEW, Action.CREATE, Action.EDIT, Action.DELETE,
                 Action.CONFIGURE, Action.MANAGE_INTEGRATION);
         grant(matrix, Role.ADMIN, AppModule.AUDIT, Action.VIEW, Action.EXPORT, Action.VIEW_SECURITY_EVENTS);

@@ -49,7 +49,7 @@ class BootstrapDataServiceTest {
 
     @BeforeEach
     void setUp() {
-        resetWithProperties(new BootstrapProperties(false, new BootstrapProperties.InternalAdminProperties(false, null, null, false, null, null)));
+        resetWithProperties(new BootstrapProperties(false, new BootstrapProperties.InternalAdminProperties(false, null, null, false, false, null, null)));
         clearStubIdentityGatewayIfPresent();
     }
 
@@ -71,6 +71,7 @@ class BootstrapDataServiceTest {
                         "bootstrap.admin@oryzem.com",
                         "Bootstrap Admin",
                         false,
+                        false,
                         "PermanentPassword123!",
                         "TempPassword123!")));
 
@@ -91,6 +92,7 @@ class BootstrapDataServiceTest {
                         true,
                         "bootstrap.admin@oryzem.com",
                         "Bootstrap Admin",
+                        false,
                         false,
                         "PermanentPassword123!",
                         "TempPassword123!"));
@@ -123,6 +125,7 @@ class BootstrapDataServiceTest {
                         "bootstrap.admin@oryzem.com",
                         "Bootstrap Admin",
                         false,
+                        false,
                         "PermanentPassword123!",
                         "TempPassword123!")));
 
@@ -140,6 +143,7 @@ class BootstrapDataServiceTest {
                                 true,
                                 "recovery.admin@oryzem.com",
                                 "Recovery Admin",
+                                false,
                                 false,
                                 "PermanentPassword123!",
                                 "TempPassword123!")));
@@ -162,6 +166,7 @@ class BootstrapDataServiceTest {
                         true,
                         "vanderson.verza@gmail.com",
                         "Vanderson Verza",
+                        false,
                         false,
                         "PermanentPassword123!",
                         "TempPassword123!")));
@@ -200,6 +205,7 @@ class BootstrapDataServiceTest {
                                 "vanderson.verza@gmail.com",
                                 "Vanderson Verza",
                                 true,
+                                false,
                                 "PermanentPassword123!",
                                 "TempPassword123!")));
 
@@ -207,6 +213,46 @@ class BootstrapDataServiceTest {
 
         Assertions.assertThat(userRepository.findByEmailIgnoreCase("vanderson.verza@gmail.com")).isPresent();
         Assertions.assertThat(userRepository.findByEmailIgnoreCase("admin@oryzem.com")).isNotPresent();
+    }
+
+    @Test
+    void shouldPruneToInternalCoreSkeletonWhenExplicitlyEnabled() {
+        resetWithProperties(new BootstrapProperties(true, new BootstrapProperties.InternalAdminProperties(false, null, null, false, false, null, null)));
+
+        Assertions.assertThat(organizationLookup.findById("tenant-a")).isPresent();
+        Assertions.assertThat(userRepository.findByEmailIgnoreCase("admin.a@tenant.com")).isPresent();
+
+        BootstrapDataService service = new BootstrapDataService(
+                userRepository,
+                auditTrailService,
+                accessContextService,
+                accessContextResetService,
+                organizationBootstrapPort,
+                organizationResetPort,
+                userIdentityGateway,
+                new BootstrapProperties(
+                        true,
+                        new BootstrapProperties.InternalAdminProperties(
+                                true,
+                                "vanderson.verza@gmail.com",
+                                "Vanderson Verza",
+                                true,
+                                true,
+                                "PermanentPassword123!",
+                                "TempPassword123!")));
+
+        service.seedIfEmpty();
+
+        Assertions.assertThat(organizationLookup.findById("internal-core")).isPresent();
+        Assertions.assertThat(organizationLookup.findById("tenant-a")).isNotPresent();
+        Assertions.assertThat(organizationLookup.findById("tenant-b")).isNotPresent();
+        Assertions.assertThat(userRepository.findAll())
+                .extracting(ManagedUser::email)
+                .containsExactly("vanderson.verza@gmail.com");
+        Assertions.assertThat(accessContextService.resolvePrimaryOrganizationId(
+                        userRepository.findByEmailIgnoreCase("vanderson.verza@gmail.com").orElseThrow()))
+                .contains("internal-core");
+        assertBootstrapRoles(Role.ADMIN, Role.SUPPORT, Role.AUDITOR);
     }
 
     private void resetWithProperties(BootstrapProperties properties) {

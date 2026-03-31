@@ -1,5 +1,6 @@
 package com.oryzem.programmanagementsystem.platform.tenant;
 
+import java.util.Collection;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -17,4 +18,13 @@ interface OrganizationRelationshipRepository extends JpaRepository<OrganizationR
             String sourceOrganizationId,
             OrganizationRelationshipType relationshipType,
             OrganizationRelationshipStatus status);
+
+    java.util.Optional<OrganizationRelationshipEntity> findBySourceOrganizationIdAndTargetOrganizationIdAndRelationshipType(
+            String sourceOrganizationId,
+            String targetOrganizationId,
+            OrganizationRelationshipType relationshipType);
+
+    long deleteBySourceOrganizationIdInOrTargetOrganizationIdIn(
+            Collection<String> sourceOrganizationIds,
+            Collection<String> targetOrganizationIds);
 }

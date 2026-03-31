@@ -6,7 +6,10 @@ import com.oryzem.programmanagementsystem.platform.authorization.AuthenticatedUs
 import com.oryzem.programmanagementsystem.platform.authorization.AuthorizationContext;
 import com.oryzem.programmanagementsystem.platform.authorization.AuthorizationDecision;
 import com.oryzem.programmanagementsystem.platform.authorization.AuthorizationService;
+import com.oryzem.programmanagementsystem.platform.authorization.Role;
+import com.oryzem.programmanagementsystem.platform.access.AccessContextService;
 import com.oryzem.programmanagementsystem.platform.access.ResolvedMembershipContext;
+import com.oryzem.programmanagementsystem.platform.access.TenantGovernanceService;
 import com.oryzem.programmanagementsystem.platform.users.api.CreateUserRequest;
 import com.oryzem.programmanagementsystem.platform.users.api.UpdateUserRequest;
 import com.oryzem.programmanagementsystem.platform.users.api.UserSummaryResponse;
@@ -15,6 +18,7 @@ import com.oryzem.programmanagementsystem.platform.users.domain.UserIdentityGate
 import com.oryzem.programmanagementsystem.platform.users.domain.UserRepository;
 import com.oryzem.programmanagementsystem.platform.users.domain.UserStatus;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,16 +31,22 @@ class UserCommandService {
     private final AuthorizationService authorizationService;
     private final UserAccessService accessService;
     private final UserIdentityGateway userIdentityGateway;
+    private final AccessContextService accessContextService;
+    private final TenantGovernanceService tenantGovernanceService;
 
     UserCommandService(
             UserRepository userRepository,
             AuthorizationService authorizationService,
             UserAccessService accessService,
-            UserIdentityGateway userIdentityGateway) {
+            UserIdentityGateway userIdentityGateway,
+            AccessContextService accessContextService,
+            TenantGovernanceService tenantGovernanceService) {
         this.userRepository = userRepository;
         this.authorizationService = authorizationService;
         this.accessService = accessService;
         this.userIdentityGateway = userIdentityGateway;
+        this.accessContextService = accessContextService;
+        this.tenantGovernanceService = tenantGovernanceService;
     }
 
     UserSummaryResponse createUser(AuthenticatedUser actor, CreateUserRequest request) {
@@ -44,14 +54,31 @@ class UserCommandService {
         if (userRepository.findByEmailIgnoreCase(normalizedEmail).isPresent()) {
             throw new IllegalArgumentException("A user with this email already exists.");
         }
+        UserAccessService.MembershipAssignment membershipAssignment = accessService.resolveInitialMembershipAssignment(
+                actor,
+                request.organizationId(),
+                request.marketId(),
+                request.roles());
 
         AuthorizationContext context = AuthorizationContext.builder(AppModule.USERS, Action.CREATE)
-                .resourceTenantId(actor.activeTenantId())
-                .resourceTenantType(actor.tenantType())
+                .resourceTenantId(membershipAssignment.tenantId())
+                .resourceTenantType(membershipAssignment.tenantType())
+                .targetRole(request.roles().stream()
+                        .sorted(Comparator.comparing(Enum::name))
+                        .findFirst()
+                        .orElse(Role.MEMBER))
                 .build();
 
         AuthorizationDecision decision = authorizationService.decide(actor, context);
         accessService.assertAllowed(decision);
+        accessService.enforceOrganizationScope(
+                actor,
+                membershipAssignment.organizationId(),
+                membershipAssignment.tenantId(),
+                membershipAssignment.tenantType(),
+                decision.crossTenant(),
+                false);
+        tenantGovernanceService.assertActiveMembershipQuotaAvailable(membershipAssignment.tenantId());
 
         String userId = "USR-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase();
         ManagedUser created = new ManagedUser(
@@ -67,7 +94,15 @@ class UserCommandService {
 
         ManagedUser saved = userRepository.save(created);
         userIdentityGateway.createUser(saved);
-        accessService.recordAudit(actor, actor.activeTenantId(), "USER_CREATE", saved.id(), null, decision.crossTenant());
+        accessContextService.upsertDefaultMembership(
+                saved.id(),
+                membershipAssignment.tenantId(),
+                membershipAssignment.organizationId(),
+                membershipAssignment.marketId(),
+                saved.status(),
+                request.roles(),
+                saved.createdAt());
+        accessService.recordAudit(actor, membershipAssignment.tenantId(), "USER_CREATE", saved.id(), null, decision.crossTenant());
         return accessService.toSummary(saved);
     }
 

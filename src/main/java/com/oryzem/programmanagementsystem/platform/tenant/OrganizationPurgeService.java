@@ -10,7 +10,6 @@ import com.oryzem.programmanagementsystem.platform.authorization.AuthorizationDe
 import com.oryzem.programmanagementsystem.platform.authorization.AuthorizationService;
 import com.oryzem.programmanagementsystem.platform.authorization.Role;
 import java.time.Instant;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import org.springframework.stereotype.Service;
@@ -25,6 +24,7 @@ class OrganizationPurgeService {
     private final AuditTrailService auditTrailService;
     private final OrganizationAccessService accessService;
     private final OrganizationDirectoryService organizationDirectoryService;
+    private final OrganizationRelationshipRepository relationshipRepository;
     private final TenantUserPurgePort tenantUserPurgePort;
 
     OrganizationPurgeService(
@@ -33,12 +33,14 @@ class OrganizationPurgeService {
             AuditTrailService auditTrailService,
             OrganizationAccessService accessService,
             OrganizationDirectoryService organizationDirectoryService,
+            OrganizationRelationshipRepository relationshipRepository,
             TenantUserPurgePort tenantUserPurgePort) {
         this.organizationRepository = organizationRepository;
         this.authorizationService = authorizationService;
         this.auditTrailService = auditTrailService;
         this.accessService = accessService;
         this.organizationDirectoryService = organizationDirectoryService;
+        this.relationshipRepository = relationshipRepository;
         this.tenantUserPurgePort = tenantUserPurgePort;
     }
 
@@ -64,9 +66,11 @@ class OrganizationPurgeService {
 
         Set<String> subtreeOrganizationIds = organizationDirectoryService.collectSubtreeIds(organization.getId());
         int purgedUsers = tenantUserPurgePort.purgeUsersByOrganizationIds(subtreeOrganizationIds);
+        relationshipRepository.deleteBySourceOrganizationIdInOrTargetOrganizationIdIn(
+                subtreeOrganizationIds,
+                subtreeOrganizationIds);
         List<OrganizationEntity> organizationsToPurge = organizationRepository.findAllById(subtreeOrganizationIds).stream()
-                .sorted(Comparator.comparing(OrganizationEntity::getHierarchyLevel).reversed()
-                        .thenComparing(OrganizationEntity::getCreatedAt).reversed())
+                .sorted(java.util.Comparator.comparing(OrganizationEntity::getCreatedAt).reversed())
                 .toList();
         organizationRepository.deleteAll(organizationsToPurge);
 

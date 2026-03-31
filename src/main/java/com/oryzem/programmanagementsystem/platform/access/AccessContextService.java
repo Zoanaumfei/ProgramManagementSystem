@@ -123,6 +123,23 @@ public class AccessContextService {
     }
 
     @Transactional
+    public MembershipPurgeResult deleteMembershipsByOrganizations(Set<String> organizationIds) {
+        if (organizationIds == null || organizationIds.isEmpty()) {
+            return new MembershipPurgeResult(Set.of(), 0);
+        }
+
+        Set<String> affectedUserIds = new LinkedHashSet<>();
+        int purgedMemberships = 0;
+        for (UserMembershipEntity membership : membershipRepository.findAllByOrganizationIdIn(organizationIds)) {
+            membershipRoleRepository.deleteByMembershipId(membership.getId());
+            membershipRepository.deleteById(membership.getId());
+            affectedUserIds.add(membership.getUserId());
+            purgedMemberships++;
+        }
+        return new MembershipPurgeResult(Set.copyOf(affectedUserIds), purgedMemberships);
+    }
+
+    @Transactional
     public MembershipOffboardingResult offboardMembershipsByOrganizations(Set<String> organizationIds, java.time.Instant retentionUntil) {
         if (organizationIds == null || organizationIds.isEmpty()) {
             return new MembershipOffboardingResult(Set.of(), 0);
@@ -150,6 +167,13 @@ public class AccessContextService {
         }
         return membershipRepository.findByUserIdOrderByDefaultMembershipDescJoinedAtAsc(userId).stream()
                 .anyMatch(membership -> membership.getStatus() == MembershipStatus.ACTIVE);
+    }
+
+    public boolean hasMemberships(String userId) {
+        if (!hasText(userId)) {
+            return false;
+        }
+        return !membershipRepository.findByUserIdOrderByDefaultMembershipDescJoinedAtAsc(userId).isEmpty();
     }
 
     public Optional<String> resolvePrimaryOrganizationId(ManagedUser user) {
@@ -400,5 +424,10 @@ public class AccessContextService {
     public record MembershipOffboardingResult(
             Set<String> affectedUserIds,
             int offboardedMemberships) {
+    }
+
+    public record MembershipPurgeResult(
+            Set<String> affectedUserIds,
+            int purgedMemberships) {
     }
 }

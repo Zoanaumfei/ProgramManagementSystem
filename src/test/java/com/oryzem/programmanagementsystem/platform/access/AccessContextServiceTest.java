@@ -105,6 +105,7 @@ class AccessContextServiceTest {
                 "test",
                 "Tenant B",
                 "TENANT-B",
+                "98765432000198",
                 TenantType.EXTERNAL,
                 true);
 

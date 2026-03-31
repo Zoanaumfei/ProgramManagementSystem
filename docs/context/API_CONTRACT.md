@@ -157,12 +157,10 @@ Organization relationship management is part of the active access core.
 - `id`
 - `name`
 - `code`
+- `cnpj`
 - `tenantId`
 - `marketId`
 - `tenantType`
-- `parentOrganizationId`
-- `customerOrganizationId`
-- `hierarchyLevel`
 - `childrenCount`
 - `hasChildren`
 - `status`
@@ -172,6 +170,7 @@ Organization relationship management is part of the active access core.
 - `inactivationBlockedReason`
 - `createdAt`
 - `updatedAt`
+- `reused`
 
 `GET /api/access/organizations/{organizationId}/relationships` returns active organization relationships.
 
@@ -203,11 +202,21 @@ Organization relationship management is part of the active access core.
 - `purgedUsers`
 
 Important behavior:
+- organization identity inside a tenant is canonicalized by `cnpj`
+- `code` remains globally unique across the platform
+- `POST /api/access/organizations` now requires `name`, `code` and `cnpj`
+- when an `EXTERNAL ADMIN` creates an organization, the backend creates or reuses the supplier organization by `tenantId + cnpj`
+- when an existing organization is reused, the backend creates or reactivates the `CUSTOMER_SUPPLIER` relationship from the actor organization to the reused organization
+- create and relationship validation errors can now include a stable business `code` plus optional `details`
 - relationship edges are now the explicit source of truth for organization visibility and subtree traversal
+- the legacy tree fields `parentOrganizationId`, `customerOrganizationId` and `hierarchyLevel` are no longer part of the public contract
+- relationship inactivation keeps the historical row with `status=INACTIVE`; it is not a physical delete
 - `DELETE /api/access/organizations/{organizationId}` now performs subtree offboarding instead of requiring prior manual user revocation
 - offboarding revokes memberships, disables users that lose all active memberships and marks the organization subtree for retention/export handling internally
 - destructive deletion is still explicit through `POST /api/access/organizations/{organizationId}/purge-subtree`
-- child organization creation can return `409 Conflict` when tenant organization quota is exhausted
+- `POST /api/access/organizations/{organizationId}/purge-subtree` now removes both active and inactive relationship edges that reference the subtree before deleting the organizations
+- organization creation can return `409 Conflict` when tenant organization quota is exhausted
+- relationship creation rejects self-links and cycles in the `CUSTOMER_SUPPLIER` graph
 
 ## Markets
 Markets are tenant-scoped and can be inactivated only when not referenced by active memberships or organizations.

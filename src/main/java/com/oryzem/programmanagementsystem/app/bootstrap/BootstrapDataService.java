@@ -63,10 +63,15 @@ public class BootstrapDataService {
     @PostConstruct
     @Transactional
     public void seedIfEmpty() {
-        ensureInternalCoreOrganization();
+        BootstrapProperties.InternalAdminProperties internalAdmin = bootstrapProperties.internalAdmin();
+        if (internalAdmin != null && internalAdmin.pruneToInternalCore()) {
+            resetToInternalCoreSkeleton();
+        } else {
+            ensureInternalCoreOrganization();
 
-        if (bootstrapProperties.seedData() && userRepository.findAll().isEmpty()) {
-            seedUsers();
+            if (bootstrapProperties.seedData() && userRepository.findAll().isEmpty()) {
+                seedUsers();
+            }
         }
 
         ensureBootstrapInternalAdmin();
@@ -84,6 +89,15 @@ public class BootstrapDataService {
             seedUsers();
         }
         ensureBootstrapInternalAdmin();
+    }
+
+    private void resetToInternalCoreSkeleton() {
+        auditTrailService.clear();
+        accessContextResetService.clearMemberships();
+        userRepository.deleteAll();
+        organizationResetPort.clearOrganizations();
+        accessContextResetService.clearTenantsAndMarkets();
+        ensureInternalCoreOrganization();
     }
 
     private void seedUsers() {
@@ -108,6 +122,7 @@ public class BootstrapDataService {
                 BOOTSTRAP_ACTOR,
                 "Oryzem Internal Core",
                 "CORE-INT",
+                null,
                 TenantType.INTERNAL,
                 true);
         organizationBootstrapPort.ensureSeeded(
@@ -115,6 +130,7 @@ public class BootstrapDataService {
                 BOOTSTRAP_ACTOR,
                 "Tenant A",
                 "TENANT-A",
+                "12345678000195",
                 TenantType.EXTERNAL,
                 true);
         organizationBootstrapPort.ensureSeeded(
@@ -122,6 +138,7 @@ public class BootstrapDataService {
                 BOOTSTRAP_ACTOR,
                 "Tenant B",
                 "TENANT-B",
+                "98765432000198",
                 TenantType.EXTERNAL,
                 true);
     }
@@ -132,6 +149,7 @@ public class BootstrapDataService {
                 BOOTSTRAP_ACTOR,
                 "Oryzem Internal Core",
                 "CORE-INT",
+                null,
                 TenantType.INTERNAL,
                 true);
     }
@@ -160,7 +178,7 @@ public class BootstrapDataService {
                 INTERNAL_CORE_ORGANIZATION_ID,
                 null,
                 saved.status(),
-                Set.of(Role.ADMIN),
+                INTERNAL_ADMIN_BREAK_GLASS_ROLES,
                 saved.createdAt());
         pruneOtherInternalUsersIfRequested(internalAdmin, saved.email());
         log.info(
