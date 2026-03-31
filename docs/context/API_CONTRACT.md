@@ -4,6 +4,7 @@
 - `GET /api/auth/me`
 - `POST /api/access/context/activate`
 - `GET /api/access/users`
+- `GET /api/access/users/orphans`
 - `POST /api/access/users`
 - `PUT /api/access/users/{userId}`
 - `DELETE /api/access/users/{userId}`
@@ -17,6 +18,9 @@
 - `DELETE /api/access/users/{userId}/memberships/{membershipId}`
 - `GET /api/access/organizations`
 - `GET /api/access/organizations/{organizationId}`
+- `GET /api/access/organizations/{organizationId}/relationships`
+- `POST /api/access/organizations/{organizationId}/relationships`
+- `DELETE /api/access/organizations/{organizationId}/relationships/{relationshipId}`
 - `POST /api/access/organizations`
 - `PUT /api/access/organizations/{organizationId}`
 - `DELETE /api/access/organizations/{organizationId}`
@@ -101,6 +105,8 @@ Response shape:
 }
 ```
 
+`GET /api/access/users/orphans` returns lifecycle-only users without memberships when the actor is authorized to discover bootstrap targets.
+
 ## Membership admin
 Membership is the first-class access resource.
 
@@ -145,7 +151,7 @@ Important:
 - bootstrap can return `409 Conflict` when the target tenant has reached its active-membership quota
 
 ## Organization admin
-Organization hierarchy management is part of the active access core.
+Organization relationship management is part of the active access core.
 
 `OrganizationResponse` includes:
 - `id`
@@ -167,6 +173,27 @@ Organization hierarchy management is part of the active access core.
 - `createdAt`
 - `updatedAt`
 
+`GET /api/access/organizations/{organizationId}/relationships` returns active organization relationships.
+
+`OrganizationRelationshipResponse` includes:
+- `id`
+- `sourceOrganizationId`
+- `targetOrganizationId`
+- `relationshipType`
+- `status`
+- `createdAt`
+- `updatedAt`
+
+`POST /api/access/organizations/{organizationId}/relationships` accepts:
+```json
+{
+  "targetOrganizationId": "ORG-123",
+  "relationshipType": "CUSTOMER_SUPPLIER"
+}
+```
+
+`DELETE /api/access/organizations/{organizationId}/relationships/{relationshipId}` inactivates the relationship and returns the updated relationship snapshot.
+
 `OrganizationPurgeResponse` includes:
 - `organizationId`
 - `action`
@@ -176,6 +203,7 @@ Organization hierarchy management is part of the active access core.
 - `purgedUsers`
 
 Important behavior:
+- relationship edges are now the explicit source of truth for organization visibility and subtree traversal
 - `DELETE /api/access/organizations/{organizationId}` now performs subtree offboarding instead of requiring prior manual user revocation
 - offboarding revokes memberships, disables users that lose all active memberships and marks the organization subtree for retention/export handling internally
 - destructive deletion is still explicit through `POST /api/access/organizations/{organizationId}/purge-subtree`

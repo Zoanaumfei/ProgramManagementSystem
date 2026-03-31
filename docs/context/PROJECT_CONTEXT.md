@@ -30,7 +30,9 @@ Current implementation status:
 - the frontend error helpers now surface structured `401`/`403` payload messages and correlation ids when the backend provides them
 - membership cards in the users workspace now use an ID-card style layout to surface tenant, organization, market, roles and membership metadata more visually
 - membership cards and user membership snapshots now render the organization hierarchy tree as a breadcrumb such as `Volkswagen -> Gestamp -> Delga` when the visible organization catalog contains the parent chain
-- next access-management step under consideration: expose organization-scoped `users/orphans` so admins can discover users without memberships and bootstrap them explicitly
+- the frontend now consumes the directed relationship model for organizations, including relationship creation/inactivation in the organization workspace and hierarchy breadcrumb rendering from active `CUSTOMER_SUPPLIER` edges
+- organization creation in the frontend no longer asks for `parentOrganizationId`; the old tree fields are now derived from relationships and the organization cards treat direct partners as view-only
+- the backend now exposes `GET /api/access/users/orphans` and organization relationship endpoints for bootstrap discovery and explicit relationship management
 - next access-management step under consideration: standardize 401/403 error payloads with `timestamp`, `status`, `error`, `message`, `path` and `correlationId` so the frontend can show the real refusal reason
 - the published backend environment still needs validation for `GET /api/access/users`, which returned a static-resource-style 404 during frontend testing
 
