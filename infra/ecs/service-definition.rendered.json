@@ -1,7 +1,7 @@
 {
   "cluster": "program-management-system-cluster",
   "serviceName": "program-management-system-service",
-  "taskDefinition": "arn:aws:ecs:sa-east-1:439533253319:task-definition/program-management-system:46",
+  "taskDefinition": "arn:aws:ecs:sa-east-1:439533253319:task-definition/program-management-system:47",
   "desiredCount": 1,
   "launchType": "FARGATE",
   "platformVersion": "LATEST",

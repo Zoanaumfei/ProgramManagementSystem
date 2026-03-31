@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -46,6 +47,18 @@ public class OrganizationRelationshipController {
         OrganizationRelationshipResponse created = relationshipService.createRelationship(actor, organizationId, request);
         return ResponseEntity.created(URI.create("/api/access/organizations/" + organizationId + "/relationships/" + created.id()))
                 .body(created);
+    }
+
+    @PutMapping("/{organizationId}/relationships/{relationshipId}")
+    public ResponseEntity<OrganizationRelationshipResponse> updateRelationship(
+            Authentication authentication,
+            @PathVariable String organizationId,
+            @PathVariable String relationshipId,
+            @Valid @RequestBody UpdateOrganizationRelationshipRequest request) {
+        AuthenticatedUser actor = authenticatedUserMapper.from(authentication);
+        OrganizationRelationshipResponse updated =
+                relationshipService.updateRelationship(actor, organizationId, relationshipId, request);
+        return ResponseEntity.ok(updated);
     }
 
     @DeleteMapping("/{organizationId}/relationships/{relationshipId}")

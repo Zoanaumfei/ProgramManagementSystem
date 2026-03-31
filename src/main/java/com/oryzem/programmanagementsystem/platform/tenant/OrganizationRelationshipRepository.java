@@ -24,6 +24,15 @@ interface OrganizationRelationshipRepository extends JpaRepository<OrganizationR
             String targetOrganizationId,
             OrganizationRelationshipType relationshipType);
 
+    boolean existsBySourceOrganizationIdAndLocalOrganizationCodeIgnoreCase(
+            String sourceOrganizationId,
+            String localOrganizationCode);
+
+    boolean existsBySourceOrganizationIdAndLocalOrganizationCodeIgnoreCaseAndIdNot(
+            String sourceOrganizationId,
+            String localOrganizationCode,
+            String id);
+
     long deleteBySourceOrganizationIdInOrTargetOrganizationIdIn(
             Collection<String> sourceOrganizationIds,
             Collection<String> targetOrganizationIds);

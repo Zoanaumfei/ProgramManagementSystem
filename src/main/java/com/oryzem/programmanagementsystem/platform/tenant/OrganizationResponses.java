@@ -6,7 +6,6 @@ import java.time.Instant;
 record OrganizationResponse(
         String id,
         String name,
-        String code,
         String cnpj,
         String tenantId,
         String marketId,
@@ -50,7 +49,6 @@ record OrganizationResponse(
         return new OrganizationResponse(
                 organization.getId(),
                 organization.getName(),
-                organization.getCode(),
                 organization.getCnpj(),
                 organization.getTenantId(),
                 organization.getMarketId(),

@@ -60,8 +60,8 @@ class OrganizationCommandService {
 
     OrganizationResponse createOrganization(CreateOrganizationRequest request, AuthenticatedUser actor) {
         String normalizedName = normalizeName(request.name());
-        String normalizedCode = normalizeCode(request.code());
         String normalizedCnpj = normalizeCnpj(request.cnpj());
+        String normalizedLocalOrganizationCode = normalizeLocalOrganizationCode(request.localOrganizationCode());
 
         OrganizationEntity organization;
         if (actor != null && actor.tenantType() == TenantType.EXTERNAL) {
@@ -82,7 +82,11 @@ class OrganizationCommandService {
                 if (existingOrganization.getId().equals(managedOrganization.getId())) {
                     throw new IllegalArgumentException("The active organization already uses this CNPJ.");
                 }
-                ensureCustomerSupplierRelationship(managedOrganization, existingOrganization, actor.username());
+                ensureCustomerSupplierRelationship(
+                        managedOrganization,
+                        existingOrganization,
+                        actor.username(),
+                        normalizedLocalOrganizationCode);
                 recordAudit(
                         actor,
                         existingOrganization.getTenantId(),
@@ -92,9 +96,6 @@ class OrganizationCommandService {
                         "{\"reused\":true}");
                 return snapshotService.toResponse(existingOrganization, true);
             }
-            if (organizationRepository.existsByCodeIgnoreCase(normalizedCode)) {
-                throw organizationCodeAlreadyExists(normalizedCode);
-            }
             tenantGovernanceService.assertOrganizationQuotaAvailable(tenantId);
             organization = OrganizationEntity.createExternalForTenant(
                     OrganizationIds.newId("ORG"),
@@ -102,13 +103,9 @@ class OrganizationCommandService {
                     managedOrganization.getMarketId(),
                     actor.username(),
                     normalizedName,
-                    normalizedCode,
                     normalizedCnpj,
                     defaultValue(request.status(), OrganizationStatus.ACTIVE));
         } else {
-            if (organizationRepository.existsByCodeIgnoreCase(normalizedCode)) {
-                throw organizationCodeAlreadyExists(normalizedCode);
-            }
             accessService.assertAllowed(authorizationService.decide(
                     actor,
                     AuthorizationContext.builder(AppModule.TENANT, Action.CREATE).build()));
@@ -118,7 +115,7 @@ class OrganizationCommandService {
             tenantProvisioningService.ensureTenantForRootOrganization(
                     organizationId,
                     normalizedName,
-                    normalizedCode,
+                    tenantCodeForRootOrganization(organizationId, normalizedName, normalizedCnpj, TenantType.EXTERNAL),
                     TenantType.EXTERNAL,
                     defaultValue(request.status(), OrganizationStatus.ACTIVE) == OrganizationStatus.ACTIVE,
                     null,
@@ -128,20 +125,27 @@ class OrganizationCommandService {
                     tenantId,
                     actor.username(),
                     normalizedName,
-                    normalizedCode,
                     normalizedCnpj,
                     defaultValue(request.status(), OrganizationStatus.ACTIVE));
         }
         OrganizationEntity saved = organizationRepository.save(organization);
         if (actor != null && actor.tenantType() == TenantType.EXTERNAL) {
             OrganizationEntity sourceOrganization = accessService.findManagedOrganization(actor.organizationId());
-            ensureCustomerSupplierRelationship(sourceOrganization, saved, actor.username());
+            ensureCustomerSupplierRelationship(
+                    sourceOrganization,
+                    saved,
+                    actor.username(),
+                    normalizedLocalOrganizationCode);
         }
         if (tenantProvisioningService.tenantIdForRootOrganization(saved.getId()).equals(saved.getTenantId())) {
             tenantProvisioningService.ensureTenantForRootOrganization(
                     saved.getId(),
                     saved.getName(),
-                    saved.getCode(),
+                    tenantCodeForRootOrganization(
+                            saved.getId(),
+                            saved.getName(),
+                            saved.getCnpj(),
+                            saved.getTenantType()),
                     saved.getTenantType(),
                     saved.getStatus() == OrganizationStatus.ACTIVE,
                     saved.getCreatedAt(),
@@ -160,16 +164,12 @@ class OrganizationCommandService {
         accessService.assertCanManageOrganization(actor, organization);
         accessService.ensureOrganizationIsMutable(organization);
 
-        String normalizedCode = normalizeCode(request.code());
         String normalizedCnpj = normalizeCnpj(request.cnpj());
-        if (organizationRepository.existsByCodeIgnoreCaseAndIdNot(normalizedCode, organization.getId())) {
-            throw organizationCodeAlreadyExists(normalizedCode);
-        }
         if (organizationRepository.existsByTenantIdAndCnpjAndIdNot(organization.getTenantId(), normalizedCnpj, organization.getId())) {
             throw organizationCnpjAlreadyExistsInTenant(normalizedCnpj);
         }
 
-        organization.updateDetails(actor.username(), normalizeName(request.name()), normalizedCode, normalizedCnpj);
+        organization.updateDetails(actor.username(), normalizeName(request.name()), normalizedCnpj);
         OrganizationEntity saved = organizationRepository.save(organization);
         recordAudit(actor, saved.getTenantId(), "ORGANIZATION_UPDATE", saved.getId(), false, null);
         return snapshotService.toResponse(saved);
@@ -220,12 +220,19 @@ class OrganizationCommandService {
         return value == null ? null : value.trim();
     }
 
-    private String normalizeCode(String value) {
-        return value == null ? null : value.trim().toUpperCase(Locale.ROOT);
-    }
-
     private String normalizeCnpj(String value) {
         return OrganizationCnpj.normalize(value);
+    }
+
+    private String normalizeLocalOrganizationCode(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        return trimmed.toUpperCase(Locale.ROOT);
     }
 
     private <T> T defaultValue(T value, T fallback) {
@@ -267,7 +274,8 @@ class OrganizationCommandService {
     private void ensureCustomerSupplierRelationship(
             OrganizationEntity source,
             OrganizationEntity target,
-            String actor) {
+            String actor,
+            String localOrganizationCode) {
         if (source.getId().equals(target.getId())) {
             return;
         }
@@ -285,21 +293,17 @@ class OrganizationCommandService {
                         source.getId(),
                         target.getId(),
                         OrganizationRelationshipType.CUSTOMER_SUPPLIER,
+                        localOrganizationCode,
                         OrganizationRelationshipStatus.ACTIVE,
                         Instant.now(),
                         Instant.now()));
+        validateLocalOrganizationCode(source.getId(), localOrganizationCode, relationship.getId());
+        relationship.setLocalOrganizationCode(localOrganizationCode);
         if (relationship.getStatus() != OrganizationRelationshipStatus.ACTIVE) {
             relationship.setStatus(OrganizationRelationshipStatus.ACTIVE);
-            relationship.touch(actor);
         }
+        relationship.touch(actor);
         relationshipRepository.save(relationship);
-    }
-
-    private BusinessRuleException organizationCodeAlreadyExists(String code) {
-        return new BusinessRuleException(
-                "ORGANIZATION_CODE_ALREADY_EXISTS",
-                "Organization code already exists.",
-                fieldDetails("code", code));
     }
 
     private BusinessRuleException organizationCnpjAlreadyExistsInTenant(String cnpj) {
@@ -324,5 +328,47 @@ class OrganizationCommandService {
         details.put("field", field);
         details.put("value", value);
         return details;
+    }
+
+    private void validateLocalOrganizationCode(
+            String sourceOrganizationId,
+            String localOrganizationCode,
+            String excludedRelationshipId) {
+        if (localOrganizationCode == null) {
+            return;
+        }
+        boolean exists = excludedRelationshipId == null
+                ? relationshipRepository.existsBySourceOrganizationIdAndLocalOrganizationCodeIgnoreCase(
+                        sourceOrganizationId,
+                        localOrganizationCode)
+                : relationshipRepository.existsBySourceOrganizationIdAndLocalOrganizationCodeIgnoreCaseAndIdNot(
+                        sourceOrganizationId,
+                        localOrganizationCode,
+                        excludedRelationshipId);
+        if (exists) {
+            throw new BusinessRuleException(
+                    "ORGANIZATION_RELATIONSHIP_LOCAL_CODE_ALREADY_EXISTS",
+                    "Local organization code already exists for this organization.",
+                    fieldDetails("localOrganizationCode", localOrganizationCode));
+        }
+    }
+
+    private String tenantCodeForRootOrganization(
+            String organizationId,
+            String organizationName,
+            String cnpj,
+            TenantType tenantType) {
+        if (tenantType == TenantType.INTERNAL) {
+            return ("INT-" + organizationId).toUpperCase(Locale.ROOT);
+        }
+        if (cnpj != null && !cnpj.isBlank()) {
+            return ("ORG-" + cnpj).toUpperCase(Locale.ROOT);
+        }
+        String normalizedName = organizationName == null ? "ORG" : organizationName.trim().toUpperCase(Locale.ROOT);
+        normalizedName = normalizedName.replaceAll("[^A-Z0-9]+", "-").replaceAll("(^-+|-+$)", "");
+        if (normalizedName.isBlank()) {
+            normalizedName = "ORG";
+        }
+        return (normalizedName + "-" + organizationId).substring(0, Math.min((normalizedName + "-" + organizationId).length(), 80));
     }
 }

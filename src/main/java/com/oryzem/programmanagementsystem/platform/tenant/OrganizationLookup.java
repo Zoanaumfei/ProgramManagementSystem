@@ -31,7 +31,6 @@ public interface OrganizationLookup {
     record OrganizationView(
             String id,
             String name,
-            String code,
             String cnpj,
             String tenantId,
             String marketId,

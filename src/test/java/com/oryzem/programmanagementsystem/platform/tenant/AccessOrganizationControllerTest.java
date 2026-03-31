@@ -55,12 +55,10 @@ class AccessOrganizationControllerTest {
                         .content("""
                                 {
                                   "name": "Core Customer",
-                                  "code": "CORE-CUSTOMER",
                                   "cnpj": "11.222.333/0001-81"
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value("CORE-CUSTOMER"))
                 .andExpect(jsonPath("$.cnpj").value("11222333000181"))
                 .andExpect(jsonPath("$.tenantType").value("EXTERNAL"))
                 .andExpect(jsonPath("$.reused").value(false))
@@ -76,15 +74,13 @@ class AccessOrganizationControllerTest {
                 .content("""
                                 {
                                   "name": "Core Customer Updated",
-                                  "code": "CORE-CUSTOMER-UPD",
                                   "cnpj": "22.333.444/0001-81"
                                 }
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(organizationId))
                 .andExpect(jsonPath("$.name").value("Core Customer Updated"))
-                .andExpect(jsonPath("$.cnpj").value("22333444000181"))
-                .andExpect(jsonPath("$.code").value("CORE-CUSTOMER-UPD"));
+                .andExpect(jsonPath("$.cnpj").value("22333444000181"));
     }
 
     @Test
@@ -95,8 +91,8 @@ class AccessOrganizationControllerTest {
                         .content("""
                                 {
                                   "name": "Gestamp",
-                                  "code": "GESTAMP",
-                                  "cnpj": "33.444.555/0001-81"
+                                  "cnpj": "33.444.555/0001-81",
+                                  "localOrganizationCode": "GESTAMP"
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -114,19 +110,19 @@ class AccessOrganizationControllerTest {
                 .content("""
                                 {
                                   "name": "Gestamp Updated",
-                                  "code": "GESTAMP-UPD",
                                   "cnpj": "33.444.555/0001-81"
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(organizationId))
-                .andExpect(jsonPath("$.code").value("GESTAMP-UPD"));
+                .andExpect(jsonPath("$.id").value(organizationId));
 
         mockMvc.perform(get("/api/access/organizations/tenant-a/relationships")
                         .with(externalAdminTenantA()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[*].targetOrganizationId", hasItem(organizationId)))
-                .andExpect(jsonPath("$[*].relationshipType", hasItem("CUSTOMER_SUPPLIER")));
+                .andExpect(jsonPath("$[*].relationshipType", hasItem("CUSTOMER_SUPPLIER")))
+                .andExpect(jsonPath("$[?(@.targetOrganizationId == '" + organizationId + "')].localOrganizationCode")
+                        .value(hasItem("GESTAMP")));
     }
 
     @Test
@@ -137,7 +133,6 @@ class AccessOrganizationControllerTest {
                         .content("""
                                 {
                                   "name": "Delga",
-                                  "code": "DELGA",
                                   "cnpj": "45.723.174/0001-10"
                                 }
                                 """))
@@ -154,13 +149,11 @@ class AccessOrganizationControllerTest {
                         .content("""
                                 {
                                   "name": "Delga Alternative Name",
-                                  "code": "DELGA-ALT",
                                   "cnpj": "45.723.174/0001-10"
                                 }
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(firstOrganizationId))
-                .andExpect(jsonPath("$.code").value("DELGA"))
                 .andExpect(jsonPath("$.cnpj").value("45723174000110"))
                 .andExpect(jsonPath("$.reused").value(true))
                 .andReturn()
@@ -172,33 +165,33 @@ class AccessOrganizationControllerTest {
     }
 
     @Test
-    void shouldReturnStableErrorCodeWhenOrganizationCodeAlreadyExists() throws Exception {
+    void shouldReturnStableErrorCodeWhenLocalOrganizationCodeAlreadyExistsForSameSource() throws Exception {
         mockMvc.perform(post("/api/access/organizations")
-                        .with(internalAdmin())
+                        .with(externalAdminTenantA())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
                                   "name": "Customer One",
-                                  "code": "SHARED-CODE",
-                                  "cnpj": "11.222.333/0001-81"
+                                  "cnpj": "11.222.333/0001-81",
+                                  "localOrganizationCode": "SHARED-CODE"
                                 }
                                 """))
                 .andExpect(status().isOk());
 
         mockMvc.perform(post("/api/access/organizations")
-                        .with(internalAdmin())
+                        .with(externalAdminTenantA())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
                                   "name": "Customer Two",
-                                  "code": "SHARED-CODE",
-                                  "cnpj": "22.333.444/0001-81"
+                                  "cnpj": "22.333.444/0001-81",
+                                  "localOrganizationCode": "SHARED-CODE"
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("Bad Request"))
-                .andExpect(jsonPath("$.code").value("ORGANIZATION_CODE_ALREADY_EXISTS"))
-                .andExpect(jsonPath("$.details.field").value("code"))
+                .andExpect(jsonPath("$.code").value("ORGANIZATION_RELATIONSHIP_LOCAL_CODE_ALREADY_EXISTS"))
+                .andExpect(jsonPath("$.details.field").value("localOrganizationCode"))
                 .andExpect(jsonPath("$.details.value").value("SHARED-CODE"));
     }
 
@@ -238,6 +231,39 @@ class AccessOrganizationControllerTest {
                         .with(internalAdmin()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[*].id", not(hasItem("tenant-a"))));
+    }
+
+    @Test
+    void shouldUpdateRelationshipLocalOrganizationCode() throws Exception {
+        String relationshipResponse = mockMvc.perform(post("/api/access/organizations/tenant-b/relationships")
+                        .with(internalAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "targetOrganizationId": "tenant-a",
+                                  "relationshipType": "PARTNER",
+                                  "localOrganizationCode": "TENANT-A-PARTNER"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.localOrganizationCode").value("TENANT-A-PARTNER"))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        String relationshipId = objectMapper.readTree(relationshipResponse).get("id").asText();
+
+        mockMvc.perform(put("/api/access/organizations/tenant-b/relationships/" + relationshipId)
+                        .with(internalAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "localOrganizationCode": "TENANT-A-PARTNER-UPD"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(relationshipId))
+                .andExpect(jsonPath("$.localOrganizationCode").value("TENANT-A-PARTNER-UPD"));
     }
 
     @Test

@@ -159,11 +159,10 @@ class CoreSaasHardeningIntegrationTest {
                         .with(jwtFor("admin.a@tenant.com", "ROLE_ADMIN"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {
-                                  "name": "Tenant A Subsidiary",
-                                  "code": "TENANT-A-SUB",
-                                  "cnpj": "55.666.777/0001-81"
-                                }
+                      {
+                        "name": "Tenant A Subsidiary",
+                        "cnpj": "55.666.777/0001-81"
+                      }
                                 """))
                 .andExpect(status().isOk())
                 .andReturn()

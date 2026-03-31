@@ -122,7 +122,6 @@ public class OrganizationDirectoryService implements OrganizationLookup, Organiz
             String organizationId,
             String actor,
             String name,
-            String code,
             String cnpj,
             TenantType tenantType,
             boolean active) {
@@ -133,7 +132,7 @@ public class OrganizationDirectoryService implements OrganizationLookup, Organiz
                 tenantProvisioningService.ensureTenantForRootOrganization(
                         organizationId,
                         name.trim(),
-                        code.trim().toUpperCase(),
+                        tenantCodeForRootOrganization(organizationId, name, cnpj, tenantType),
                         TenantType.INTERNAL,
                         active,
                         null,
@@ -143,14 +142,13 @@ public class OrganizationDirectoryService implements OrganizationLookup, Organiz
                         tenantId,
                         actor,
                         name.trim(),
-                        code.trim().toUpperCase(),
                         OrganizationCnpj.normalize(cnpj),
                         active ? OrganizationStatus.ACTIVE : OrganizationStatus.INACTIVE);
             } else {
                 tenantProvisioningService.ensureTenantForRootOrganization(
                         organizationId,
                         name.trim(),
-                        code.trim().toUpperCase(),
+                        tenantCodeForRootOrganization(organizationId, name, cnpj, tenantType),
                         TenantType.EXTERNAL,
                         active,
                         null,
@@ -160,7 +158,6 @@ public class OrganizationDirectoryService implements OrganizationLookup, Organiz
                         tenantId,
                         actor,
                         name.trim(),
-                        code.trim().toUpperCase(),
                         OrganizationCnpj.normalize(cnpj),
                         active ? OrganizationStatus.ACTIVE : OrganizationStatus.INACTIVE);
             }
@@ -169,7 +166,7 @@ public class OrganizationDirectoryService implements OrganizationLookup, Organiz
             tenantProvisioningService.ensureTenantForRootOrganization(
                     saved.getId(),
                     saved.getName(),
-                    saved.getCode(),
+                    tenantCodeForRootOrganization(saved.getId(), saved.getName(), saved.getCnpj(), saved.getTenantType()),
                     saved.getTenantType(),
                     saved.getStatus() == OrganizationStatus.ACTIVE,
                     saved.getCreatedAt(),
@@ -189,11 +186,30 @@ public class OrganizationDirectoryService implements OrganizationLookup, Organiz
         return new OrganizationView(
                 organization.getId(),
                 organization.getName(),
-                organization.getCode(),
                 organization.getCnpj(),
                 organization.getTenantId(),
                 organization.getMarketId(),
                 organization.getTenantType(),
                 organization.getStatus() == OrganizationStatus.ACTIVE);
+    }
+
+    private String tenantCodeForRootOrganization(
+            String organizationId,
+            String organizationName,
+            String cnpj,
+            TenantType tenantType) {
+        if (tenantType == TenantType.INTERNAL) {
+            return ("INT-" + organizationId).toUpperCase(java.util.Locale.ROOT);
+        }
+        if (cnpj != null && !cnpj.isBlank()) {
+            return ("ORG-" + cnpj).toUpperCase(java.util.Locale.ROOT);
+        }
+        String normalizedName = organizationName == null ? "ORG" : organizationName.trim().toUpperCase(java.util.Locale.ROOT);
+        normalizedName = normalizedName.replaceAll("[^A-Z0-9]+", "-").replaceAll("(^-+|-+$)", "");
+        if (normalizedName.isBlank()) {
+            normalizedName = "ORG";
+        }
+        String candidate = normalizedName + "-" + organizationId;
+        return candidate.substring(0, Math.min(candidate.length(), 80));
     }
 }

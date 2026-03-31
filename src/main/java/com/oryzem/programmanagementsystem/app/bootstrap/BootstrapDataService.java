@@ -121,7 +121,6 @@ public class BootstrapDataService {
                 INTERNAL_CORE_ORGANIZATION_ID,
                 BOOTSTRAP_ACTOR,
                 "Oryzem Internal Core",
-                "CORE-INT",
                 null,
                 TenantType.INTERNAL,
                 true);
@@ -129,7 +128,6 @@ public class BootstrapDataService {
                 "tenant-a",
                 BOOTSTRAP_ACTOR,
                 "Tenant A",
-                "TENANT-A",
                 "12345678000195",
                 TenantType.EXTERNAL,
                 true);
@@ -137,7 +135,6 @@ public class BootstrapDataService {
                 "tenant-b",
                 BOOTSTRAP_ACTOR,
                 "Tenant B",
-                "TENANT-B",
                 "98765432000198",
                 TenantType.EXTERNAL,
                 true);
@@ -148,7 +145,6 @@ public class BootstrapDataService {
                 INTERNAL_CORE_ORGANIZATION_ID,
                 BOOTSTRAP_ACTOR,
                 "Oryzem Internal Core",
-                "CORE-INT",
                 null,
                 TenantType.INTERNAL,
                 true);

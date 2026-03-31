@@ -4,13 +4,12 @@ import jakarta.validation.constraints.NotBlank;
 
 record CreateOrganizationRequest(
         @NotBlank String name,
-        @NotBlank String code,
         @NotBlank String cnpj,
-        OrganizationStatus status) {
+        OrganizationStatus status,
+        String localOrganizationCode) {
 }
 
 record UpdateOrganizationRequest(
         @NotBlank String name,
-        @NotBlank String code,
         @NotBlank String cnpj) {
 }

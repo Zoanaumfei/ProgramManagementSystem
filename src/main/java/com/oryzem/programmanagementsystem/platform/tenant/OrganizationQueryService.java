@@ -50,7 +50,7 @@ class OrganizationQueryService {
 
         String normalizedSearch = search.trim().toLowerCase(Locale.ROOT);
         return organization.name().toLowerCase(Locale.ROOT).contains(normalizedSearch)
-                || organization.code().toLowerCase(Locale.ROOT).contains(normalizedSearch)
+                || (organization.cnpj() != null && organization.cnpj().toLowerCase(Locale.ROOT).contains(normalizedSearch))
                 || organization.id().toLowerCase(Locale.ROOT).contains(normalizedSearch);
     }
 

@@ -14,6 +14,7 @@ class OrganizationRelationshipEntity extends JpaAuditableEntity {
     private String sourceOrganizationId;
     private String targetOrganizationId;
     private OrganizationRelationshipType relationshipType;
+    private String localOrganizationCode;
     private OrganizationRelationshipStatus status;
 
     protected OrganizationRelationshipEntity() {
@@ -25,6 +26,7 @@ class OrganizationRelationshipEntity extends JpaAuditableEntity {
             String sourceOrganizationId,
             String targetOrganizationId,
             OrganizationRelationshipType relationshipType,
+            String localOrganizationCode,
             OrganizationRelationshipStatus status,
             Instant createdAt,
             Instant updatedAt) {
@@ -33,6 +35,7 @@ class OrganizationRelationshipEntity extends JpaAuditableEntity {
         relationship.sourceOrganizationId = sourceOrganizationId;
         relationship.targetOrganizationId = targetOrganizationId;
         relationship.relationshipType = relationshipType;
+        relationship.localOrganizationCode = localOrganizationCode;
         relationship.status = status;
         relationship.setCreatedAt(createdAt != null ? createdAt : Instant.now());
         relationship.setUpdatedAt(updatedAt != null ? updatedAt : relationship.getCreatedAt());
@@ -65,6 +68,15 @@ class OrganizationRelationshipEntity extends JpaAuditableEntity {
 
     protected void setRelationshipType(OrganizationRelationshipType relationshipType) {
         this.relationshipType = relationshipType;
+    }
+
+    @Column(name = "local_organization_code", length = 80)
+    public String getLocalOrganizationCode() {
+        return localOrganizationCode;
+    }
+
+    protected void setLocalOrganizationCode(String localOrganizationCode) {
+        this.localOrganizationCode = localOrganizationCode;
     }
 
     @Enumerated(EnumType.STRING)

@@ -60,22 +60,52 @@ class OrganizationRelationshipService {
         OrganizationEntity target = findManagedOrganization(request.targetOrganizationId());
         authorizeRelationshipMutation(actor, source, target);
         validateRelationship(source, target, request.relationshipType());
+        String normalizedLocalOrganizationCode = normalizeLocalOrganizationCode(request.localOrganizationCode());
 
-        OrganizationRelationshipEntity saved = relationshipRepository
+        OrganizationRelationshipEntity existing = relationshipRepository
                 .findBySourceOrganizationIdAndTargetOrganizationIdAndRelationshipType(
                         source.getId(),
                         target.getId(),
                         request.relationshipType())
-                .map(existing -> reactivateRelationship(existing, actor.username()))
+                .orElse(null);
+        String excludedRelationshipId = existing != null ? existing.getId() : null;
+        validateLocalOrganizationCode(source.getId(), normalizedLocalOrganizationCode, excludedRelationshipId);
+
+        OrganizationRelationshipEntity saved = java.util.Optional.ofNullable(existing)
+                .map(relationship -> reactivateRelationship(relationship, actor.username(), normalizedLocalOrganizationCode))
                 .orElseGet(() -> relationshipRepository.save(OrganizationRelationshipEntity.create(
                         OrganizationIds.newId("REL"),
                         actor.username(),
                         source.getId(),
                         target.getId(),
                         request.relationshipType(),
+                        normalizedLocalOrganizationCode,
                         OrganizationRelationshipStatus.ACTIVE,
                         Instant.now(),
                         Instant.now())));
+        return OrganizationRelationshipResponse.from(saved);
+    }
+
+    OrganizationRelationshipResponse updateRelationship(
+            AuthenticatedUser actor,
+            String organizationId,
+            String relationshipId,
+            UpdateOrganizationRelationshipRequest request) {
+        OrganizationEntity source = findManagedOrganization(organizationId);
+        OrganizationRelationshipEntity relationship = relationshipRepository.findById(relationshipId)
+                .orElseThrow(() -> new ResourceNotFoundException("OrganizationRelationship", relationshipId));
+        if (!source.getId().equals(relationship.getSourceOrganizationId())) {
+            throw new ResourceNotFoundException("OrganizationRelationship", relationshipId);
+        }
+        OrganizationEntity target = findManagedOrganization(relationship.getTargetOrganizationId());
+        authorizeRelationshipMutation(actor, source, target);
+
+        String normalizedLocalOrganizationCode = normalizeLocalOrganizationCode(request.localOrganizationCode());
+        validateLocalOrganizationCode(source.getId(), normalizedLocalOrganizationCode, relationship.getId());
+
+        relationship.setLocalOrganizationCode(normalizedLocalOrganizationCode);
+        relationship.touch(actor.username());
+        OrganizationRelationshipEntity saved = relationshipRepository.save(relationship);
         return OrganizationRelationshipResponse.from(saved);
     }
 
@@ -144,13 +174,51 @@ class OrganizationRelationshipService {
 
     private OrganizationRelationshipEntity reactivateRelationship(
             OrganizationRelationshipEntity relationship,
-            String actor) {
+            String actor,
+            String localOrganizationCode) {
+        boolean changed = !java.util.Objects.equals(relationship.getLocalOrganizationCode(), localOrganizationCode);
+        relationship.setLocalOrganizationCode(localOrganizationCode);
         if (relationship.getStatus() == OrganizationRelationshipStatus.ACTIVE) {
+            if (changed) {
+                relationship.touch(actor);
+                return relationshipRepository.save(relationship);
+            }
             return relationship;
         }
         relationship.setStatus(OrganizationRelationshipStatus.ACTIVE);
         relationship.touch(actor);
         return relationshipRepository.save(relationship);
+    }
+
+    private void validateLocalOrganizationCode(
+            String sourceOrganizationId,
+            String localOrganizationCode,
+            String excludedRelationshipId) {
+        if (localOrganizationCode == null) {
+            return;
+        }
+        boolean exists = excludedRelationshipId == null
+                ? relationshipRepository.existsBySourceOrganizationIdAndLocalOrganizationCodeIgnoreCase(
+                        sourceOrganizationId,
+                        localOrganizationCode)
+                : relationshipRepository.existsBySourceOrganizationIdAndLocalOrganizationCodeIgnoreCaseAndIdNot(
+                        sourceOrganizationId,
+                        localOrganizationCode,
+                        excludedRelationshipId);
+        if (exists) {
+            throw localOrganizationCodeAlreadyExists(sourceOrganizationId, localOrganizationCode);
+        }
+    }
+
+    private String normalizeLocalOrganizationCode(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        return trimmed.toUpperCase(java.util.Locale.ROOT);
     }
 
     private OrganizationEntity findManagedOrganization(String organizationId) {
@@ -176,6 +244,19 @@ class OrganizationRelationshipService {
         return new BusinessRuleException(
                 "ORGANIZATION_RELATIONSHIP_CYCLE_NOT_ALLOWED",
                 "Relationship would create a cycle in the customer/supplier graph.",
+                details);
+    }
+
+    private BusinessRuleException localOrganizationCodeAlreadyExists(
+            String sourceOrganizationId,
+            String localOrganizationCode) {
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("field", "localOrganizationCode");
+        details.put("value", localOrganizationCode);
+        details.put("sourceOrganizationId", sourceOrganizationId);
+        return new BusinessRuleException(
+                "ORGANIZATION_RELATIONSHIP_LOCAL_CODE_ALREADY_EXISTS",
+                "Local organization code already exists for this organization.",
                 details);
     }
 }

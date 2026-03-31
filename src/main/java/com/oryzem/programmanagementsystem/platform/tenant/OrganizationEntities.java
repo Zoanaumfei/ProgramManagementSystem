@@ -12,7 +12,6 @@ import jakarta.persistence.Table;
 class OrganizationEntity extends JpaAuditableEntity {
 
     private String name;
-    private String code;
     private OrganizationStatus status;
     private TenantType tenantType;
     private String tenantId;
@@ -33,13 +32,11 @@ class OrganizationEntity extends JpaAuditableEntity {
             String tenantId,
             String actor,
             String name,
-            String code,
             String cnpj,
             OrganizationStatus status) {
         OrganizationEntity organization = new OrganizationEntity();
         organization.initialize(organizationId, actor);
         organization.name = name;
-        organization.code = code;
         organization.cnpj = cnpj;
         organization.status = status;
         organization.tenantType = TenantType.EXTERNAL;
@@ -55,13 +52,11 @@ class OrganizationEntity extends JpaAuditableEntity {
             String marketId,
             String actor,
             String name,
-            String code,
             String cnpj,
             OrganizationStatus status) {
         OrganizationEntity organization = new OrganizationEntity();
         organization.initialize(organizationId, actor);
         organization.name = name;
-        organization.code = code;
         organization.cnpj = cnpj;
         organization.status = status;
         organization.tenantType = TenantType.EXTERNAL;
@@ -77,13 +72,11 @@ class OrganizationEntity extends JpaAuditableEntity {
             String tenantId,
             String actor,
             String name,
-            String code,
             String cnpj,
             OrganizationStatus status) {
         OrganizationEntity organization = new OrganizationEntity();
         organization.initialize(organizationId, actor);
         organization.name = name;
-        organization.code = code;
         organization.cnpj = cnpj;
         organization.status = status;
         organization.tenantType = TenantType.INTERNAL;
@@ -93,9 +86,8 @@ class OrganizationEntity extends JpaAuditableEntity {
         return organization;
     }
 
-    void updateDetails(String actor, String name, String code, String cnpj) {
+    void updateDetails(String actor, String name, String cnpj) {
         this.name = name;
-        this.code = code;
         this.cnpj = cnpj;
         touch(actor);
     }
@@ -168,15 +160,6 @@ class OrganizationEntity extends JpaAuditableEntity {
 
     protected void setName(String name) {
         this.name = name;
-    }
-
-    @Column(length = 80, nullable = false, unique = true)
-    public String getCode() {
-        return code;
-    }
-
-    protected void setCode(String code) {
-        this.code = code;
     }
 
     @Enumerated(EnumType.STRING)

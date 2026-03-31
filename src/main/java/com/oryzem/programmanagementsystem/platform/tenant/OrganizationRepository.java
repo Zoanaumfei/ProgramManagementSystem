@@ -12,10 +12,6 @@ public interface OrganizationRepository extends JpaRepository<OrganizationEntity
 
     boolean existsByMarketId(String marketId);
 
-    boolean existsByCodeIgnoreCase(String code);
-
-    boolean existsByCodeIgnoreCaseAndIdNot(String code, String id);
-
     Optional<OrganizationEntity> findByTenantIdAndCnpj(String tenantId, String cnpj);
 
     boolean existsByTenantIdAndCnpjAndIdNot(String tenantId, String cnpj, String id);

@@ -6,7 +6,12 @@ import java.time.Instant;
 
 record CreateOrganizationRelationshipRequest(
         @NotBlank String targetOrganizationId,
-        @NotNull OrganizationRelationshipType relationshipType) {
+        @NotNull OrganizationRelationshipType relationshipType,
+        String localOrganizationCode) {
+}
+
+record UpdateOrganizationRelationshipRequest(
+        String localOrganizationCode) {
 }
 
 record OrganizationRelationshipResponse(
@@ -14,6 +19,7 @@ record OrganizationRelationshipResponse(
         String sourceOrganizationId,
         String targetOrganizationId,
         OrganizationRelationshipType relationshipType,
+        String localOrganizationCode,
         OrganizationRelationshipStatus status,
         Instant createdAt,
         Instant updatedAt) {
@@ -24,6 +30,7 @@ record OrganizationRelationshipResponse(
                 relationship.getSourceOrganizationId(),
                 relationship.getTargetOrganizationId(),
                 relationship.getRelationshipType(),
+                relationship.getLocalOrganizationCode(),
                 relationship.getStatus(),
                 relationship.getCreatedAt(),
                 relationship.getUpdatedAt());

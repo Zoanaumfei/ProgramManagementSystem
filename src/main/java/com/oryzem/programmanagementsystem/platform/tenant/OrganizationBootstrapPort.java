@@ -8,7 +8,6 @@ public interface OrganizationBootstrapPort {
             String organizationId,
             String actor,
             String name,
-            String code,
             String cnpj,
             TenantType tenantType,
             boolean active);
