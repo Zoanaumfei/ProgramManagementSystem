@@ -49,15 +49,15 @@ class OrganizationExportControllerTest {
 
     @Test
     void shouldStartAndCompleteExportForOffboardedOrganization() throws Exception {
+        double offboardBefore = offboardCountFor("TEN-tenant-b");
+        double exportRequestedBefore = exportRequestedCountFor("TEN-tenant-b");
+        double exportCompletedBefore = exportCompletedCountFor("TEN-tenant-b");
+
         mockMvc.perform(delete("/api/access/organizations/tenant-b")
                         .with(internalAdmin()))
                 .andExpect(status().isOk());
 
-        Assertions.assertThat(meterRegistry.get("oryzem.operational.events")
-                        .tag("eventType", "organization_offboard")
-                        .tag("tenantId", "TEN-tenant-b")
-                        .counter()
-                        .count())
+        Assertions.assertThat(offboardCountFor("TEN-tenant-b") - offboardBefore)
                 .isEqualTo(1.0d);
 
         mockMvc.perform(post("/api/access/organizations/tenant-b/exports")
@@ -96,18 +96,10 @@ class OrganizationExportControllerTest {
                 .extracting(event -> event.eventType())
                 .contains("ORGANIZATION_EXPORT_REQUESTED", "ORGANIZATION_EXPORT_COMPLETED");
 
-        Assertions.assertThat(meterRegistry.get("oryzem.operational.events")
-                        .tag("eventType", "organization_export_requested")
-                        .tag("tenantId", "TEN-tenant-b")
-                        .counter()
-                        .count())
+        Assertions.assertThat(exportRequestedCountFor("TEN-tenant-b") - exportRequestedBefore)
                 .isEqualTo(1.0d);
 
-        Assertions.assertThat(meterRegistry.get("oryzem.operational.events")
-                        .tag("eventType", "organization_export_completed")
-                        .tag("tenantId", "TEN-tenant-b")
-                        .counter()
-                        .count())
+        Assertions.assertThat(exportCompletedCountFor("TEN-tenant-b") - exportCompletedBefore)
                 .isEqualTo(1.0d);
     }
 
@@ -132,5 +124,25 @@ class OrganizationExportControllerTest {
                         .claim("email", "admin@oryzem.com")
                         .claim("token_use", "access"))
                 .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
+    }
+
+    private double offboardCountFor(String tenantId) {
+        return countOperationalEvent("organization_offboard", tenantId);
+    }
+
+    private double exportRequestedCountFor(String tenantId) {
+        return countOperationalEvent("organization_export_requested", tenantId);
+    }
+
+    private double exportCompletedCountFor(String tenantId) {
+        return countOperationalEvent("organization_export_completed", tenantId);
+    }
+
+    private double countOperationalEvent(String eventType, String tenantId) {
+        io.micrometer.core.instrument.Counter counter = meterRegistry.find("oryzem.operational.events")
+                .tag("eventType", eventType)
+                .tag("tenantId", tenantId)
+                .counter();
+        return counter != null ? counter.count() : 0.0d;
     }
 }

@@ -14,7 +14,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest(classes = com.oryzem.programmanagementsystem.app.ProgramManagementSystemApplication.class)
+@SpringBootTest(
+        classes = com.oryzem.programmanagementsystem.app.ProgramManagementSystemApplication.class,
+        properties = "management.health.redis.enabled=false")
 @AutoConfigureMockMvc
 class PingControllerSecurityTest {
 
