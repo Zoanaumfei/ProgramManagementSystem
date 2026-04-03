@@ -1,14 +1,4 @@
--- Permanently remove dormant runtime surfaces outside the active User + Organization core.
-
-DELETE FROM role_permission
-WHERE permission_code LIKE 'portfolio.%'
-   OR permission_code LIKE 'operations.%'
-   OR permission_code LIKE 'reports.%';
-
-DELETE FROM app_permission
-WHERE code LIKE 'portfolio.%'
-   OR code LIKE 'operations.%'
-   OR code LIKE 'reports.%';
+-- Permanently remove obsolete runtime surfaces outside the active core.
 
 DROP TABLE IF EXISTS deliverable_document;
 DROP TABLE IF EXISTS deliverable;
