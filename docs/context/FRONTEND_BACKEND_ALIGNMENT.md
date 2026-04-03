@@ -128,6 +128,7 @@ The active frontend source tree is not fully present in this repository, so the 
 - organization management is expected to use the directed relationship model and stop rendering a derived single-path breadcrumb for organization visibility
 - frontend error helpers are expected to surface backend-provided refusal reasons and `correlationId`
 - frontend administrative workspaces now surface structured `401`/`403` data from the backend without overwriting the refusal reason with a generic fallback; the visible copy preserves `message`, `path` and `correlationId` in users, organizations and session diagnostics flows
+- frontend runtime config now upgrades `http` API bases to `https` when served from an `https` app origin so the published shell does not keep an insecure backend URL by accident
 
 ## Operational validations still pending
 - the published backend environment was revalidated on `2026-04-01`: `GET /api/access/users` now returns structured `401 Unauthorized` for anonymous requests, confirming that the route is served by the secured backend controller path rather than a static-resource `404`

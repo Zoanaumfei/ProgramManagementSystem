@@ -94,6 +94,23 @@ class AuthControllerSecurityTest {
     }
 
     @Test
+    void loginShouldReturnStructuredBadRequestWhenJsonBodyIsMalformed() throws Exception {
+        mockMvc.perform(post("/public/auth/login")
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "member@oryzem.com",
+                                  "password":
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Bad Request"))
+                .andExpect(jsonPath("$.message").value("Malformed JSON request body."))
+                .andExpect(jsonPath("$.path").value("/public/auth/login"))
+                .andExpect(jsonPath("$.correlationId").isNotEmpty());
+    }
+
+    @Test
     void shouldCompleteNewPasswordAndPasswordResetFlowsWithStubGateway() throws Exception {
         String challengeResponse = mockMvc.perform(post("/public/auth/login")
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)

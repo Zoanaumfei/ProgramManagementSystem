@@ -44,6 +44,7 @@ The frontend source tree is not the active implementation focus of this reposito
 - frontend error handling should surface backend-provided `401`/`403` messages and `correlationId` values consistently
 - the frontend admin rollout for structured `401`/`403` is now implemented in the active frontend workspace: `/workspace/users`, `/workspace/organizations` and `/workspace/session` preserve backend `message`, `path` and `correlationId` instead of collapsing those cases into generic errors
 - frontend regression coverage now includes structured security-error handling for `/api/auth/me`, `/api/access/users` and `/api/access/organizations`, including visible `correlationId` assertions in the admin UI
+- frontend environment resolution now auto-upgrades an insecure `http` API base URL to `https` whenever the app itself is running under an `https` origin, reducing published mixed-content failures during auth/login
 - the published backend environment was revalidated on `2026-04-01`: `GET /api/access/users` now resolves through the secured backend route and returns structured `401 Unauthorized` for anonymous traffic instead of the previously reported static-resource-style `404`
 
 ## Core themes
