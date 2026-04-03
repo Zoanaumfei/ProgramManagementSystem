@@ -1,5 +1,5 @@
 param(
-    [string]$BaseUrl = 'http://program-management-system-alb-1082436660.sa-east-1.elb.amazonaws.com',
+    [string]$BaseUrl = 'https://program-management-system-alb-1082436660.sa-east-1.elb.amazonaws.com',
     [string]$AccessToken,
     [switch]$SkipHttpChecks
 )

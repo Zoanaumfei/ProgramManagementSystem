@@ -45,3 +45,21 @@ The task role still needs Cognito administrative permissions used by the active 
 3. render the task definition with `scripts/render-ecs-task-definition.ps1`
 4. update or create the ECS service
 5. validate the authenticated core flows and runbook references
+
+## Public HTTPS on the ALB
+The ECS service does not provision the load balancer listener itself.
+Use `scripts/enable-alb-https.ps1` to attach an ACM certificate, add the HTTPS listener on port `443`, and redirect `80 -> 443`.
+
+Example:
+```powershell
+.\scripts\enable-alb-https.ps1 `
+  -LoadBalancerArn arn:aws:elasticloadbalancing:sa-east-1:439533253319:loadbalancer/app/program-management-system-alb/... `
+  -CertificateArn arn:aws:acm:sa-east-1:439533253319:certificate/... `
+  -TargetGroupArn arn:aws:elasticloadbalancing:sa-east-1:439533253319:targetgroup/program-management-system-alb-tg/1425d73086a3393d
+```
+
+The published frontend should then use `https://` for the API base URL.
+
+## Historical reference
+
+The full published API HTTPS setup, DNS, ALB, certificate and verification history are documented in `docs/runbooks/PUBLIC_API_HTTPS.md`.

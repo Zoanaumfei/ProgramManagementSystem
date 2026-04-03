@@ -15,8 +15,11 @@ import tools.jackson.databind.json.JsonMapper;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.hamcrest.Matchers.containsString;
 
 @SpringBootTest(classes = com.oryzem.programmanagementsystem.app.ProgramManagementSystemApplication.class)
 @AutoConfigureMockMvc
@@ -43,6 +46,19 @@ class AuthControllerSecurityTest {
                 .andExpect(jsonPath("$.mode").value("custom-login-ready"))
                 .andExpect(jsonPath("$.issuerUri").isNotEmpty())
                 .andExpect(jsonPath("$.appClientId").isNotEmpty());
+    }
+
+    @Test
+    void loginPreflightShouldReturnCorsHeadersForPublishedFrontendOrigin() throws Exception {
+        mockMvc.perform(options("/public/auth/login")
+                        .header("Origin", "https://oryzem.com")
+                        .header("Access-Control-Request-Method", "POST")
+                        .header("Access-Control-Request-Headers", "content-type,accept"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "https://oryzem.com"))
+                .andExpect(header().string("Access-Control-Allow-Methods", containsString("POST")))
+                .andExpect(header().string("Access-Control-Allow-Headers", containsString("content-type")))
+                .andExpect(header().string("Access-Control-Allow-Headers", containsString("accept")));
     }
 
     @Test
