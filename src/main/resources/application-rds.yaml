@@ -13,6 +13,7 @@ spring:
         tcpKeepAlive: true
   flyway:
     clean-disabled: true
+    validate-on-migrate: false
 
 app:
   bootstrap:
