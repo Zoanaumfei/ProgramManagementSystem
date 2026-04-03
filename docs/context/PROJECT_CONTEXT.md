@@ -34,6 +34,7 @@ The frontend source tree is not the active implementation focus of this reposito
 
 - the active frontend direction remains the access-first workspace flow centered on `/workspace`, `/workspace/users`, `/workspace/organizations`, `/workspace/markets` and `/workspace/session`
 - the active frontend workspace now also includes `/workspace/operations` for operational visibility over `429`, `409`, offboarding and export workflow
+- the operational dashboard is backed by `GET /api/admin/operational/overview`, which returns aggregated KPIs, series, top tenants, tenant drill-down details, alerts and recent events
 - the users experience should consume `/api/access/users` and membership APIs as the primary access-management surface
 - the users workspace may expose a dedicated `Usuarios sem membership` diagnostic view backed by `/api/access/users/orphans`, explicitly positioned as data-repair tooling rather than the normal onboarding path
 - user creation in the frontend should require `organizationId`, optional `marketId` and non-empty `roles` so the first membership is provisioned in the same request

@@ -16,7 +16,6 @@
 ## Open high priority gaps
 - validate the published environment end-to-end so the frontend consistently receives the structured `401`/`403` payloads already implemented in the backend
 - tighten operational dashboards around new offboarding, quota and rate-limit audit signals
-- implement the aggregated operational overview endpoint for the frontend dashboard, including tenant drill-down details and alert snapshots
 
 ## Open medium priority gaps
 - expose richer tenant directory data if the client needs more than the current tenant summary response
