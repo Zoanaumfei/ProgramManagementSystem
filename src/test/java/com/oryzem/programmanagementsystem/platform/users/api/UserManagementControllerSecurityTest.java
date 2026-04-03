@@ -205,6 +205,33 @@ class UserManagementControllerSecurityTest {
         Assertions.assertThat(activatedUser.identitySubject()).isEqualTo("invited.member@tenant.com-sub");
     }
 
+    @Test
+    void shouldRejectLifecycleOperationsForOrphanUser() throws Exception {
+        userRepository.save(new ManagedUser(
+                "USR-ORPHAN-001",
+                "orphan.user@tenant.com",
+                null,
+                "Orphan User",
+                "orphan.user@tenant.com",
+                UserStatus.INVITED,
+                java.time.Instant.now(),
+                null,
+                null));
+
+        mockMvc.perform(put("/api/access/users/USR-ORPHAN-001")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "displayName": "Orphan User Updated",
+                                  "email": "orphan.user.updated@tenant.com"
+                                }
+                                """)
+                        .with(jwtFor("admin@oryzem.com", "ROLE_ADMIN")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("ORPHAN_USER_DETECTED"))
+                .andExpect(jsonPath("$.details.userId").value("USR-ORPHAN-001"));
+    }
+
     private org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor jwtFor(
             String username,
             String authority) {

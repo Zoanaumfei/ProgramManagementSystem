@@ -25,16 +25,18 @@ Why:
 - system is not yet in production
 - reducing conceptual duplication now is cheaper than a long coexistence window later
 
-## ADR-004 app_user is identity-only and first membership bootstrap is explicit
+## ADR-004 app_user is identity-only and standard onboarding provisions the first membership immediately
 Decision:
 - `app_user` stores only identity and lifecycle data
 - legacy `app_user.role`, `app_user.tenant_id` and `app_user.tenant_type` are removed from the physical schema
 - `/api/access/users` remains the lifecycle surface
-- first membership assignment happens through `/api/access/users/{userId}/bootstrap-membership`
+- standard user creation now provisions the first membership inside `POST /api/access/users`
+- `POST /api/access/users/{userId}/bootstrap-membership` remains available only for lifecycle-only users that still need a first membership assigned later
 
 Why:
 - runtime authorization already belongs to membership, so keeping access snapshots in `app_user` creates duplicate truth
-- splitting bootstrap from lifecycle makes the admin contract easier to reason about and safer to evolve
+- provisioning the first membership during standard user creation reduces failed first-login scenarios and removes an unnecessary admin step from the common path
+- preserving the bootstrap endpoint keeps a safe recovery path for legacy or inconsistent records without making it the default onboarding contract
 - removing the columns before production reduces the chance of accidental fallback logic returning later
 
 ## ADR-005 Portfolio/program/project runtime is removed instead of frozen

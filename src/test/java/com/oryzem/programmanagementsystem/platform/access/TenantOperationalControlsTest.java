@@ -1,5 +1,6 @@
 package com.oryzem.programmanagementsystem.platform.access;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import com.oryzem.programmanagementsystem.app.bootstrap.BootstrapDataService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,6 +38,9 @@ class TenantOperationalControlsTest {
     @Autowired
     private TenantRateLimitingFilter tenantRateLimitingFilter;
 
+    @Autowired
+    private MeterRegistry meterRegistry;
+
     @BeforeEach
     void setUp() {
         bootstrapDataService.reset();
@@ -60,6 +64,16 @@ class TenantOperationalControlsTest {
                 .andExpect(jsonPath("$.status").value(429))
                 .andExpect(jsonPath("$.path").value("/api/auth/me"))
                 .andExpect(jsonPath("$.correlationId").isNotEmpty());
+
+        org.assertj.core.api.Assertions.assertThat(meterRegistry.get("oryzem.operational.http.responses")
+                        .tag("tenantId", "TEN-tenant-a")
+                        .tag("tenantTier", "STANDARD")
+                        .tag("path", "/api/auth/me")
+                        .tag("status", "429")
+                        .tag("category", "rate_limit")
+                        .counter()
+                        .count())
+                .isEqualTo(1.0d);
     }
 
     @Test
@@ -77,6 +91,16 @@ class TenantOperationalControlsTest {
                                 """))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message").value("Active membership quota reached for tenant tier."));
+
+        org.assertj.core.api.Assertions.assertThat(meterRegistry.get("oryzem.operational.http.responses")
+                        .tag("tenantId", "TEN-tenant-a")
+                        .tag("tenantTier", "STANDARD")
+                        .tag("path", "quota")
+                        .tag("status", "409")
+                        .tag("category", "quota_active_memberships")
+                        .counter()
+                        .count())
+                .isEqualTo(1.0d);
     }
 
     private org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor jwtFor(

@@ -2,6 +2,7 @@ package com.oryzem.programmanagementsystem.platform.tenant;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.oryzem.programmanagementsystem.app.bootstrap.BootstrapDataService;
+import com.oryzem.programmanagementsystem.platform.audit.AuditTrailService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,6 +31,9 @@ class AccessOrganizationControllerTest {
 
     @Autowired
     private BootstrapDataService bootstrapDataService;
+
+    @Autowired
+    private AuditTrailService auditTrailService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -231,6 +235,11 @@ class AccessOrganizationControllerTest {
                         .with(internalAdmin()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[*].id", not(hasItem("tenant-a"))));
+
+        org.assertj.core.api.Assertions.assertThat(auditTrailService.findAll())
+                .filteredOn(event -> "ORGANIZATION_PURGE_SUBTREE".equals(event.eventType()))
+                .extracting(event -> event.targetTenantId())
+                .contains("TEN-tenant-a");
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.oryzem.programmanagementsystem.platform.access;
 
+import com.oryzem.programmanagementsystem.app.monitoring.OperationalMetricsService;
 import com.oryzem.programmanagementsystem.platform.audit.RequestCorrelationContext;
 import com.oryzem.programmanagementsystem.platform.authorization.AuthenticatedUser;
 import com.oryzem.programmanagementsystem.platform.authorization.AuthenticatedUserMapper;
@@ -27,18 +28,21 @@ public class TenantRateLimitingFilter extends OncePerRequestFilter {
     private final TenantRateLimitCounterStore tenantRateLimitCounterStore;
     private final RequestCorrelationContext requestCorrelationContext;
     private final ObjectMapper objectMapper;
+    private final OperationalMetricsService operationalMetricsService;
 
     public TenantRateLimitingFilter(
             AuthenticatedUserMapper authenticatedUserMapper,
             TenantGovernanceService tenantGovernanceService,
             TenantRateLimitCounterStore tenantRateLimitCounterStore,
             RequestCorrelationContext requestCorrelationContext,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            OperationalMetricsService operationalMetricsService) {
         this.authenticatedUserMapper = authenticatedUserMapper;
         this.tenantGovernanceService = tenantGovernanceService;
         this.tenantRateLimitCounterStore = tenantRateLimitCounterStore;
         this.requestCorrelationContext = requestCorrelationContext;
         this.objectMapper = objectMapper;
+        this.operationalMetricsService = operationalMetricsService;
     }
 
     @Override
@@ -78,6 +82,10 @@ public class TenantRateLimitingFilter extends OncePerRequestFilter {
             return;
         }
 
+        operationalMetricsService.recordTenantRateLimitExceeded(
+                actor.activeTenantId(),
+                tenantGovernanceService.resolveTier(actor.activeTenantId()).name(),
+                request.getRequestURI());
         writeTooManyRequests(response, request);
     }
 

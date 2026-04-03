@@ -63,15 +63,15 @@ class UserSensitiveActionService {
             String justification) {
         ManagedUser target = accessService.findRequiredUser(userId);
         accessService.ensureUserCanReceiveSensitiveAction(target, action);
-        ResolvedMembershipContext targetContext = accessService.resolveUserContext(target).orElse(null);
-        String targetTenantId = targetContext != null ? targetContext.activeTenantId() : actor.activeTenantId();
-        String targetOrganizationId = targetContext != null ? targetContext.activeOrganizationId() : actor.organizationId();
+        ResolvedMembershipContext targetContext = accessService.resolveRequiredOperationalContext(target, action);
+        String targetTenantId = targetContext.activeTenantId();
+        String targetOrganizationId = targetContext.activeOrganizationId();
         OrganizationLookup.OrganizationView targetOrganization = targetOrganizationId == null
                 ? null
                 : organizationLookup.getRequired(targetOrganizationId);
         AuthorizationContext context = AuthorizationContext.builder(AppModule.USERS, action)
                 .resourceTenantId(targetTenantId)
-                .resourceTenantType(targetContext != null ? targetContext.tenantType() : actor.tenantType())
+                .resourceTenantType(targetContext.tenantType())
                 .targetRole(accessService.resolvePrimaryRole(target))
                 .targetUserId(target.id())
                 .auditTrailEnabled(true)
@@ -81,7 +81,7 @@ class UserSensitiveActionService {
 
         AuthorizationDecision decision = authorizationService.decide(actor, context);
         accessService.assertAllowed(decision);
-        if (targetOrganization != null && targetContext != null) {
+        if (targetOrganization != null) {
             accessService.enforceOrganizationScope(
                     actor,
                     targetOrganization.id(),

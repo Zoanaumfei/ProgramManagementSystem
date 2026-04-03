@@ -3,6 +3,7 @@ package com.oryzem.programmanagementsystem.platform.tenant;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.oryzem.programmanagementsystem.app.bootstrap.BootstrapDataService;
 import com.oryzem.programmanagementsystem.platform.audit.AuditTrailService;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,6 +36,9 @@ class OrganizationExportControllerTest {
     @Autowired
     private AuditTrailService auditTrailService;
 
+    @Autowired
+    private MeterRegistry meterRegistry;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @BeforeEach
@@ -48,6 +52,13 @@ class OrganizationExportControllerTest {
         mockMvc.perform(delete("/api/access/organizations/tenant-b")
                         .with(internalAdmin()))
                 .andExpect(status().isOk());
+
+        Assertions.assertThat(meterRegistry.get("oryzem.operational.events")
+                        .tag("eventType", "organization_offboard")
+                        .tag("tenantId", "TEN-tenant-b")
+                        .counter()
+                        .count())
+                .isEqualTo(1.0d);
 
         mockMvc.perform(post("/api/access/organizations/tenant-b/exports")
                         .with(internalAdmin())
@@ -84,6 +95,20 @@ class OrganizationExportControllerTest {
         Assertions.assertThat(auditTrailService.findAll())
                 .extracting(event -> event.eventType())
                 .contains("ORGANIZATION_EXPORT_REQUESTED", "ORGANIZATION_EXPORT_COMPLETED");
+
+        Assertions.assertThat(meterRegistry.get("oryzem.operational.events")
+                        .tag("eventType", "organization_export_requested")
+                        .tag("tenantId", "TEN-tenant-b")
+                        .counter()
+                        .count())
+                .isEqualTo(1.0d);
+
+        Assertions.assertThat(meterRegistry.get("oryzem.operational.events")
+                        .tag("eventType", "organization_export_completed")
+                        .tag("tenantId", "TEN-tenant-b")
+                        .counter()
+                        .count())
+                .isEqualTo(1.0d);
     }
 
     @Test

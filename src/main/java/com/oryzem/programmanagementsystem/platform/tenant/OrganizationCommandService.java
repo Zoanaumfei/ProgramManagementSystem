@@ -1,5 +1,6 @@
 package com.oryzem.programmanagementsystem.platform.tenant;
 
+import com.oryzem.programmanagementsystem.app.monitoring.OperationalMetricsService;
 import com.oryzem.programmanagementsystem.platform.access.TenantProvisioningService;
 import com.oryzem.programmanagementsystem.platform.access.TenantGovernanceService;
 import com.oryzem.programmanagementsystem.platform.audit.AuditTrailEvent;
@@ -34,6 +35,7 @@ class OrganizationCommandService {
     private final TenantProvisioningService tenantProvisioningService;
     private final TenantGovernanceService tenantGovernanceService;
     private final AuditTrailService auditTrailService;
+    private final OperationalMetricsService operationalMetricsService;
 
     OrganizationCommandService(
             OrganizationRepository organizationRepository,
@@ -45,7 +47,8 @@ class OrganizationCommandService {
             TenantUserPurgePort tenantUserPurgePort,
             TenantProvisioningService tenantProvisioningService,
             TenantGovernanceService tenantGovernanceService,
-            AuditTrailService auditTrailService) {
+            AuditTrailService auditTrailService,
+            OperationalMetricsService operationalMetricsService) {
         this.organizationRepository = organizationRepository;
         this.authorizationService = authorizationService;
         this.accessService = accessService;
@@ -56,6 +59,7 @@ class OrganizationCommandService {
         this.tenantProvisioningService = tenantProvisioningService;
         this.tenantGovernanceService = tenantGovernanceService;
         this.auditTrailService = auditTrailService;
+        this.operationalMetricsService = operationalMetricsService;
     }
 
     OrganizationResponse createOrganization(CreateOrganizationRequest request, AuthenticatedUser actor) {
@@ -205,6 +209,7 @@ class OrganizationCommandService {
                         + ",\"affectedUsers\":" + offboardingSummary.affectedUsers()
                         + ",\"offboardedMemberships\":" + offboardingSummary.offboardedMemberships()
                         + ",\"exportStatus\":\"READY_FOR_EXPORT\"}");
+        operationalMetricsService.recordOrganizationOffboard(organization.getTenantId());
         return snapshotService.toResponse(organizationRepository.findById(organizationId).orElseThrow());
     }
 

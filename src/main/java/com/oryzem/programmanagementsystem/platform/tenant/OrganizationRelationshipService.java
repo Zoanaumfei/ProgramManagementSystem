@@ -58,7 +58,7 @@ class OrganizationRelationshipService {
             CreateOrganizationRelationshipRequest request) {
         OrganizationEntity source = findManagedOrganization(organizationId);
         OrganizationEntity target = findManagedOrganization(request.targetOrganizationId());
-        authorizeRelationshipMutation(actor, source, target);
+        authorizeRelationshipMutation(actor, source, target, Action.CREATE);
         validateRelationship(source, target, request.relationshipType());
         String normalizedLocalOrganizationCode = normalizeLocalOrganizationCode(request.localOrganizationCode());
 
@@ -98,7 +98,7 @@ class OrganizationRelationshipService {
             throw new ResourceNotFoundException("OrganizationRelationship", relationshipId);
         }
         OrganizationEntity target = findManagedOrganization(relationship.getTargetOrganizationId());
-        authorizeRelationshipMutation(actor, source, target);
+        authorizeRelationshipMutation(actor, source, target, Action.EDIT);
 
         String normalizedLocalOrganizationCode = normalizeLocalOrganizationCode(request.localOrganizationCode());
         validateLocalOrganizationCode(source.getId(), normalizedLocalOrganizationCode, relationship.getId());
@@ -120,7 +120,7 @@ class OrganizationRelationshipService {
             throw new ResourceNotFoundException("OrganizationRelationship", relationshipId);
         }
         OrganizationEntity target = findManagedOrganization(relationship.getTargetOrganizationId());
-        authorizeRelationshipMutation(actor, source, target);
+        authorizeRelationshipMutation(actor, source, target, Action.DELETE);
 
         relationship.setStatus(OrganizationRelationshipStatus.INACTIVE);
         relationship.touch(actor.username());
@@ -131,10 +131,11 @@ class OrganizationRelationshipService {
     private void authorizeRelationshipMutation(
             AuthenticatedUser actor,
             OrganizationEntity source,
-            OrganizationEntity target) {
+            OrganizationEntity target,
+            Action action) {
         AuthorizationDecision decision = authorizationService.decide(
                 actor,
-                AuthorizationContext.builder(AppModule.TENANT, Action.CREATE)
+                AuthorizationContext.builder(AppModule.TENANT, action)
                         .resourceTenantId(source.getTenantId())
                         .resourceTenantType(source.getTenantType())
                         .build());

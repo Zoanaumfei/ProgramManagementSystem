@@ -1,6 +1,25 @@
 # Changelog
 
+## 2026-04-01
+- hardened `users` so create now fails closed when the initial membership cannot be provisioned, with compensating identity cleanup when possible
+- changed orphan users from a tolerated lifecycle state into an explicit inconsistency/error condition with stable business codes for API consumers
+- corrected organization subtree purge audit attribution so `targetTenantId` records the real tenant instead of the organization id
+- aligned organization relationship authorization with semantic actions for create, update and inactivate flows
+- refreshed `docs/context/PROJECT_CONTEXT.md` to separate repository-verified backend status from frontend integration tracking
+- refreshed `docs/context/FRONTEND_BACKEND_ALIGNMENT.md` so payload examples match the current backend requests and responses
+- refreshed `docs/context/API_CONTRACT.md` with the structured error payload contract and the current tenant-directory summary model
+- refreshed `docs/context/DECISIONS.md` to reflect that standard user creation now provisions the first membership and `bootstrap-membership` is the exception path
+- rewrote `docs/organization-hierarchy.md` around the current relationship-based organization model and split backend versus frontend implications
+- updated `docs/context/OPEN_GAPS.md` to close the implemented structured `401`/`403` payload gap and reclassify the remaining work by current priority
+
 ## 2026-03-31
+- moved organization-level `code` out of the canonical organization model and into relationship-local metadata as `localOrganizationCode`
+- added Flyway `V15__move_organization_code_to_relationship_local_metadata.sql` to migrate existing organization codes into `organization_relationship.local_organization_code` and drop `organization.code`
+- added `PUT /api/access/organizations/{organizationId}/relationships/{relationshipId}` for updating relationship-local organization codes
+- changed `POST /api/access/organizations` to require only `name` and `cnpj`, with optional `localOrganizationCode` applied to the auto-created relationship for external admins
+- changed `POST /api/access/users` to provision the first membership in the same request via `organizationId`, optional `marketId` and `roles`
+- updated the frontend organization workspace to remove organization-level `code`, show/edit `localOrganizationCode` on relationship flows, and stop rendering a derived `Caminho relacional` breadcrumb that implied a single canonical path
+- updated the frontend users workspace so the orphan-user view is explicitly treated as legacy/inconsistency cleanup rather than the normal onboarding path
 - introduced canonical tenant-scoped `cnpj` identity for organizations and removed the legacy parent/customer/hierarchy organization tree fields from the active public contract
 - changed external organization creation to create-or-reuse by `tenant + cnpj` and automatically create or reactivate the `CUSTOMER_SUPPLIER` relationship from the actor organization
 - added cycle and self-link protection for `CUSTOMER_SUPPLIER` relationship management
@@ -66,6 +85,9 @@
 - schema: `app_user.role`, `app_user.tenant_id` and `app_user.tenant_type` were removed
 - API: `POST /api/access/users` and `PUT /api/access/users/{userId}` no longer accept role or organization bootstrap fields
 - integration contract: authorization must operate exclusively through membership context
+
+Note:
+- the standard onboarding path was refined later on 2026-03-31 so `POST /api/access/users` now provisions the first membership in the same request, while `/bootstrap-membership` remains for lifecycle-only recovery cases
 
 ## 2026-03-24
 - introduced explicit tenant, market and membership structures

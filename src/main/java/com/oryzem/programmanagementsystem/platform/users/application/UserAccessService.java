@@ -12,7 +12,9 @@ import com.oryzem.programmanagementsystem.platform.authorization.AuthorizationDe
 import com.oryzem.programmanagementsystem.platform.authorization.AuthorizationService;
 import com.oryzem.programmanagementsystem.platform.authorization.Role;
 import com.oryzem.programmanagementsystem.platform.authorization.TenantType;
+import com.oryzem.programmanagementsystem.platform.shared.BusinessRuleException;
 import com.oryzem.programmanagementsystem.platform.tenant.OrganizationLookup;
+import com.oryzem.programmanagementsystem.platform.users.api.CreateUserRequest;
 import com.oryzem.programmanagementsystem.platform.users.api.UserSummaryResponse;
 import com.oryzem.programmanagementsystem.platform.users.domain.ManagedUser;
 import com.oryzem.programmanagementsystem.platform.users.domain.UserNotFoundException;
@@ -21,6 +23,7 @@ import com.oryzem.programmanagementsystem.platform.users.domain.UserStatus;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Set;
 import org.springframework.security.access.AccessDeniedException;
@@ -256,7 +259,7 @@ class UserAccessService {
     }
 
     UserSummaryResponse toSummary(ManagedUser user) {
-        return UserSummaryResponse.from(user, resolveUserContext(user).isPresent());
+        return UserSummaryResponse.from(user, accessContextService.hasMemberships(user.id()));
     }
 
     ResolvedMembershipContext resolveRequiredUserContext(ManagedUser user) {
@@ -265,6 +268,16 @@ class UserAccessService {
 
     java.util.Optional<ResolvedMembershipContext> resolveUserContext(ManagedUser user) {
         return accessContextService.resolveActiveContext(user, null);
+    }
+
+    ResolvedMembershipContext resolveRequiredOperationalContext(ManagedUser user, Action action) {
+        return resolveUserContext(user)
+                .orElseThrow(() -> missingOperationalMembership(user, action));
+    }
+
+    ResolvedMembershipContext resolveRequiredManagedContext(ManagedUser user, Action action) {
+        return accessContextService.resolveManagedContext(user)
+                .orElseThrow(() -> orphanUserDetected(user, action));
     }
 
     Role resolvePrimaryRole(ManagedUser user) {
@@ -444,6 +457,26 @@ class UserAccessService {
                 resolvedTenantType);
     }
 
+    BusinessRuleException initialMembershipProvisioningFailed(
+            CreateUserRequest request,
+            MembershipAssignment membershipAssignment,
+            Exception cause) {
+        LinkedHashMap<String, Object> details = new LinkedHashMap<>();
+        details.put("email", normalizeEmail(request.email()));
+        details.put("organizationId", membershipAssignment.organizationId());
+        details.put("tenantId", membershipAssignment.tenantId());
+        if (membershipAssignment.marketId() != null) {
+            details.put("marketId", membershipAssignment.marketId());
+        }
+        if (cause != null && cause.getMessage() != null && !cause.getMessage().isBlank()) {
+            details.put("reason", cause.getMessage());
+        }
+        return new BusinessRuleException(
+                "USER_CREATION_MEMBERSHIP_FAILED",
+                "User creation could not be completed because the initial membership could not be provisioned.",
+                details);
+    }
+
     private Role primaryRole(AuthenticatedUser actor) {
         java.util.List<Role> precedence = java.util.List.of(Role.ADMIN, Role.SUPPORT, Role.MANAGER, Role.AUDITOR, Role.MEMBER);
         return precedence.stream()
@@ -454,6 +487,34 @@ class UserAccessService {
 
     private String metadataJson(boolean crossTenant) {
         return "{\"crossTenant\":" + crossTenant + "}";
+    }
+
+    private BusinessRuleException orphanUserDetected(ManagedUser user, Action action) {
+        LinkedHashMap<String, Object> details = new LinkedHashMap<>();
+        details.put("userId", user.id());
+        details.put("email", user.email());
+        details.put("status", user.status().name());
+        details.put("action", action.name());
+        return new BusinessRuleException(
+                "ORPHAN_USER_DETECTED",
+                "User does not have any membership assigned. This indicates an invalid lifecycle state and requires data repair.",
+                details);
+    }
+
+    private BusinessRuleException missingOperationalMembership(ManagedUser user, Action action) {
+        if (!accessContextService.hasMemberships(user.id())) {
+            return orphanUserDetected(user, action);
+        }
+
+        LinkedHashMap<String, Object> details = new LinkedHashMap<>();
+        details.put("userId", user.id());
+        details.put("email", user.email());
+        details.put("status", user.status().name());
+        details.put("action", action.name());
+        return new BusinessRuleException(
+                "USER_ACTIVE_MEMBERSHIP_REQUIRED",
+                "User does not have an active membership required for this operation.",
+                details);
     }
 
     record MembershipAssignment(

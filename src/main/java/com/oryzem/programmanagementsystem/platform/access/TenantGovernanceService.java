@@ -1,5 +1,6 @@
 package com.oryzem.programmanagementsystem.platform.access;
 
+import com.oryzem.programmanagementsystem.app.monitoring.OperationalMetricsService;
 import com.oryzem.programmanagementsystem.platform.shared.ConflictException;
 import com.oryzem.programmanagementsystem.platform.tenant.OrganizationRepository;
 import java.time.Duration;
@@ -17,18 +18,21 @@ public class TenantGovernanceService {
     private final SpringDataUserMembershipJpaRepository membershipRepository;
     private final OrganizationRepository organizationRepository;
     private final TenantGovernanceProperties properties;
+    private final OperationalMetricsService operationalMetricsService;
 
     public TenantGovernanceService(
             SpringDataTenantJpaRepository tenantRepository,
             SpringDataTenantMarketJpaRepository tenantMarketRepository,
             SpringDataUserMembershipJpaRepository membershipRepository,
             OrganizationRepository organizationRepository,
-            TenantGovernanceProperties properties) {
+            TenantGovernanceProperties properties,
+            OperationalMetricsService operationalMetricsService) {
         this.tenantRepository = tenantRepository;
         this.tenantMarketRepository = tenantMarketRepository;
         this.membershipRepository = membershipRepository;
         this.organizationRepository = organizationRepository;
         this.properties = properties;
+        this.operationalMetricsService = operationalMetricsService;
     }
 
     public TenantServiceTier resolveTier(String tenantId) {
@@ -52,29 +56,35 @@ public class TenantGovernanceService {
     }
 
     public void assertOrganizationQuotaAvailable(String tenantId) {
-        TenantGovernanceProperties.TierLimit limit = limitFor(resolveTier(tenantId));
+        TenantServiceTier tier = resolveTier(tenantId);
+        TenantGovernanceProperties.TierLimit limit = limitFor(tier);
         long currentCount = organizationRepository.findAllByTenantIdOrderByNameAsc(tenantId).size();
         if (currentCount >= limit.getMaxOrganizations()) {
+            operationalMetricsService.recordQuotaConflict(tenantId, tier.name(), "organizations");
             throw new ConflictException("Organization quota reached for tenant tier.");
         }
     }
 
     public void assertMarketQuotaAvailable(String tenantId) {
-        TenantGovernanceProperties.TierLimit limit = limitFor(resolveTier(tenantId));
+        TenantServiceTier tier = resolveTier(tenantId);
+        TenantGovernanceProperties.TierLimit limit = limitFor(tier);
         long currentCount = tenantMarketRepository.findAllByTenantIdOrderByNameAsc(tenantId).stream()
                 .filter(market -> market.getStatus() == MarketStatus.ACTIVE)
                 .count();
         if (currentCount >= limit.getMaxMarkets()) {
+            operationalMetricsService.recordQuotaConflict(tenantId, tier.name(), "markets");
             throw new ConflictException("Market quota reached for tenant tier.");
         }
     }
 
     public void assertActiveMembershipQuotaAvailable(String tenantId) {
-        TenantGovernanceProperties.TierLimit limit = limitFor(resolveTier(tenantId));
+        TenantServiceTier tier = resolveTier(tenantId);
+        TenantGovernanceProperties.TierLimit limit = limitFor(tier);
         long currentCount = membershipRepository.findAllByTenantId(tenantId).stream()
                 .filter(membership -> membership.getStatus() == MembershipStatus.ACTIVE)
                 .count();
         if (currentCount >= limit.getMaxActiveMemberships()) {
+            operationalMetricsService.recordQuotaConflict(tenantId, tier.name(), "active_memberships");
             throw new ConflictException("Active membership quota reached for tenant tier.");
         }
     }

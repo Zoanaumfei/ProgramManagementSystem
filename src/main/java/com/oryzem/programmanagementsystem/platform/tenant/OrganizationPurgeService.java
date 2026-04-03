@@ -74,7 +74,13 @@ class OrganizationPurgeService {
                 .toList();
         organizationRepository.deleteAll(organizationsToPurge);
 
-        recordAudit(actor, organization.getId(), "ORGANIZATION_PURGE_SUBTREE", organization.getId(), justification, decision.crossTenant());
+        recordAudit(
+                actor,
+                organization.getTenantId(),
+                "ORGANIZATION_PURGE_SUBTREE",
+                organization.getId(),
+                justification,
+                decision.crossTenant());
         return new OrganizationPurgeResponse(
                 organization.getId(),
                 Action.PURGE.name(),

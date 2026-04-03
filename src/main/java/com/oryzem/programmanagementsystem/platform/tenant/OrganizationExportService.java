@@ -1,5 +1,6 @@
 package com.oryzem.programmanagementsystem.platform.tenant;
 
+import com.oryzem.programmanagementsystem.app.monitoring.OperationalMetricsService;
 import com.oryzem.programmanagementsystem.platform.audit.AuditTrailEvent;
 import com.oryzem.programmanagementsystem.platform.audit.AuditTrailService;
 import com.oryzem.programmanagementsystem.platform.authorization.Action;
@@ -19,14 +20,17 @@ class OrganizationExportService {
     private final OrganizationRepository organizationRepository;
     private final OrganizationAccessService organizationAccessService;
     private final AuditTrailService auditTrailService;
+    private final OperationalMetricsService operationalMetricsService;
 
     OrganizationExportService(
             OrganizationRepository organizationRepository,
             OrganizationAccessService organizationAccessService,
-            AuditTrailService auditTrailService) {
+            AuditTrailService auditTrailService,
+            OperationalMetricsService operationalMetricsService) {
         this.organizationRepository = organizationRepository;
         this.organizationAccessService = organizationAccessService;
         this.auditTrailService = auditTrailService;
+        this.operationalMetricsService = operationalMetricsService;
     }
 
     @Transactional(readOnly = true)
@@ -67,6 +71,7 @@ class OrganizationExportService {
                 saved.getId(),
                 "{\"from\":\"READY_FOR_EXPORT\",\"to\":\"EXPORT_IN_PROGRESS\",\"justification\":\""
                         + escapeJson(request.justification()) + "\"}");
+        operationalMetricsService.recordOrganizationExportRequested(saved.getTenantId());
         return toResponse(saved);
     }
 
@@ -96,6 +101,7 @@ class OrganizationExportService {
                 saved.getId(),
                 "{\"from\":\"EXPORT_IN_PROGRESS\",\"to\":\"EXPORTED\",\"justification\":\""
                         + escapeJson(request.justification()) + "\"}");
+        operationalMetricsService.recordOrganizationExportCompleted(saved.getTenantId());
         return toResponse(saved);
     }
 

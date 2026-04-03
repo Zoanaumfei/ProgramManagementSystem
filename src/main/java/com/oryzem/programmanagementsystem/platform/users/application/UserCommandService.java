@@ -20,12 +20,16 @@ import com.oryzem.programmanagementsystem.platform.users.domain.UserStatus;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional
 class UserCommandService {
+
+    private static final Logger log = LoggerFactory.getLogger(UserCommandService.class);
 
     private final UserRepository userRepository;
     private final AuthorizationService authorizationService;
@@ -94,15 +98,20 @@ class UserCommandService {
 
         ManagedUser saved = userRepository.save(created);
         userIdentityGateway.createUser(saved);
-        accessContextService.upsertDefaultMembership(
-                saved.id(),
-                membershipAssignment.tenantId(),
-                membershipAssignment.organizationId(),
-                membershipAssignment.marketId(),
-                saved.status(),
-                request.roles(),
-                saved.createdAt());
-        accessService.recordAudit(actor, membershipAssignment.tenantId(), "USER_CREATE", saved.id(), null, decision.crossTenant());
+        try {
+            accessContextService.upsertDefaultMembership(
+                    saved.id(),
+                    membershipAssignment.tenantId(),
+                    membershipAssignment.organizationId(),
+                    membershipAssignment.marketId(),
+                    saved.status(),
+                    request.roles(),
+                    saved.createdAt());
+            accessService.recordAudit(actor, membershipAssignment.tenantId(), "USER_CREATE", saved.id(), null, decision.crossTenant());
+        } catch (RuntimeException exception) {
+            rollbackProvisionedIdentity(saved, exception);
+            throw accessService.initialMembershipProvisioningFailed(request, membershipAssignment, exception);
+        }
         return accessService.toSummary(saved);
     }
 
@@ -117,20 +126,20 @@ class UserCommandService {
                     throw new IllegalArgumentException("A user with this email already exists.");
                 });
 
-        ResolvedMembershipContext targetContext = accessService.resolveUserContext(target).orElse(null);
-        String targetTenantId = targetContext != null ? targetContext.activeTenantId() : actor.activeTenantId();
-        String targetOrganizationId = targetContext != null ? targetContext.activeOrganizationId() : actor.organizationId();
+        ResolvedMembershipContext targetContext = accessService.resolveRequiredOperationalContext(target, Action.EDIT);
+        String targetTenantId = targetContext.activeTenantId();
+        String targetOrganizationId = targetContext.activeOrganizationId();
 
         AuthorizationContext context = AuthorizationContext.builder(AppModule.USERS, Action.EDIT)
                 .resourceTenantId(targetTenantId)
-                .resourceTenantType(targetContext != null ? targetContext.tenantType() : actor.tenantType())
+                .resourceTenantType(targetContext.tenantType())
                 .targetRole(accessService.resolvePrimaryRole(target))
                 .targetUserId(target.id())
                 .build();
 
         AuthorizationDecision decision = authorizationService.decide(actor, context);
         accessService.assertAllowed(decision);
-        if (targetContext != null && targetOrganizationId != null) {
+        if (targetOrganizationId != null) {
             accessService.enforceOrganizationScope(
                     actor,
                     targetOrganizationId,
@@ -152,19 +161,21 @@ class UserCommandService {
 
     void deleteUser(AuthenticatedUser actor, String userId) {
         ManagedUser target = accessService.findRequiredUser(userId);
-        ResolvedMembershipContext targetContext = accessService.resolveUserContext(target).orElse(null);
-        String targetTenantId = targetContext != null ? targetContext.activeTenantId() : actor.activeTenantId();
-        String targetOrganizationId = targetContext != null ? targetContext.activeOrganizationId() : actor.organizationId();
+        ResolvedMembershipContext targetContext = target.status() == UserStatus.INACTIVE
+                ? accessService.resolveRequiredManagedContext(target, Action.DELETE)
+                : accessService.resolveRequiredOperationalContext(target, Action.DELETE);
+        String targetTenantId = targetContext.activeTenantId();
+        String targetOrganizationId = targetContext.activeOrganizationId();
         AuthorizationContext context = AuthorizationContext.builder(AppModule.USERS, Action.DELETE)
                 .resourceTenantId(targetTenantId)
-                .resourceTenantType(targetContext != null ? targetContext.tenantType() : actor.tenantType())
+                .resourceTenantType(targetContext.tenantType())
                 .targetRole(accessService.resolvePrimaryRole(target))
                 .targetUserId(target.id())
                 .build();
 
         AuthorizationDecision decision = authorizationService.decide(actor, context);
         accessService.assertAllowed(decision);
-        if (targetContext != null && targetOrganizationId != null) {
+        if (targetOrganizationId != null) {
             accessService.enforceOrganizationScope(
                     actor,
                     targetOrganizationId,
@@ -187,5 +198,17 @@ class UserCommandService {
                 updated.id(),
                 null,
                 decision.crossTenant());
+    }
+
+    private void rollbackProvisionedIdentity(ManagedUser user, Exception cause) {
+        try {
+            userIdentityGateway.deleteUser(user);
+        } catch (RuntimeException cleanupException) {
+            log.warn(
+                    "Unable to roll back provisioned identity for user {} after membership provisioning failure. cause={}, cleanupReason={}",
+                    user.id(),
+                    cause.getMessage(),
+                    cleanupException.getMessage());
+        }
     }
 }

@@ -1,5 +1,7 @@
 package com.oryzem.programmanagementsystem.platform.access;
 
+import com.oryzem.programmanagementsystem.app.monitoring.OperationalMetricsService;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import com.oryzem.programmanagementsystem.platform.audit.RequestCorrelationContext;
 import com.oryzem.programmanagementsystem.platform.authorization.AuthenticatedUser;
 import com.oryzem.programmanagementsystem.platform.authorization.AuthenticatedUserMapper;
@@ -41,6 +43,8 @@ class TenantRateLimitingFilterTest {
     private final LocalTenantRateLimitCounterStore counterStore = new LocalTenantRateLimitCounterStore();
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final AtomicReference<AuthenticatedUser> currentActor = new AtomicReference<>();
+    private final OperationalMetricsService operationalMetricsService =
+            new OperationalMetricsService(new SimpleMeterRegistry());
 
     private TenantRateLimitingFilter filterInstanceA;
     private TenantRateLimitingFilter filterInstanceB;
@@ -55,13 +59,15 @@ class TenantRateLimitingFilterTest {
                 tenantGovernanceService,
                 counterStore,
                 requestCorrelationContext,
-                objectMapper);
+                objectMapper,
+                operationalMetricsService);
         filterInstanceB = new TenantRateLimitingFilter(
                 authenticatedUserMapper,
                 tenantGovernanceService,
                 counterStore,
                 requestCorrelationContext,
-                objectMapper);
+                objectMapper,
+                operationalMetricsService);
 
         when(authenticatedUserMapper.from(any(Authentication.class))).thenAnswer(invocation -> currentActor.get());
         when(requestCorrelationContext.getOrCreate()).thenReturn("corr-rate-limit-test");
@@ -69,6 +75,8 @@ class TenantRateLimitingFilterTest {
                 .thenReturn(new TenantGovernanceService.RateLimitPolicy(Duration.ofSeconds(60), 2));
         lenient().when(tenantGovernanceService.rateLimitPolicy("TEN-tenant-b"))
                 .thenReturn(new TenantGovernanceService.RateLimitPolicy(Duration.ofSeconds(60), 2));
+        lenient().when(tenantGovernanceService.resolveTier("TEN-tenant-a")).thenReturn(TenantServiceTier.STANDARD);
+        lenient().when(tenantGovernanceService.resolveTier("TEN-tenant-b")).thenReturn(TenantServiceTier.STANDARD);
     }
 
     @Test

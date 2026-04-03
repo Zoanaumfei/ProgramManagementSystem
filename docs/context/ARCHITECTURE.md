@@ -1,13 +1,13 @@
 # Architecture
 
 ## Product direction
-Oryzem currently ships a core SaaS administration surface centered on user identity, organization hierarchy and membership-based access control.
+Oryzem currently ships a core SaaS administration surface centered on user identity, organization relationship networks and membership-based access control.
 
 Active backend scope:
 - user lifecycle
 - membership-based access control
 - tenant and market administration
-- organization hierarchy management
+- organization relationship management
 - authentication, authorization and audit support for the core
 - tenant isolation, quotas and operational rate limiting
 
@@ -28,7 +28,8 @@ The backend operates with this access chain:
 Definitions:
 - `User`: global identity and lifecycle record
 - `Tenant`: SaaS isolation boundary
-- `Organization`: hierarchical business structure inside a tenant
+- `Organization`: canonical business entity inside a tenant, identified publicly by `name + cnpj`
+- `OrganizationRelationship`: directed customer/supplier or partner edge that carries contextual metadata such as `localOrganizationCode`
 - `Market`: optional commercial or regional slice inside a tenant
 - `Membership`: contextual binding between a user and a tenant scope
 - `Role`: contextual role granted inside a membership
@@ -42,10 +43,11 @@ Definitions:
 - invalid `X-Access-Context` hints fail closed instead of silently falling back to another tenant context.
 - `/api/auth/me` exposes the resolved active context.
 - authenticated core routes are rate limited per tenant.
+- structured JSON error responses for security and exception handling include `timestamp`, `status`, `error`, `message`, `path` and `correlationId`.
 
 ## Isolation and ownership
 - cross-tenant authorization decisions are evaluated from the actor membership and the resource tenant boundary.
-- organization-scoped user listing is filtered by organization subtree, never by raw tenant-wide fallback when a narrower organization filter is requested.
+- organization-scoped user listing is filtered by the visible `CUSTOMER_SUPPLIER` relationship graph, never by raw tenant-wide fallback when a narrower organization filter is requested.
 - concrete tenant and membership repositories stay encapsulated in `platform.access` behind application services and ports.
 - support cross-tenant actions require explicit override + audit-friendly justification where applicable.
 
@@ -69,6 +71,7 @@ Operational behavior:
 - offboarded organizations retain a controlled retention deadline and an internal export-ready marker.
 - user purge is an explicit destructive step available to internal `ADMIN` and `SUPPORT` actors under the audited authorization flow.
 - organization subtree purge still requires the support-style explicit confirmation path, and now clears relationship edges that reference the subtree before deleting organizations.
+- relationship inactivation is historical only; physical cleanup of relationship rows happens during explicit subtree purge.
 
 ## Enterprise controls
 - rate limits are enforced per tenant tier through a `TenantRateLimitCounterStore` abstraction.
@@ -84,9 +87,12 @@ Operational behavior:
 ## Administrative surfaces
 - `/api/auth/me`
 - `/api/access/users`
+- `/api/access/users/orphans`
 - `/api/access/users/{userId}/bootstrap-membership`
 - `/api/access/users/{userId}/memberships`
 - `/api/access/organizations`
+- `/api/access/organizations/{organizationId}/relationships`
+- `/api/access/organizations/{organizationId}/purge-subtree`
 - `/api/access/organizations/{organizationId}/exports`
 - `/api/access/tenants`
 - `/api/access/tenants/{tenantId}/service-tier`
@@ -95,6 +101,8 @@ Operational behavior:
 ## User model boundary
 `app_user` is identity-and-lifecycle data only.
 
+A valid managed user is still expected to have at least one membership record.
+
 It is not the source of truth for tenant, organization, market, role or tenant type during authorization.
 Membership data drives:
 - active tenant
@@ -102,6 +110,15 @@ Membership data drives:
 - active market
 - effective roles
 - effective permissions
+
+User create now also requires the initial membership context in the same request:
+- `organizationId`
+- optional `marketId`
+- non-empty `roles`
+
+`POST /api/access/users/{userId}/bootstrap-membership` is now an exceptional repair path for inconsistent records, not the standard onboarding path.
+
+If the initial membership cannot be provisioned during `POST /api/access/users`, the create flow must fail atomically and the partially provisioned identity must be compensated when possible.
 
 ## Schema boundary
 Authoritative schema after the hardening:
@@ -120,6 +137,9 @@ Important migrations:
 - `V10__remove_legacy_app_user_access_columns.sql` removes `app_user.role`, `app_user.tenant_id` and `app_user.tenant_type`
 - `V11__remove_dormant_domain_surfaces.sql` drops dormant portfolio/program/project/operations tables and deletes obsolete permission codes
 - `V12__enterprise_hardening_core_lifecycle.sql` adds tenant tier, lifecycle state, retention and export metadata for the active core
+- `V13__introduce_organization_relationships_and_reset_access_core.sql` introduces explicit organization relationship storage for the active core
+- `V14__replace_organization_hierarchy_with_cnpj_identity.sql` removes legacy stored hierarchy metadata in favor of canonical tenant-scoped `cnpj`
+- `V15__move_organization_code_to_relationship_local_metadata.sql` migrates organization-level codes into `organization_relationship.local_organization_code`
 
 ## Removed legacy concerns
 Removed from the backend:

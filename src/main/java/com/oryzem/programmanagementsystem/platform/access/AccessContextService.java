@@ -54,49 +54,11 @@ public class AccessContextService {
     }
 
     public Optional<ResolvedMembershipContext> resolveActiveContext(ManagedUser user, String requestedContextHint) {
-        List<UserMembershipEntity> memberships = membershipRepository.findByUserIdOrderByDefaultMembershipDescJoinedAtAsc(user.id())
-                .stream()
-                .filter(membership -> membership.getStatus() == MembershipStatus.ACTIVE)
-                .toList();
-        if (memberships.isEmpty()) {
-            return Optional.empty();
-        }
+        return resolveContext(user, requestedContextHint, true);
+    }
 
-        Optional<UserMembershipEntity> selectedMembership = selectMembership(memberships, requestedContextHint);
-        if (hasText(requestedContextHint) && selectedMembership.isEmpty()) {
-            throw new IllegalArgumentException("Requested access context is not available to the authenticated user.");
-        }
-        UserMembershipEntity resolvedMembership = selectedMembership.orElse(memberships.getFirst());
-        Set<Role> roles = membershipRoleRepository.findByMembershipId(resolvedMembership.getId()).stream()
-                .map(MembershipRoleEntity::getRoleCode)
-                .map(this::toRole)
-                .flatMap(Optional::stream)
-                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
-        Set<String> permissions = rolePermissionRepository.findByRoleCodeIn(
-                        roles.stream().map(Enum::name).toList())
-                .stream()
-                .map(RolePermissionEntity::getPermissionCode)
-                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
-
-        Optional<TenantType> tenantTypeFromOrganization = resolvedMembership.getOrganizationId() == null
-                ? Optional.empty()
-                : organizationBoundaryResolver.findBoundary(resolvedMembership.getOrganizationId())
-                        .map(OrganizationBoundaryResolver.OrganizationBoundaryView::tenantType);
-        TenantType tenantType = tenantRepository.findById(resolvedMembership.getTenantId())
-                .map(TenantEntity::getTenantType)
-                .or(() -> tenantTypeFromOrganization)
-                .orElseThrow(() -> new IllegalStateException(
-                        "Membership '%s' does not resolve a tenant type.".formatted(resolvedMembership.getId())));
-
-        return Optional.of(new ResolvedMembershipContext(
-                user.id(),
-                resolvedMembership.getId(),
-                resolvedMembership.getTenantId(),
-                resolvedMembership.getOrganizationId(),
-                resolvedMembership.getMarketId(),
-                tenantType,
-                Set.copyOf(roles),
-                Set.copyOf(permissions)));
+    public Optional<ResolvedMembershipContext> resolveManagedContext(ManagedUser user) {
+        return resolveContext(user, null, false);
     }
 
     public ResolvedMembershipContext requireActiveContext(ManagedUser user) {
@@ -107,6 +69,7 @@ public class AccessContextService {
 
     public Optional<Role> resolvePrimaryRole(ManagedUser user) {
         return resolveActiveContext(user, null)
+                .or(() -> resolveManagedContext(user))
                 .map(ResolvedMembershipContext::roles)
                 .map(this::primaryRole);
     }
@@ -389,6 +352,55 @@ public class AccessContextService {
         return memberships.stream()
                 .filter(UserMembershipEntity::isDefaultMembership)
                 .findFirst();
+    }
+
+    private Optional<ResolvedMembershipContext> resolveContext(
+            ManagedUser user,
+            String requestedContextHint,
+            boolean activeOnly) {
+        List<UserMembershipEntity> memberships = membershipRepository.findByUserIdOrderByDefaultMembershipDescJoinedAtAsc(user.id())
+                .stream()
+                .filter(membership -> !activeOnly || membership.getStatus() == MembershipStatus.ACTIVE)
+                .toList();
+        if (memberships.isEmpty()) {
+            return Optional.empty();
+        }
+
+        Optional<UserMembershipEntity> selectedMembership = selectMembership(memberships, requestedContextHint);
+        if (hasText(requestedContextHint) && selectedMembership.isEmpty()) {
+            throw new IllegalArgumentException("Requested access context is not available to the authenticated user.");
+        }
+        UserMembershipEntity resolvedMembership = selectedMembership.orElse(memberships.getFirst());
+        Set<Role> roles = membershipRoleRepository.findByMembershipId(resolvedMembership.getId()).stream()
+                .map(MembershipRoleEntity::getRoleCode)
+                .map(this::toRole)
+                .flatMap(Optional::stream)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        Set<String> permissions = rolePermissionRepository.findByRoleCodeIn(
+                        roles.stream().map(Enum::name).toList())
+                .stream()
+                .map(RolePermissionEntity::getPermissionCode)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+
+        Optional<TenantType> tenantTypeFromOrganization = resolvedMembership.getOrganizationId() == null
+                ? Optional.empty()
+                : organizationBoundaryResolver.findBoundary(resolvedMembership.getOrganizationId())
+                        .map(OrganizationBoundaryResolver.OrganizationBoundaryView::tenantType);
+        TenantType tenantType = tenantRepository.findById(resolvedMembership.getTenantId())
+                .map(TenantEntity::getTenantType)
+                .or(() -> tenantTypeFromOrganization)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Membership '%s' does not resolve a tenant type.".formatted(resolvedMembership.getId())));
+
+        return Optional.of(new ResolvedMembershipContext(
+                user.id(),
+                resolvedMembership.getId(),
+                resolvedMembership.getTenantId(),
+                resolvedMembership.getOrganizationId(),
+                resolvedMembership.getMarketId(),
+                tenantType,
+                Set.copyOf(roles),
+                Set.copyOf(permissions)));
     }
 
     private MembershipStatus toMembershipStatus(UserStatus status) {
