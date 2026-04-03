@@ -11,15 +11,6 @@ Active backend scope:
 - authentication, authorization and audit support for the core
 - tenant isolation, quotas and operational rate limiting
 
-Removed from runtime:
-- portfolio
-- program
-- project
-- product, item and deliverable execution
-- operations
-- reports
-- portfolio document storage
-
 ## Core access model
 The backend operates with this access chain:
 
@@ -135,17 +126,7 @@ Authoritative schema after the hardening:
 
 Important migrations:
 - `V10__remove_legacy_app_user_access_columns.sql` removes `app_user.role`, `app_user.tenant_id` and `app_user.tenant_type`
-- `V11__remove_dormant_domain_surfaces.sql` drops dormant portfolio/program/project/operations tables and deletes obsolete permission codes
 - `V12__enterprise_hardening_core_lifecycle.sql` adds tenant tier, lifecycle state, retention and export metadata for the active core
 - `V13__introduce_organization_relationships_and_reset_access_core.sql` introduces explicit organization relationship storage for the active core
 - `V14__replace_organization_hierarchy_with_cnpj_identity.sql` removes legacy stored hierarchy metadata in favor of canonical tenant-scoped `cnpj`
 - `V15__move_organization_code_to_relationship_local_metadata.sql` migrates organization-level codes into `organization_relationship.local_organization_code`
-
-## Removed legacy concerns
-Removed from the backend:
-- legacy `/api/users` route family
-- legacy portfolio/program/project runtime routes
-- legacy operations and reports runtime routes
-- temporary portfolio freeze controller and `503` response path
-- document-storage wiring dedicated to the removed portfolio runtime
-- authorization fallback based on Cognito tenant claims

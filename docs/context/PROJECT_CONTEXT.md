@@ -28,12 +28,12 @@ The backend status below was cross-checked against the code currently present in
 - tenant service tier changes flow through an audited `PATCH /api/access/tenants/{tenantId}/service-tier` endpoint and immediately affect quota and rate-limit policy resolution
 - offboarded organizations now expose an audited export workflow through `/api/access/organizations/{organizationId}/exports`
 - structured `401`/`403` payloads are implemented in the backend with `timestamp`, `status`, `error`, `message`, `path` and `correlationId`
-- legacy runtime families `/api/portfolio/**`, `/api/operations/**`, `/api/reports/**` and `/api/users/**` are no longer part of the supported backend surface
 
 ## Frontend integration status
 The frontend source tree is not the active implementation focus of this repository today, so the notes below should be treated as integration guidance plus tracked product status rather than fully repository-verified UI code.
 
 - the active frontend direction remains the access-first workspace flow centered on `/workspace`, `/workspace/users`, `/workspace/organizations`, `/workspace/markets` and `/workspace/session`
+- the active frontend workspace now also includes `/workspace/operations` for operational visibility over `429`, `409`, offboarding and export workflow
 - the users experience should consume `/api/access/users` and membership APIs as the primary access-management surface
 - the users workspace may expose a dedicated `Usuarios sem membership` diagnostic view backed by `/api/access/users/orphans`, explicitly positioned as data-repair tooling rather than the normal onboarding path
 - user creation in the frontend should require `organizationId`, optional `marketId` and non-empty `roles` so the first membership is provisioned in the same request
@@ -47,7 +47,6 @@ The frontend source tree is not the active implementation focus of this reposito
 - frontend environment resolution now auto-upgrades an insecure `http` API base URL to `https` whenever the app itself is running under an `https` origin, reducing published mixed-content failures during auth/login
 - browser-blocked auth requests now surface an actionable network/CORS/mixed-content hint from the shared API client instead of only bubbling a generic `Failed to fetch`-style error
 - the production frontend should point to `https://api.oryzem.com` as the canonical API base URL
-- the public API HTTPS/DNS/ALB setup and verification history is documented in `docs/runbooks/PUBLIC_API_HTTPS.md`
 - the published backend environment was revalidated on `2026-04-01`: `GET /api/access/users` now resolves through the secured backend route and returns structured `401 Unauthorized` for anonymous traffic instead of the previously reported static-resource-style `404`
 
 ## Core themes
@@ -55,14 +54,3 @@ The frontend source tree is not the active implementation focus of this reposito
 - contextual access control by tenant, organization and market
 - low-friction administration suitable for smaller and medium-sized businesses
 - clear separation between identity data and runtime authorization context
-
-## Out of scope for the active product
-- portfolio
-- program
-- project
-- product, item and deliverable execution
-- operations
-- reports
-- portfolio-specific document storage
-
-Those capabilities are not frozen in place anymore. They were removed from runtime and schema support so the codebase matches the active product boundary.

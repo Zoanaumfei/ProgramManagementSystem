@@ -17,36 +17,14 @@ Why:
 - tenant and role context changes faster than identity shape
 - local authorization keeps the product independent from Cognito group topology
 
-## ADR-003 Legacy users surface removed before production
-Decision:
-- `/api/users` and its coexistence machinery were removed before go-live
-
-Why:
-- system is not yet in production
-- reducing conceptual duplication now is cheaper than a long coexistence window later
-
-## ADR-004 app_user is identity-only and standard onboarding provisions the first membership immediately
+## ADR-003 app_user is identity-only and standard onboarding provisions the first membership immediately
 Decision:
 - `app_user` stores only identity and lifecycle data
 - legacy `app_user.role`, `app_user.tenant_id` and `app_user.tenant_type` are removed from the physical schema
-- `/api/access/users` remains the lifecycle surface
 - standard user creation now provisions the first membership inside `POST /api/access/users`
 - `POST /api/access/users/{userId}/bootstrap-membership` remains available only for lifecycle-only users that still need a first membership assigned later
 
 Why:
 - runtime authorization already belongs to membership, so keeping access snapshots in `app_user` creates duplicate truth
 - provisioning the first membership during standard user creation reduces failed first-login scenarios and removes an unnecessary admin step from the common path
-- preserving the bootstrap endpoint keeps a safe recovery path for legacy or inconsistent records without making it the default onboarding contract
 - removing the columns before production reduces the chance of accidental fallback logic returning later
-
-## ADR-005 Portfolio/program/project runtime is removed instead of frozen
-Decision:
-- the active product boundary is `user + organization + access`
-- dormant portfolio/program/project, operations and reports modules are physically removed from runtime
-- temporary `/api/portfolio/**` freeze behavior is retired
-- legacy schema support for those dormant modules is dropped by migration `V11__remove_dormant_domain_surfaces.sql`
-
-Why:
-- keeping dormant code and tables created maintenance cost without supporting the active product
-- removing the temporary freeze contract avoids confusing clients about what is actually supported
-- a future re-entry of portfolio/project work should be a deliberate new capability, not a hidden dormant runtime

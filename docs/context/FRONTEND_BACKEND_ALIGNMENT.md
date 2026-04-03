@@ -18,10 +18,12 @@ This repository now exposes only the core membership-first platform surface.
 ## Backend behaviors the frontend must honor
 - frontend should treat membership APIs as the main access-management surface
 - frontend should treat organization administration as part of the core access shell
-- frontend must not call `/api/portfolio/**`, `/api/operations/**` or `/api/reports/**`
+- frontend should rely exclusively on the active access-first surface documented in the backend contract
 - frontend should send `X-Access-Context` when operating under a request-scoped selected membership
 - invalid `X-Access-Context` values fail closed with `400 Bad Request`
 - frontend should rely on structured `401`/`403` payloads with `message`, `path` and `correlationId` to explain authorization failures to admins
+- the operational dashboard frontend at `/workspace/operations` expects an aggregated backend endpoint such as `GET /api/admin/operational/overview` with `from`, `to`, `tenantId`, `tenantTier`, `path` and `activeOnly` filters
+- the operational dashboard should receive `kpis`, `series`, `topTenants`, optional `alerts` and per-tenant drill-down details from the aggregated backend response
 - frontend should require `organizationId` and `roles` when creating users because the backend now provisions the first membership in the same request
 - `GET /api/access/users/orphans` is a cleanup/discovery surface for inconsistent data only, not the normal onboarding path
 - frontend should treat business codes such as `ORPHAN_USER_DETECTED`, `USER_ACTIVE_MEMBERSHIP_REQUIRED` and `USER_CREATION_MEMBERSHIP_FAILED` as actionable data-repair errors rather than as recoverable inline onboarding states

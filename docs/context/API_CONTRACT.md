@@ -37,12 +37,6 @@
 - `PATCH /api/access/organizations/{organizationId}/exports`
 - `GET /api/authz/check`
 
-Removed endpoint families:
-- `/api/portfolio/**`
-- `/api/operations/**`
-- `/api/reports/**`
-- legacy `/api/users/**`
-
 ## Core contract guarantees
 - `/api/auth/me` and `/api/access/*` remain the supported public core surface.
 - hardening changes preserve route shape and payload compatibility for the active core.
@@ -352,5 +346,3 @@ Important behavior:
 - relationship payloads/responses now carry `localOrganizationCode`
 - `OrganizationResponse` no longer exposes any program or portfolio summary block
 - `OrganizationPurgeResponse` no longer exposes purged program or document counters
-- callers must stop using `/api/portfolio/**`, `/api/operations/**` and `/api/reports/**`
-- permission lists returned by `/api/auth/me` and membership endpoints no longer include `portfolio.*`, `operations.*` or `reports.*`
