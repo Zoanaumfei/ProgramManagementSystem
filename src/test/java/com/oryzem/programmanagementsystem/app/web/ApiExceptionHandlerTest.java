@@ -5,6 +5,7 @@ import static org.hamcrest.Matchers.blankOrNullString;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -62,6 +63,41 @@ class ApiExceptionHandlerTest {
                 .andExpect(jsonPath("$.hint").value("Remova ou revise os vínculos de acesso relacionados a esta organização antes de tentar o purge novamente."));
     }
 
+    @Test
+    void shouldReturnSpecificConflictForMembershipOrganizationConstraint() throws Exception {
+        mockMvc.perform(put("/api/access/users/USR-123/memberships/MBR-123")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("Conflict"))
+                .andExpect(jsonPath("$.code").value("MEMBERSHIP_ORGANIZATION_REFERENCE_INVALID"))
+                .andExpect(jsonPath("$.message").value(
+                        "Nao foi possivel salvar o membership porque a organizacao informada nao existe ou nao esta mais disponivel."))
+                .andExpect(jsonPath("$.hint").value("Revise a organizacao selecionada e tente novamente."));
+    }
+
+    @Test
+    void shouldReturnSpecificConflictForMembershipRoleConstraint() throws Exception {
+        mockMvc.perform(put("/api/access/users/USR-123/memberships/MBR-ROLE")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("Conflict"))
+                .andExpect(jsonPath("$.code").value("MEMBERSHIP_ROLE_REFERENCE_INVALID"))
+                .andExpect(jsonPath("$.message").value(
+                        "Nao foi possivel salvar o membership porque um ou mais perfis informados sao invalidos."))
+                .andExpect(jsonPath("$.hint").value("Revise os perfis selecionados e tente novamente."));
+    }
+
+    @Test
+    void shouldKeepGenericConflictForUnknownIntegrityViolations() throws Exception {
+        mockMvc.perform(put("/api/access/users/USR-123/memberships/MBR-GENERIC")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("Conflict"))
+                .andExpect(jsonPath("$.code").value("DATA_INTEGRITY_VIOLATION"))
+                .andExpect(jsonPath("$.message").value(
+                        "Nao foi possivel concluir a operacao porque ainda existem dados relacionados a este registro."));
+    }
+
     @TestConfiguration
     static class TestConfig {
 
@@ -84,6 +120,29 @@ class ApiExceptionHandlerTest {
             throw new DataIntegrityViolationException(
                     "ERROR: update or delete on table \"organization\" violates foreign key constraint "
                             + "\"fk_user_membership_organization\" on table \"user_membership\"");
+        }
+
+        @org.springframework.web.bind.annotation.PutMapping("/api/access/users/USR-123/memberships/MBR-123")
+        String membershipOrganizationBoom() {
+            throw new DataIntegrityViolationException(
+                    "Membership update failed",
+                    new RuntimeException(
+                            "ERROR: insert or update on table \"user_membership\" violates foreign key constraint "
+                                    + "\"fk_user_membership_organization\""));
+        }
+
+        @org.springframework.web.bind.annotation.PutMapping("/api/access/users/USR-123/memberships/MBR-ROLE")
+        String membershipRoleBoom() {
+            throw new DataIntegrityViolationException(
+                    "Membership role update failed",
+                    new RuntimeException(
+                            "ERROR: insert or update on table \"membership_role\" violates foreign key constraint "
+                                    + "\"fk_membership_role_role\""));
+        }
+
+        @org.springframework.web.bind.annotation.PutMapping("/api/access/users/USR-123/memberships/MBR-GENERIC")
+        String membershipGenericBoom() {
+            throw new DataIntegrityViolationException("Generic integrity failure");
         }
     }
 }

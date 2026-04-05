@@ -33,6 +33,11 @@ The backend status below was cross-checked against the code currently present in
 The frontend source tree is not the active implementation focus of this repository today, so the notes below should be treated as integration guidance plus tracked product status rather than fully repository-verified UI code.
 
 - the active frontend direction remains the access-first workspace flow centered on `/workspace`, `/workspace/users`, `/workspace/organizations`, `/workspace/markets` and `/workspace/session`
+- the organizations workspace is now split into dedicated route-driven screens under `/workspace/organizations/*` for list, detail, create, edit, relationships and purge flows
+- the organizations detail screen now uses a dashboard-style two-column layout with identity/metadata on the left and actions/relationship preview on the right
+- the organizations relationships screen now uses a hub layout with a contextual overview rail, a dedicated creation panel and a relationship list/editor area
+- the organizations workspace render was further decomposed into dedicated screen components for list, create/edit, purge, detail and relationships, leaving the main container focused on routing and shared state
+- the organizations screen split was validated with a production build after extraction, so the routing and component boundaries are now the current stable layout baseline
 - the active frontend workspace now also includes `/workspace/operations` for operational visibility over `429`, `409`, offboarding and export workflow
 - the operational dashboard is backed by `GET /api/admin/operational/overview`, which returns aggregated KPIs, series, top tenants, tenant drill-down details, alerts and recent events
 - the users experience should consume `/api/access/users` and membership APIs as the primary access-management surface
@@ -47,6 +52,10 @@ The frontend source tree is not the active implementation focus of this reposito
 - frontend regression coverage now includes structured security-error handling for `/api/auth/me`, `/api/access/users` and `/api/access/organizations`, including visible `correlationId` assertions in the admin UI
 - frontend environment resolution now auto-upgrades an insecure `http` API base URL to `https` whenever the app itself is running under an `https` origin, reducing published mixed-content failures during auth/login
 - browser-blocked auth requests now surface an actionable network/CORS/mixed-content hint from the shared API client instead of only bubbling a generic `Failed to fetch`-style error
+- actionable UI elements now use the hand cursor globally (`button`, `a`, `summary`, `label`, `select`, and checkbox/radio inputs), while disabled buttons keep the normal visual weight instead of fading and the login submit button can still switch to `wait` only during the active sign-in request
+- the login page now syncs browser autofill values from the DOM on mount so the submit button reflects the real credential state on first visit instead of staying visually disabled until a manual input event
+- the login page also watches for late browser autofill updates during the first seconds after mount and via autofill animation hooks, so the submit button can enable itself without requiring a focus/click round-trip
+- the login submit button now stays enabled before the request starts and rejects empty credential submits inside the handler, which keeps the hand cursor visible on first visit even if the browser has not exposed autofill yet
 - the production frontend should point to `https://api.oryzem.com` as the canonical API base URL
 - the published backend environment was revalidated on `2026-04-01`: `GET /api/access/users` now resolves through the secured backend route and returns structured `401 Unauthorized` for anonymous traffic instead of the previously reported static-resource-style `404`
 

@@ -123,6 +123,24 @@ public class ApiExceptionHandler {
                             extras));
         }
 
+        Map<String, Object> membershipReferenceError = membershipReferenceError(request, exception);
+        if (membershipReferenceError != null) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(errorBody(
+                            request,
+                            HttpStatus.CONFLICT,
+                            "Conflict",
+                            String.valueOf(membershipReferenceError.remove("message")),
+                            membershipReferenceError));
+        }
+
+        log.warn(
+                "Generic data integrity violation for [{} {}] correlationId={} cause={}",
+                request != null ? request.getMethod() : "unknown",
+                request != null ? request.getRequestURI() : "unknown",
+                requestCorrelationContext.getOrCreate(),
+                mostSpecificMessage(exception));
+
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(errorBody(
                         request,
@@ -235,5 +253,64 @@ public class ApiExceptionHandler {
         }
         return message.contains("fk_user_membership_organization")
                 || message.contains("\"user_membership\"");
+    }
+
+    private Map<String, Object> membershipReferenceError(
+            HttpServletRequest request,
+            DataIntegrityViolationException exception) {
+        if (request == null || request.getRequestURI() == null || !request.getRequestURI().contains("/memberships/")) {
+            return null;
+        }
+
+        String message = mostSpecificMessage(exception);
+        if (message == null || message.isBlank()) {
+            return null;
+        }
+
+        if (message.contains("fk_user_membership_tenant")) {
+            return integrityError(
+                    "MEMBERSHIP_TENANT_REFERENCE_INVALID",
+                    "Nao foi possivel salvar o membership porque o tenant informado nao existe ou nao esta mais disponivel.",
+                    "Revise o tenant selecionado e tente novamente.");
+        }
+        if (message.contains("fk_user_membership_organization")) {
+            return integrityError(
+                    "MEMBERSHIP_ORGANIZATION_REFERENCE_INVALID",
+                    "Nao foi possivel salvar o membership porque a organizacao informada nao existe ou nao esta mais disponivel.",
+                    "Revise a organizacao selecionada e tente novamente.");
+        }
+        if (message.contains("fk_user_membership_market")) {
+            return integrityError(
+                    "MEMBERSHIP_MARKET_REFERENCE_INVALID",
+                    "Nao foi possivel salvar o membership porque o mercado informado nao existe ou nao esta mais disponivel.",
+                    "Revise o mercado selecionado e tente novamente.");
+        }
+        if (message.contains("fk_membership_role_role")) {
+            return integrityError(
+                    "MEMBERSHIP_ROLE_REFERENCE_INVALID",
+                    "Nao foi possivel salvar o membership porque um ou mais perfis informados sao invalidos.",
+                    "Revise os perfis selecionados e tente novamente.");
+        }
+
+        return null;
+    }
+
+    private Map<String, Object> integrityError(String code, String message, String hint) {
+        Map<String, Object> extras = new LinkedHashMap<>();
+        extras.put("code", code);
+        extras.put("hint", hint);
+        extras.put("message", message);
+        return extras;
+    }
+
+    private String mostSpecificMessage(DataIntegrityViolationException exception) {
+        if (exception == null) {
+            return null;
+        }
+        Throwable mostSpecificCause = exception.getMostSpecificCause();
+        if (mostSpecificCause != null && mostSpecificCause.getMessage() != null && !mostSpecificCause.getMessage().isBlank()) {
+            return mostSpecificCause.getMessage();
+        }
+        return exception.getMessage();
     }
 }
