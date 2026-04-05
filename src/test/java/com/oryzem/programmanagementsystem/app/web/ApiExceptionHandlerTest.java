@@ -88,6 +88,19 @@ class ApiExceptionHandlerTest {
     }
 
     @Test
+    void shouldReturnSpecificConflictForDuplicateMembershipRoleConstraint() throws Exception {
+        mockMvc.perform(put("/api/access/users/USR-123/memberships/MBR-DUPLICATE-ROLE")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("Conflict"))
+                .andExpect(jsonPath("$.code").value("MEMBERSHIP_ROLE_DUPLICATE"))
+                .andExpect(jsonPath("$.message").value(
+                        "Nao foi possivel salvar o membership porque o mesmo perfil foi associado mais de uma vez a este vinculo."))
+                .andExpect(jsonPath("$.hint").value(
+                        "Tente novamente. Se o problema persistir, revise os perfis atuais do membership antes de salvar."));
+    }
+
+    @Test
     void shouldKeepGenericConflictForUnknownIntegrityViolations() throws Exception {
         mockMvc.perform(put("/api/access/users/USR-123/memberships/MBR-GENERIC")
                         .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
@@ -138,6 +151,15 @@ class ApiExceptionHandlerTest {
                     new RuntimeException(
                             "ERROR: insert or update on table \"membership_role\" violates foreign key constraint "
                                     + "\"fk_membership_role_role\""));
+        }
+
+        @org.springframework.web.bind.annotation.PutMapping("/api/access/users/USR-123/memberships/MBR-DUPLICATE-ROLE")
+        String membershipDuplicateRoleBoom() {
+            throw new DataIntegrityViolationException(
+                    "Membership role duplicate failed",
+                    new RuntimeException(
+                            "ERROR: duplicate key value violates unique constraint "
+                                    + "\"uq_membership_role_membership_code\""));
         }
 
         @org.springframework.web.bind.annotation.PutMapping("/api/access/users/USR-123/memberships/MBR-GENERIC")

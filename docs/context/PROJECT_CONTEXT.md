@@ -43,6 +43,7 @@ The frontend source tree is not the active implementation focus of this reposito
 - the users experience should consume `/api/access/users` and membership APIs as the primary access-management surface
 - the users workspace may expose a dedicated `Usuarios sem membership` diagnostic view backed by `/api/access/users/orphans`, explicitly positioned as data-repair tooling rather than the normal onboarding path
 - user creation in the frontend should require `organizationId`, optional `marketId` and non-empty `roles` so the first membership is provisioned in the same request
+- the user-create form in `/workspace/users` now requires an explicit organization selection by the operator, shows an inline warning while none is selected and blocks submit even if the create button state is bypassed
 - the frontend users workspace now surfaces orphan-user and missing-active-membership failures as operational inconsistency states, not as generic request errors, and includes `correlationId` in the administrative error copy when the backend provides it
 - the memberships workspace copy now treats `bootstrap-membership` as an exceptional repair flow only; normal onboarding messaging points to `POST /api/access/users` as the standard path
 - organization management in the frontend should follow the relationship-first model and treat `localOrganizationCode` as relationship metadata, not organization identity

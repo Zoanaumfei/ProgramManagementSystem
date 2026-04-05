@@ -291,6 +291,12 @@ public class ApiExceptionHandler {
                     "Nao foi possivel salvar o membership porque um ou mais perfis informados sao invalidos.",
                     "Revise os perfis selecionados e tente novamente.");
         }
+        if (message.contains("uq_membership_role_membership_code")) {
+            return integrityError(
+                    "MEMBERSHIP_ROLE_DUPLICATE",
+                    "Nao foi possivel salvar o membership porque o mesmo perfil foi associado mais de uma vez a este vinculo.",
+                    "Tente novamente. Se o problema persistir, revise os perfis atuais do membership antes de salvar.");
+        }
 
         return null;
     }

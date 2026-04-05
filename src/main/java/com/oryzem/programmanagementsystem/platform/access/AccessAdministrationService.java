@@ -524,6 +524,7 @@ public class AccessAdministrationService {
 
     private void replaceRoles(String membershipId, Set<Role> roles) {
         membershipRoleRepository.deleteByMembershipId(membershipId);
+        membershipRoleRepository.flush();
         roles.stream()
                 .sorted(Comparator.comparing(Enum::name))
                 .forEach(role -> membershipRoleRepository.save(MembershipRoleEntity.create(
@@ -683,7 +684,7 @@ public class AccessAdministrationService {
         if (actor.hasRole(Role.ADMIN) && actor.tenantType() == TenantType.INTERNAL) {
             return decision;
         }
-        if (actor.hasRole(Role.SUPPORT)) {
+        if (actor.hasRole(Role.SUPPORT) && actor.tenantType() == TenantType.INTERNAL) {
             return decision;
         }
         if (actor.activeTenantId() != null && actor.activeTenantId().equals(tenant.getId()) && actor.hasRole(Role.ADMIN)) {

@@ -296,12 +296,58 @@ class AccessAdministrationControllerTest {
     }
 
     @Test
+    void shouldUpdateMembershipKeepingSameRoleWithoutDuplicateConstraint() throws Exception {
+        String createResponse = mockMvc.perform(post("/api/access/users/USR-EXT-A-MEM-001/memberships")
+                        .with(internalAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "tenantId": "TEN-tenant-a",
+                                  "organizationId": "tenant-a",
+                                  "roles": ["SUPPORT"],
+                                  "defaultMembership": false,
+                                  "status": "ACTIVE"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String membershipId = objectMapper.readTree(createResponse).get("id").asText();
+
+        mockMvc.perform(put("/api/access/users/USR-EXT-A-MEM-001/memberships/" + membershipId)
+                        .with(internalAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "tenantId": "TEN-tenant-a",
+                                  "organizationId": "tenant-a",
+                                  "roles": ["SUPPORT"],
+                                  "defaultMembership": false,
+                                  "status": "ACTIVE"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(membershipId))
+                .andExpect(jsonPath("$.roles[0]").value("SUPPORT"));
+    }
+
+    @Test
     void shouldListVisibleTenantsForInternalAdmin() throws Exception {
         mockMvc.perform(get("/api/access/tenants")
                         .with(internalAdmin()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[*].id", hasItem("TEN-tenant-a")))
                 .andExpect(jsonPath("$[*].name", hasItem("Tenant A")));
+    }
+
+    @Test
+    void externalAdminWithSupportRoleShouldNotListInternalOrSiblingTenants() throws Exception {
+        mockMvc.perform(get("/api/access/tenants")
+                        .with(externalAdminSupportTenantA()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].id").value("TEN-tenant-a"));
     }
 
     @Test
@@ -337,6 +383,24 @@ class AccessAdministrationControllerTest {
                         .with(internalAdmin()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("INACTIVE"));
+    }
+
+    @Test
+    void externalAdminWithSupportRoleShouldNotCreateMarketOutsideOwnTenant() throws Exception {
+        mockMvc.perform(post("/api/access/tenants/TEN-tenant-b/markets")
+                        .with(externalAdminSupportTenantA())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "code": "INT-BR",
+                                  "name": "Internal Brazil",
+                                  "currencyCode": "BRL",
+                                  "languageCode": "pt-BR",
+                                  "timezone": "America/Sao_Paulo",
+                                  "status": "ACTIVE"
+                                }
+                                """))
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -402,6 +466,17 @@ class AccessAdministrationControllerTest {
                         .claim("email", "support@oryzem.com")
                         .claim("token_use", "access"))
                 .authorities(new SimpleGrantedAuthority("ROLE_SUPPORT"));
+    }
+
+    private RequestPostProcessor externalAdminSupportTenantA() {
+        return jwt().jwt(jwt -> jwt
+                        .claim("sub", "admin.a@tenant.com-sub")
+                        .claim("cognito:username", "admin.a@tenant.com")
+                        .claim("email", "admin.a@tenant.com")
+                        .claim("token_use", "access"))
+                .authorities(
+                        new SimpleGrantedAuthority("ROLE_ADMIN"),
+                        new SimpleGrantedAuthority("ROLE_SUPPORT"));
     }
 
     private RequestPostProcessor tenantAUser() {
