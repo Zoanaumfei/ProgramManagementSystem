@@ -15,7 +15,7 @@
   "containerDefinitions": [
     {
       "name": "program-management-system",
-      "image": "439533253319.dkr.ecr.sa-east-1.amazonaws.com/oryzem-backend-dev:latest",
+      "image": "439533253319.dkr.ecr.sa-east-1.amazonaws.com/oryzem-backend-dev:project-management-20260408-1637",
       "essential": true,
       "portMappings": [
         {
@@ -52,11 +52,15 @@
         },
         {
           "name": "APP_BOOTSTRAP_INTERNAL_ADMIN_ENABLED",
-          "value": "true"
+          "value": "false"
         },
         {
           "name": "APP_BOOTSTRAP_INTERNAL_ADMIN_PRUNE_OTHER_INTERNAL_USERS",
-          "value": "true"
+          "value": "false"
+        },
+        {
+          "name": "APP_BOOTSTRAP_INTERNAL_ADMIN_PRUNE_TO_INTERNAL_CORE",
+          "value": "false"
         },
         {
           "name": "APP_BOOTSTRAP_INTERNAL_ADMIN_EMAIL",

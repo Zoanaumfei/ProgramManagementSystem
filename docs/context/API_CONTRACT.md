@@ -37,6 +37,32 @@
 - `PATCH /api/access/organizations/{organizationId}/exports`
 - `GET /api/admin/operational/overview`
 - `GET /api/authz/check`
+- `POST /api/projects`
+- `GET /api/projects`
+- `GET /api/projects/{projectId}`
+- `PATCH /api/projects/{projectId}`
+- `POST /api/projects/{projectId}/organizations`
+- `GET /api/projects/{projectId}/organizations`
+- `POST /api/projects/{projectId}/members`
+- `GET /api/projects/{projectId}/members`
+- `GET /api/projects/{projectId}/milestones`
+- `PATCH /api/projects/{projectId}/milestones/{milestoneId}`
+- `GET /api/projects/{projectId}/deliverables`
+- `GET /api/projects/{projectId}/deliverables/pending-review`
+- `GET /api/projects/{projectId}/deliverables/{deliverableId}`
+- `PATCH /api/projects/{projectId}/deliverables/{deliverableId}`
+- `POST /api/projects/{projectId}/deliverables/{deliverableId}/submissions`
+- `GET /api/projects/{projectId}/deliverables/{deliverableId}/submissions`
+- `GET /api/projects/{projectId}/deliverables/{deliverableId}/submissions/{submissionId}`
+- `POST /api/projects/{projectId}/deliverables/{deliverableId}/submissions/{submissionId}/approve`
+- `POST /api/projects/{projectId}/deliverables/{deliverableId}/submissions/{submissionId}/reject`
+- `GET /api/projects/{projectId}/dashboard`
+- `POST /api/document-contexts/{contextType}/{contextId}/documents/uploads`
+- `GET /api/document-contexts/{contextType}/{contextId}/documents`
+- `GET /api/documents/{documentId}`
+- `POST /api/documents/{documentId}/finalize-upload`
+- `POST /api/documents/{documentId}/download-url`
+- `DELETE /api/documents/{documentId}`
 
 ## Core contract guarantees
 - `/api/auth/me` and `/api/access/*` remain the supported public core surface.
@@ -347,3 +373,185 @@ Important behavior:
 - relationship payloads/responses now carry `localOrganizationCode`
 - `OrganizationResponse` no longer exposes any program or portfolio summary block
 - `OrganizationPurgeResponse` no longer exposes purged program or document counters
+
+## Project management
+`/api/projects` is now the active collaborative project-management surface.
+
+Create request shape:
+```json
+{
+  "code": "PRJ-APQP-001",
+  "name": "Project PRJ-APQP-001",
+  "description": "integration flow",
+  "frameworkType": "APQP",
+  "templateId": "TMP-APQP-V1",
+  "customerOrganizationId": "ORG-123",
+  "status": "PLANNED",
+  "visibilityScope": "ALL_PROJECT_PARTICIPANTS",
+  "plannedStartDate": "2026-04-08",
+  "plannedEndDate": "2026-06-30"
+}
+```
+
+Important behavior:
+- `Idempotency-Key` is supported on create and submission/review mutation flows
+- when `templateId` is omitted, the backend resolves the current default template for the chosen `frameworkType`
+- the lead organization is always derived from the authenticated active access context, not from a free-form request field
+- project update, milestone update, deliverable update and submission review flows use optimistic concurrency through `version`
+
+`ProjectSummaryResponse` includes:
+- `id`
+- `code`
+- `name`
+- `frameworkType`
+- `status`
+- `visibilityScope`
+- `leadOrganizationId`
+- `customerOrganizationId`
+- `plannedStartDate`
+- `plannedEndDate`
+- `createdAt`
+
+`ProjectDetailResponse` includes:
+- `id`
+- `code`
+- `name`
+- `description`
+- `frameworkType`
+- `templateId`
+- `templateVersion`
+- `leadOrganizationId`
+- `customerOrganizationId`
+- `status`
+- `visibilityScope`
+- `plannedStartDate`
+- `plannedEndDate`
+- `actualStartDate`
+- `actualEndDate`
+- `createdByUserId`
+- `createdAt`
+- `updatedAt`
+- `version`
+- `organizations`
+- `members`
+
+`ProjectDashboardResponse` includes:
+- `projectId`
+- `totalDeliverables`
+- `pendingSubmissionCount`
+- `pendingReviewCount`
+- `approvedCount`
+- `rejectedCount`
+- `overdueCount`
+- `milestonesAtRisk`
+- `nextMilestoneDate`
+
+`ProjectMilestoneResponse` includes:
+- `id`
+- `phaseId`
+- `code`
+- `name`
+- `sequence`
+- `plannedDate`
+- `actualDate`
+- `status`
+- `ownerOrganizationId`
+- `visibilityScope`
+- `version`
+
+`ProjectDeliverableResponse` includes:
+- `id`
+- `phaseId`
+- `milestoneId`
+- `code`
+- `name`
+- `description`
+- `deliverableType`
+- `responsibleOrganizationId`
+- `responsibleUserId`
+- `approverOrganizationId`
+- `approverUserId`
+- `requiredDocument`
+- `plannedDueDate`
+- `submittedAt`
+- `approvedAt`
+- `status`
+- `priority`
+- `visibilityScope`
+- `version`
+
+Deliverable submission create request:
+```json
+{
+  "deliverableVersion": 0,
+  "documentIds": ["DOC-123"]
+}
+```
+
+Deliverable review request:
+```json
+{
+  "reviewComment": "Looks good",
+  "version": 0
+}
+```
+
+`DeliverableSubmissionResponse` includes:
+- `id`
+- `submissionNumber`
+- `submittedByUserId`
+- `submittedByOrganizationId`
+- `submittedAt`
+- `status`
+- `reviewComment`
+- `reviewedByUserId`
+- `reviewedAt`
+- `version`
+- `documentIds`
+
+## Document management
+The active document-management contexts relevant to project-management are:
+- `PROJECT`
+- `PROJECT_DELIVERABLE`
+- `PROJECT_DELIVERABLE_SUBMISSION`
+
+Upload-initiation request shape:
+```json
+{
+  "originalFilename": "evidence.pdf",
+  "contentType": "application/pdf",
+  "sizeBytes": 2048,
+  "checksumSha256": "..."
+}
+```
+
+`UploadSessionResponse` includes:
+- `documentId`
+- `url`
+- `fields`
+- `expiresAt`
+
+`DocumentResponse` includes:
+- `id`
+- `tenantId`
+- `contextType`
+- `contextId`
+- `ownerOrganizationId`
+- `originalFilename`
+- `safeFilename`
+- `contentType`
+- `extension`
+- `sizeBytes`
+- `checksumSha256`
+- `status`
+- `uploadedByUserId`
+- `uploadedByOrganizationId`
+- `createdAt`
+- `updatedAt`
+- `deletedAt`
+
+Important behavior:
+- the frontend must upload the raw file directly to the returned presigned POST target, then call `POST /api/documents/{documentId}/finalize-upload`
+- the backend validates filename extension, content type, checksum and exact file size during initiation/finalize
+- current file policy allows office files, pdf, csv/txt and common raster image formats, and rejects executable/compressed/cad-oriented extensions
+- the default max file size is `26214400` bytes (`25 MB`)

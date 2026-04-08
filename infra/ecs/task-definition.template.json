@@ -52,11 +52,15 @@
         },
         {
           "name": "APP_BOOTSTRAP_INTERNAL_ADMIN_ENABLED",
-          "value": "true"
+          "value": "false"
         },
         {
           "name": "APP_BOOTSTRAP_INTERNAL_ADMIN_PRUNE_OTHER_INTERNAL_USERS",
-          "value": "true"
+          "value": "false"
+        },
+        {
+          "name": "APP_BOOTSTRAP_INTERNAL_ADMIN_PRUNE_TO_INTERNAL_CORE",
+          "value": "false"
         },
         {
           "name": "APP_BOOTSTRAP_INTERNAL_ADMIN_EMAIL",

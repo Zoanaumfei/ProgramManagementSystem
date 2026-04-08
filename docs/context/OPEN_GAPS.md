@@ -24,6 +24,9 @@
 - expose richer tenant directory data if the client needs more than the current tenant summary response
 - add explicit regression coverage for removed legacy route families returning missing-route behavior from a consumer perspective
 - confirm whether the frontend should show direct-partner relationships as view-only in the organization and user workspaces, or surface that distinction only through authorization failures
+- expose a public project-template discovery endpoint if the frontend should stop relying on known seeded defaults for `APQP`, `VDA_MLA` and `CUSTOM`
+- finish the dedicated participant-management UI for project organizations/members on top of the already-available backend endpoints
+- implement the project-management operational inbox view proposed for `/workspace/projects/inbox`
 
 ## Open low priority gaps
 - add a dedicated read model for user listing if the product later wants to separate identity administration from access administration in the UI

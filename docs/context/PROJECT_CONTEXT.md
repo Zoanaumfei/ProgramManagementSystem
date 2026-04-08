@@ -13,6 +13,10 @@ Oryzem is being positioned as a SaaS platform for PMEs that need simple multi-te
 The backend status below was cross-checked against the code currently present in this repository.
 
 - the active backend surface is centered on `/api/auth/me`, `/api/access/users`, `/api/access/users/{userId}/memberships`, `/api/access/organizations`, `/api/access/organizations/{organizationId}/relationships`, `/api/access/tenants` and related operational endpoints
+- the backend now also exposes the new `project-management` and `document-management` surfaces through `/api/projects`, `/api/document-contexts/{contextType}/{contextId}/documents`, `/api/documents/{documentId}/finalize-upload` and `/api/documents/{documentId}/download-url`
+- project management currently supports project creation/list/detail/update, participant organization/member registration, milestone listing, deliverable listing/detail/update, deliverable submission create/review, project dashboard and pending-review listing
+- project creation resolves the applied template from `templateId` when provided, and otherwise falls back to the active default template for the chosen `frameworkType`
+- document management now supports the `PROJECT`, `PROJECT_DELIVERABLE` and `PROJECT_DELIVERABLE_SUBMISSION` contexts with direct upload initiation, backend-side finalize, contextual listing, signed download URL generation and soft delete
 - user onboarding now provisions the first membership during `POST /api/access/users`, so the standard invite flow no longer depends on a later bootstrap-membership step
 - `GET /api/access/users/orphans` exists only as an inconsistency discovery surface for unexpected legacy/test data; orphan users are no longer treated as a valid lifecycle state
 - internal break-glass administration resolves from local membership roles `ADMIN`, `SUPPORT` and `AUDITOR`, matching the Cognito bootstrap groups used for the internal global user
@@ -33,6 +37,12 @@ The backend status below was cross-checked against the code currently present in
 The frontend source tree is not the active implementation focus of this repository today, so the notes below should be treated as integration guidance plus tracked product status rather than fully repository-verified UI code.
 
 - the active frontend direction remains the access-first workspace flow centered on `/workspace`, `/workspace/users`, `/workspace/organizations`, `/workspace/markets` and `/workspace/session`
+- the active frontend workspace now also includes `/workspace/projects/*` for collaborative project management backed by the new project/document modules
+- the frontend project-management module now ships the MVP routes for project list, project creation wizard, project detail with tabs, deliverable detail and submission detail, all integrated with the real backend contract
+- the project detail screen now centralizes summary, milestones, deliverables, participants and project documents, while the deliverable detail screen concentrates work-package documents plus submission creation and the submission detail screen concentrates review/approve/reject actions
+- the project create flow currently binds the lead organization to the operator's active access context, matching the backend contract, and uses the known seeded default template ids for `APQP`, `VDA_MLA` and `CUSTOM` because the backend still lacks a public template-list endpoint
+- the current participants tab is live as a read model for project organizations and members, but the dedicated transactional UI for adding/removing participants remains tracked separately as a follow-up refinement
+- the operational inbox view proposed for project-management is still pending in the frontend; the current first release focuses on the core list/detail/deliverable/submission/document workflow
 - the organizations workspace is now split into dedicated route-driven screens under `/workspace/organizations/*` for list, detail, create, edit, relationships and purge flows
 - the organizations detail screen now uses a dashboard-style two-column layout with identity/metadata on the left and actions/relationship preview on the right
 - the organizations relationships screen now uses a hub layout with a contextual overview rail, a dedicated creation panel and a relationship list/editor area
