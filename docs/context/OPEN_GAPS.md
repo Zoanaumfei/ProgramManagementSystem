@@ -12,12 +12,15 @@
 - structured `401`/`403` auth payloads now ship with `timestamp`, `status`, `error`, `message`, `path` and `correlationId`, with backend coverage in the security and exception-handler tests
 - the published backend environment now resolves `GET /api/access/users` through the secured controller path; anonymous validation on `2026-04-01` returned structured `401 Unauthorized` instead of a static-resource `404`
 - the current ECS test environment intentionally runs tenant rate limiting in local mode until a shared Redis dependency is added for that stack
+- the published environments were validated end-to-end for `/api/auth/me`, `/api/access/users` and `/api/access/organizations`, confirming the structured `401`/`403` contract in dev and prod
+- the minimum operational dashboard is now live in the frontend on dev and prod for `429`, `409` quota, offboarding and export requested/completed signals
+- the operational reaction runbook has been exercised successfully in dev and prod against the active core flows
 
 ## Open high priority gaps
-- validate the published environment end-to-end so the frontend consistently receives the structured `401`/`403` payloads already implemented in the backend
-- tighten operational dashboards around new offboarding, quota and rate-limit audit signals
+- none currently tracked for Frente A
 
 ## Open medium priority gaps
+- exercise the automatic alert-threshold flows end-to-end and capture explicit evidence for the already-implemented `429` spike, quota spike and export-backlog rules
 - expose richer tenant directory data if the client needs more than the current tenant summary response
 - add explicit regression coverage for removed legacy route families returning missing-route behavior from a consumer perspective
 - confirm whether the frontend should show direct-partner relationships as view-only in the organization and user workspaces, or surface that distinction only through authorization failures

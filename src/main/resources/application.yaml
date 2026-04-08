@@ -78,6 +78,23 @@ app:
         max-organizations: ${APP_MULTITENANCY_QUOTA_ENTERPRISE_MAX_ORGANIZATIONS:200}
         max-markets: ${APP_MULTITENANCY_QUOTA_ENTERPRISE_MAX_MARKETS:50}
         max-active-memberships: ${APP_MULTITENANCY_QUOTA_ENTERPRISE_MAX_ACTIVE_MEMBERSHIPS:5000}
+  document-management:
+    max-file-size-bytes: ${APP_DOCUMENT_MANAGEMENT_MAX_FILE_SIZE_BYTES:26214400}
+    max-files-per-context: ${APP_DOCUMENT_MANAGEMENT_MAX_FILES_PER_CONTEXT:20}
+    upload-url-ttl-seconds: ${APP_DOCUMENT_MANAGEMENT_UPLOAD_URL_TTL_SECONDS:900}
+    download-url-ttl-seconds: ${APP_DOCUMENT_MANAGEMENT_DOWNLOAD_URL_TTL_SECONDS:180}
+    pending-upload-expiration-minutes: ${APP_DOCUMENT_MANAGEMENT_PENDING_UPLOAD_EXPIRATION_MINUTES:30}
+    storage:
+      provider: ${APP_DOCUMENT_MANAGEMENT_STORAGE_PROVIDER:S3}
+      s3:
+        bucket: ${APP_DOCUMENT_MANAGEMENT_S3_BUCKET:}
+        region: ${APP_DOCUMENT_MANAGEMENT_S3_REGION:${AWS_REGION:sa-east-1}}
+        kms-key-id: ${APP_DOCUMENT_MANAGEMENT_S3_KMS_KEY_ID:}
+        key-prefix: ${APP_DOCUMENT_MANAGEMENT_S3_KEY_PREFIX:tenant}
+  project-management:
+    enabled: ${APP_PROJECT_MANAGEMENT_ENABLED:true}
+    documents-enabled: ${APP_PROJECT_MANAGEMENT_DOCUMENTS_ENABLED:true}
+    pending-review-page-size: ${APP_PROJECT_MANAGEMENT_PENDING_REVIEW_PAGE_SIZE:25}
 
 logging:
   level:

@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-04-05
+- updated `docs/context/OPEN_GAPS.md` to close the remaining Frente A high-priority items after dev/prod validation and runbook execution evidence
+- refreshed `docs/context/PROJECT_CONTEXT.md` to record that the operational dashboard is active in dev and prod and that structured `401`/`403` validation is closed end-to-end
+- refreshed `docs/context/FRONTEND_BACKEND_ALIGNMENT.md` so the operational validation section reflects the current dev/prod status and keeps alert-threshold end-to-end evidence as the remaining follow-up
+
 ## 2026-04-01
 - hardened `users` so create now fails closed when the initial membership cannot be provisioned, with compensating identity cleanup when possible
 - changed orphan users from a tolerated lifecycle state into an explicit inconsistency/error condition with stable business codes for API consumers

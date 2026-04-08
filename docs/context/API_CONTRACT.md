@@ -35,6 +35,7 @@
 - `GET /api/access/organizations/{organizationId}/exports`
 - `POST /api/access/organizations/{organizationId}/exports`
 - `PATCH /api/access/organizations/{organizationId}/exports`
+- `GET /api/admin/operational/overview`
 - `GET /api/authz/check`
 
 ## Core contract guarantees

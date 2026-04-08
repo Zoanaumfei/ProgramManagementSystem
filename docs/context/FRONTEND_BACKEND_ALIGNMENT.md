@@ -132,8 +132,11 @@ The active frontend source tree is not fully present in this repository, so the 
 - frontend error helpers are expected to surface backend-provided refusal reasons and `correlationId`
 - frontend administrative workspaces now surface structured `401`/`403` data from the backend without overwriting the refusal reason with a generic fallback; the visible copy preserves `message`, `path` and `correlationId` in users, organizations and session diagnostics flows
 - frontend runtime config now upgrades `http` API bases to `https` when served from an `https` app origin so the published shell does not keep an insecure backend URL by accident
+- the operational dashboard frontend is now active in dev and prod and consumes the minimum overview contract for `429`, `409` quota, offboarding and export requested/completed panels
 
-## Operational validations still pending
+## Operational validation status
 - the published backend environment was revalidated on `2026-04-01`: `GET /api/access/users` now returns structured `401 Unauthorized` for anonymous requests, confirming that the route is served by the secured backend controller path rather than a static-resource `404`
-- validate the published environment end-to-end so the frontend consistently receives the structured `401`/`403` payloads already implemented in the backend
+- `/api/auth/me`, `/api/access/users` and `/api/access/organizations` have now been validated end-to-end in dev and prod against the structured `401`/`403` contract consumed by the frontend
+- the operational reaction runbook has been exercised in dev and prod for the active core administration surface
+- the automatic alert thresholds are implemented, but explicit end-to-end alert-evidence capture remains a follow-up activity
 - confirm the desired UX for `PARTNER` relationships in organization and user workspaces: explicit read-only distinction versus relying only on authorization failures

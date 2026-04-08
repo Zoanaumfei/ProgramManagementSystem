@@ -40,6 +40,8 @@ The frontend source tree is not the active implementation focus of this reposito
 - the organizations screen split was validated with a production build after extraction, so the routing and component boundaries are now the current stable layout baseline
 - the active frontend workspace now also includes `/workspace/operations` for operational visibility over `429`, `409`, offboarding and export workflow
 - the operational dashboard is backed by `GET /api/admin/operational/overview`, which returns aggregated KPIs, series, top tenants, tenant drill-down details, alerts and recent events
+- the minimum operational dashboard is now running in both dev and prod frontend environments with the expected panels for `429`, `409` quota, offboarding and export requested/completed
+- automatic alert thresholds for rate-limit spike, quota spike and export backlog are implemented, although explicit end-to-end alert testing is still tracked separately from the shipped dashboard
 - the users experience should consume `/api/access/users` and membership APIs as the primary access-management surface
 - the users workspace may expose a dedicated `Usuarios sem membership` diagnostic view backed by `/api/access/users/orphans`, explicitly positioned as data-repair tooling rather than the normal onboarding path
 - user creation in the frontend should require `organizationId`, optional `marketId` and non-empty `roles` so the first membership is provisioned in the same request
@@ -59,6 +61,7 @@ The frontend source tree is not the active implementation focus of this reposito
 - the login submit button now stays enabled before the request starts and rejects empty credential submits inside the handler, which keeps the hand cursor visible on first visit even if the browser has not exposed autofill yet
 - the production frontend should point to `https://api.oryzem.com` as the canonical API base URL
 - the published backend environment was revalidated on `2026-04-01`: `GET /api/access/users` now resolves through the secured backend route and returns structured `401 Unauthorized` for anonymous traffic instead of the previously reported static-resource-style `404`
+- the structured `401`/`403` behavior for `/api/auth/me`, `/api/access/users` and `/api/access/organizations` has now been validated end-to-end in both dev and prod, and the operational reaction runbook has also been exercised in those environments
 
 ## Core themes
 - user and organization administration as the release anchor
