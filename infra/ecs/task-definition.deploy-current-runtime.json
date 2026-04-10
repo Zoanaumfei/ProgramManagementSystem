@@ -1,93 +1,165 @@
 {
-  "containerDefinitions": [
-    {
-      "name": "program-management-system",
-      "image": "439533253319.dkr.ecr.sa-east-1.amazonaws.com/oryzem-backend-dev:auth-gateway-fix-20260324-1919",
-      "cpu": 0,
-      "portMappings": [
-        {
-          "containerPort": 8080,
-          "hostPort": 8080,
-          "protocol": "tcp",
-          "name": "http-8080"
-        }
-      ],
-      "essential": true,
-      "environment": [
-        {
-          "name": "AWS_REGION",
-          "value": "sa-east-1"
-        },
-        {
-          "name": "DB_SECRET_ID",
-          "value": "program-management-system/rds/master"
-        },
-        {
-          "name": "APP_BOOTSTRAP_INTERNAL_ADMIN_ENABLED",
-          "value": "false"
-        },
-        {
-          "name": "APP_SECURITY_IDENTITY_USER_POOL_ID",
-          "value": "sa-east-1_aA4I3tEmF"
-        },
-        {
-          "name": "APP_SECURITY_IDENTITY_REGION",
-          "value": "sa-east-1"
-        },
-        {
-          "name": "SPRING_PROFILES_ACTIVE",
-          "value": "rds"
-        },
-        {
-          "name": "APP_SECURITY_IDENTITY_PROVIDER",
-          "value": "cognito"
-        },
-        {
-          "name": "APP_BOOTSTRAP_INTERNAL_ADMIN_PRUNE_OTHER_INTERNAL_USERS",
-          "value": "false"
-        },
-        {
-          "name": "DB_SSL_MODE",
-          "value": "require"
-        }
-      ],
-      "mountPoints": [],
-      "volumesFrom": [],
-      "logConfiguration": {
-        "logDriver": "awslogs",
-        "options": {
-          "awslogs-group": "/ecs/program-management-system",
-          "awslogs-region": "sa-east-1",
-          "awslogs-stream-prefix": "ecs"
-        }
-      },
-      "healthCheck": {
-        "command": [
-          "CMD-SHELL",
-          "curl -fsS http://localhost:8080/actuator/health/liveness || exit 1"
+    "taskDefinition": {
+        "taskDefinitionArn": "arn:aws:ecs:sa-east-1:439533253319:task-definition/program-management-system:62",
+        "containerDefinitions": [
+            {
+                "name": "program-management-system",
+                "image": "439533253319.dkr.ecr.sa-east-1.amazonaws.com/oryzem-backend-dev:document-s3-20260408-2055",
+                "cpu": 0,
+                "portMappings": [
+                    {
+                        "containerPort": 8080,
+                        "hostPort": 8080,
+                        "protocol": "tcp",
+                        "name": "http-8080"
+                    }
+                ],
+                "essential": true,
+                "environment": [
+                    {
+                        "name": "APP_DOCUMENT_MANAGEMENT_S3_BUCKET",
+                        "value": "oryzem-pms-documents-sa-east-1-439533253319"
+                    },
+                    {
+                        "name": "AWS_REGION",
+                        "value": "sa-east-1"
+                    },
+                    {
+                        "name": "DB_SECRET_ID",
+                        "value": "program-management-system/rds/master"
+                    },
+                    {
+                        "name": "APP_BOOTSTRAP_INTERNAL_ADMIN_ENABLED",
+                        "value": "false"
+                    },
+                    {
+                        "name": "APP_SECURITY_IDENTITY_USER_POOL_ID",
+                        "value": "sa-east-1_aA4I3tEmF"
+                    },
+                    {
+                        "name": "APP_SECURITY_IDENTITY_REGION",
+                        "value": "sa-east-1"
+                    },
+                    {
+                        "name": "SPRING_PROFILES_ACTIVE",
+                        "value": "rds"
+                    },
+                    {
+                        "name": "APP_MULTITENANCY_RATE_LIMIT_STORE",
+                        "value": "local"
+                    },
+                    {
+                        "name": "APP_BOOTSTRAP_INTERNAL_ADMIN_PRUNE_TO_INTERNAL_CORE",
+                        "value": "false"
+                    },
+                    {
+                        "name": "APP_BOOTSTRAP_INTERNAL_ADMIN_EMAIL",
+                        "value": "vanderson.verza@gmail.com"
+                    },
+                    {
+                        "name": "APP_SECURITY_IDENTITY_PROVIDER",
+                        "value": "cognito"
+                    },
+                    {
+                        "name": "APP_PROJECT_MANAGEMENT_DOCUMENTS_ENABLED",
+                        "value": "true"
+                    },
+                    {
+                        "name": "APP_BOOTSTRAP_INTERNAL_ADMIN_PRUNE_OTHER_INTERNAL_USERS",
+                        "value": "false"
+                    },
+                    {
+                        "name": "APP_DOCUMENT_MANAGEMENT_S3_REGION",
+                        "value": "sa-east-1"
+                    },
+                    {
+                        "name": "DB_SSL_MODE",
+                        "value": "require"
+                    },
+                    {
+                        "name": "APP_BOOTSTRAP_INTERNAL_ADMIN_DISPLAY_NAME",
+                        "value": "Vanderson Verza"
+                    }
+                ],
+                "mountPoints": [],
+                "volumesFrom": [],
+                "logConfiguration": {
+                    "logDriver": "awslogs",
+                    "options": {
+                        "awslogs-group": "/ecs/program-management-system",
+                        "awslogs-region": "sa-east-1",
+                        "awslogs-stream-prefix": "ecs"
+                    }
+                },
+                "healthCheck": {
+                    "command": [
+                        "CMD-SHELL",
+                        "curl -fsS http://localhost:8080/actuator/health/liveness || exit 1"
+                    ],
+                    "interval": 30,
+                    "timeout": 5,
+                    "retries": 3,
+                    "startPeriod": 90
+                },
+                "systemControls": []
+            }
         ],
-        "interval": 30,
-        "timeout": 5,
-        "retries": 3,
-        "startPeriod": 90
-      },
-      "systemControls": []
-    }
-  ],
-  "family": "program-management-system",
-  "taskRoleArn": "arn:aws:iam::439533253319:role/program-management-system-ecs-task-role",
-  "executionRoleArn": "arn:aws:iam::439533253319:role/program-management-system-ecs-execution-role",
-  "networkMode": "awsvpc",
-  "volumes": [],
-  "placementConstraints": [],
-  "runtimePlatform": {
-    "cpuArchitecture": "X86_64",
-    "operatingSystemFamily": "LINUX"
-  },
-  "requiresCompatibilities": [
-    "FARGATE"
-  ],
-  "cpu": "1024",
-  "memory": "2048"
+        "family": "program-management-system",
+        "taskRoleArn": "arn:aws:iam::439533253319:role/program-management-system-ecs-task-role",
+        "executionRoleArn": "arn:aws:iam::439533253319:role/program-management-system-ecs-execution-role",
+        "networkMode": "awsvpc",
+        "revision": 62,
+        "volumes": [],
+        "status": "ACTIVE",
+        "requiresAttributes": [
+            {
+                "name": "com.amazonaws.ecs.capability.logging-driver.awslogs"
+            },
+            {
+                "name": "ecs.capability.execution-role-awslogs"
+            },
+            {
+                "name": "com.amazonaws.ecs.capability.ecr-auth"
+            },
+            {
+                "name": "com.amazonaws.ecs.capability.docker-remote-api.1.19"
+            },
+            {
+                "name": "com.amazonaws.ecs.capability.task-iam-role"
+            },
+            {
+                "name": "ecs.capability.container-health-check"
+            },
+            {
+                "name": "ecs.capability.execution-role-ecr-pull"
+            },
+            {
+                "name": "com.amazonaws.ecs.capability.docker-remote-api.1.18"
+            },
+            {
+                "name": "ecs.capability.task-eni"
+            },
+            {
+                "name": "com.amazonaws.ecs.capability.docker-remote-api.1.29"
+            }
+        ],
+        "placementConstraints": [],
+        "compatibilities": [
+            "EC2",
+            "MANAGED_INSTANCES",
+            "FARGATE"
+        ],
+        "runtimePlatform": {
+            "cpuArchitecture": "X86_64",
+            "operatingSystemFamily": "LINUX"
+        },
+        "requiresCompatibilities": [
+            "FARGATE"
+        ],
+        "cpu": "1024",
+        "memory": "2048",
+        "registeredAt": "2026-04-08T21:10:27.771000-03:00",
+        "registeredBy": "arn:aws:iam::439533253319:user/oryzem_admin"
+    },
+    "tags": []
 }
-

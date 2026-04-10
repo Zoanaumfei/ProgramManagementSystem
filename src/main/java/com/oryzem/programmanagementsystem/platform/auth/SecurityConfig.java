@@ -97,6 +97,7 @@ public class SecurityConfig {
                 "Authorization",
                 "Content-Type",
                 "Accept",
+                "Idempotency-Key",
                 "Origin",
                 "X-Access-Context",
                 "X-Correlation-Id"));

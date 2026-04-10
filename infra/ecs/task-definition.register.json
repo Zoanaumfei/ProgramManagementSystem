@@ -15,7 +15,7 @@
   "containerDefinitions": [
     {
       "name": "program-management-system",
-      "image": "439533253319.dkr.ecr.sa-east-1.amazonaws.com/oryzem-backend-dev:custom-login-20260323-0053",
+      "image": "439533253319.dkr.ecr.sa-east-1.amazonaws.com/oryzem-backend-dev:document-s3-20260408-2055",
       "essential": true,
       "portMappings": [
         {
@@ -27,16 +27,48 @@
       ],
       "environment": [
         {
-          "name": "AWS_REGION",
-          "value": "sa-east-1"
+          "name": "SPRING_PROFILES_ACTIVE",
+          "value": "rds"
         },
         {
           "name": "DB_SECRET_ID",
           "value": "program-management-system/rds/master"
         },
         {
+          "name": "AWS_REGION",
+          "value": "sa-east-1"
+        },
+        {
+          "name": "DB_SSL_MODE",
+          "value": "require"
+        },
+        {
+          "name": "APP_MULTITENANCY_RATE_LIMIT_STORE",
+          "value": "local"
+        },
+        {
+          "name": "APP_SECURITY_IDENTITY_PROVIDER",
+          "value": "cognito"
+        },
+        {
           "name": "APP_BOOTSTRAP_INTERNAL_ADMIN_ENABLED",
           "value": "false"
+        },
+        {
+          "name": "APP_BOOTSTRAP_INTERNAL_ADMIN_PRUNE_OTHER_INTERNAL_USERS",
+          "value": "false"
+        },
+        {
+          "name": "APP_BOOTSTRAP_INTERNAL_ADMIN_PRUNE_TO_INTERNAL_CORE",
+          "value": "false"
+        },
+        {
+          "name": "APP_BOOTSTRAP_INTERNAL_ADMIN_EMAIL",
+          "value": "vanderson.verza@gmail.com"
+        },
+        {
+          "name": "APP_BOOTSTRAP_INTERNAL_ADMIN_DISPLAY_NAME",
+          "value": "Vanderson Verza"
         },
         {
           "name": "APP_SECURITY_IDENTITY_USER_POOL_ID",
@@ -47,20 +79,16 @@
           "value": "sa-east-1"
         },
         {
-          "name": "SPRING_PROFILES_ACTIVE",
-          "value": "rds"
+          "name": "APP_DOCUMENT_MANAGEMENT_S3_BUCKET",
+          "value": "oryzem-pms-documents-sa-east-1-439533253319"
         },
         {
-          "name": "APP_SECURITY_IDENTITY_PROVIDER",
-          "value": "cognito"
+          "name": "APP_DOCUMENT_MANAGEMENT_S3_REGION",
+          "value": "sa-east-1"
         },
         {
-          "name": "APP_BOOTSTRAP_INTERNAL_ADMIN_PRUNE_OTHER_INTERNAL_USERS",
-          "value": "false"
-        },
-        {
-          "name": "DB_SSL_MODE",
-          "value": "require"
+          "name": "APP_PROJECT_MANAGEMENT_DOCUMENTS_ENABLED",
+          "value": "true"
         }
       ],
       "logConfiguration": {
@@ -84,3 +112,5 @@
     }
   ]
 }
+
+

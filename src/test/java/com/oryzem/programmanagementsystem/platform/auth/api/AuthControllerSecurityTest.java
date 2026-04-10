@@ -62,6 +62,17 @@ class AuthControllerSecurityTest {
     }
 
     @Test
+    void projectPreflightShouldAllowIdempotencyKeyHeaderFromLocalFrontend() throws Exception {
+        mockMvc.perform(options("/api/projects")
+                        .header("Origin", "http://localhost:3000")
+                        .header("Access-Control-Request-Method", "POST")
+                        .header("Access-Control-Request-Headers", "authorization,content-type,idempotency-key"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:3000"))
+                .andExpect(header().string("Access-Control-Allow-Headers", containsString("idempotency-key")));
+    }
+
+    @Test
     void loginShouldAuthenticateWithStubGateway() throws Exception {
         mockMvc.perform(post("/public/auth/login")
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)

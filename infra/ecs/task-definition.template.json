@@ -77,6 +77,18 @@
         {
           "name": "APP_SECURITY_IDENTITY_REGION",
           "value": "sa-east-1"
+        },
+        {
+          "name": "APP_DOCUMENT_MANAGEMENT_S3_BUCKET",
+          "value": "oryzem-pms-documents-sa-east-1-439533253319"
+        },
+        {
+          "name": "APP_DOCUMENT_MANAGEMENT_S3_REGION",
+          "value": "sa-east-1"
+        },
+        {
+          "name": "APP_PROJECT_MANAGEMENT_DOCUMENTS_ENABLED",
+          "value": "true"
         }
       ],
       "logConfiguration": {

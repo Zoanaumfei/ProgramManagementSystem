@@ -255,6 +255,41 @@ class BootstrapDataServiceTest {
         assertBootstrapRoles(Role.ADMIN, Role.SUPPORT, Role.AUDITOR);
     }
 
+    @Test
+    void shouldNotPruneToInternalCoreWhenBootstrapAdminIsDisabled() {
+        resetWithProperties(new BootstrapProperties(true, new BootstrapProperties.InternalAdminProperties(false, null, null, false, false, null, null)));
+
+        Assertions.assertThat(organizationLookup.findById("tenant-a")).isPresent();
+        Assertions.assertThat(userRepository.findByEmailIgnoreCase("admin.a@tenant.com")).isPresent();
+
+        BootstrapDataService service = new BootstrapDataService(
+                userRepository,
+                auditTrailService,
+                accessContextService,
+                accessContextResetService,
+                organizationBootstrapPort,
+                organizationResetPort,
+                userIdentityGateway,
+                new BootstrapProperties(
+                        true,
+                        new BootstrapProperties.InternalAdminProperties(
+                                false,
+                                "vanderson.verza@gmail.com",
+                                "Vanderson Verza",
+                                true,
+                                true,
+                                "PermanentPassword123!",
+                                "TempPassword123!")));
+
+        service.seedIfEmpty();
+
+        Assertions.assertThat(organizationLookup.findById("internal-core")).isPresent();
+        Assertions.assertThat(organizationLookup.findById("tenant-a")).isPresent();
+        Assertions.assertThat(organizationLookup.findById("tenant-b")).isPresent();
+        Assertions.assertThat(userRepository.findByEmailIgnoreCase("admin.a@tenant.com")).isPresent();
+        Assertions.assertThat(userRepository.findByEmailIgnoreCase("vanderson.verza@gmail.com")).isNotPresent();
+    }
+
     private void resetWithProperties(BootstrapProperties properties) {
         BootstrapDataService service = new BootstrapDataService(
                 userRepository,

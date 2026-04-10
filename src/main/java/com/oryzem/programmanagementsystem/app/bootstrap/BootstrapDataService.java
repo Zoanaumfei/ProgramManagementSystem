@@ -64,7 +64,7 @@ public class BootstrapDataService {
     @Transactional
     public void seedIfEmpty() {
         BootstrapProperties.InternalAdminProperties internalAdmin = bootstrapProperties.internalAdmin();
-        if (internalAdmin != null && internalAdmin.pruneToInternalCore()) {
+        if (internalAdmin != null && internalAdmin.enabled() && internalAdmin.pruneToInternalCore()) {
             resetToInternalCoreSkeleton();
         } else {
             ensureInternalCoreOrganization();

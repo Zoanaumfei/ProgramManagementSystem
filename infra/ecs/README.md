@@ -10,11 +10,29 @@ Current deployment target is the core SaaS administration runtime only.
 - `APP_SECURITY_IDENTITY_PROVIDER=cognito`
 - `APP_SECURITY_IDENTITY_USER_POOL_ID=sa-east-1_aA4I3tEmF`
 - `APP_SECURITY_IDENTITY_REGION=sa-east-1`
+- `APP_BOOTSTRAP_INTERNAL_ADMIN_ENABLED=false`
+- `APP_BOOTSTRAP_INTERNAL_ADMIN_PRUNE_OTHER_INTERNAL_USERS=false`
+- `APP_BOOTSTRAP_INTERNAL_ADMIN_PRUNE_TO_INTERNAL_CORE=false`
+- `APP_DOCUMENT_MANAGEMENT_S3_BUCKET=oryzem-pms-documents-sa-east-1-439533253319`
+- `APP_DOCUMENT_MANAGEMENT_S3_REGION=sa-east-1`
+- `APP_PROJECT_MANAGEMENT_DOCUMENTS_ENABLED=true`
 
 ## What is intentionally gone
 - portfolio document storage environment variables
-- document bucket provisioning as part of the core deploy path
 - deployment assumptions based on legacy tenant claims in the JWT
+
+## Document storage
+Run `scripts/configure-document-storage-s3.ps1` to provision or reconcile the document bucket and the ECS task role access.
+
+Current document bucket:
+- `oryzem-pms-documents-sa-east-1-439533253319`
+
+The bucket configuration enforced by the script is:
+- private bucket with all public access blocked
+- `BucketOwnerEnforced` object ownership
+- versioning enabled
+- default SSE-KMS encryption with bucket keys
+- CORS for `http://localhost:3000`, `https://oryzem.com` and `https://www.oryzem.com`
 
 ## Authentication notes
 - the backend depends on Cognito for identity and groups
@@ -26,6 +44,7 @@ Current deployment target is the core SaaS administration runtime only.
 2. validate `/api/auth/me` with a real access token
 3. validate `/api/access/users` and `/api/access/organizations` with an internal admin token
 4. confirm audit logging, quota handling and tenant rate limiting in the target environment
+5. validate `POST /api/document-contexts/{contextType}/{contextId}/documents/uploads` with a real access token
 
 ## Important IAM note
 The task role still needs Cognito administrative permissions used by the active core user lifecycle, including:

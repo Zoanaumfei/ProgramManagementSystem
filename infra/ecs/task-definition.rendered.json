@@ -15,7 +15,7 @@
   "containerDefinitions": [
     {
       "name": "program-management-system",
-      "image": "439533253319.dkr.ecr.sa-east-1.amazonaws.com/oryzem-backend-dev:project-management-20260408-1637",
+      "image": "439533253319.dkr.ecr.sa-east-1.amazonaws.com/oryzem-backend-dev:document-s3-20260408-2055",
       "essential": true,
       "portMappings": [
         {
@@ -77,6 +77,18 @@
         {
           "name": "APP_SECURITY_IDENTITY_REGION",
           "value": "sa-east-1"
+        },
+        {
+          "name": "APP_DOCUMENT_MANAGEMENT_S3_BUCKET",
+          "value": "oryzem-pms-documents-sa-east-1-439533253319"
+        },
+        {
+          "name": "APP_DOCUMENT_MANAGEMENT_S3_REGION",
+          "value": "sa-east-1"
+        },
+        {
+          "name": "APP_PROJECT_MANAGEMENT_DOCUMENTS_ENABLED",
+          "value": "true"
         }
       ],
       "logConfiguration": {
