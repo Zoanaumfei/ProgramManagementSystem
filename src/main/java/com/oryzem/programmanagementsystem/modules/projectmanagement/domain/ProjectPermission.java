@@ -1,0 +1,20 @@
+package com.oryzem.programmanagementsystem.modules.projectmanagement.domain;
+
+public enum ProjectPermission {
+    VIEW_PROJECT,
+    EDIT_PROJECT,
+    ADD_ORGANIZATION,
+    ADD_MEMBER,
+    VIEW_MILESTONE,
+    EDIT_MILESTONE,
+    VIEW_DELIVERABLE,
+    EDIT_DELIVERABLE,
+    SUBMIT_DELIVERABLE,
+    REVIEW_SUBMISSION,
+    APPROVE_SUBMISSION,
+    REJECT_SUBMISSION,
+    VIEW_DOCUMENT,
+    UPLOAD_DOCUMENT,
+    DOWNLOAD_DOCUMENT,
+    DELETE_DOCUMENT
+}

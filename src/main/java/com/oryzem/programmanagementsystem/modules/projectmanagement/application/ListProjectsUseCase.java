@@ -1,0 +1,53 @@
+package com.oryzem.programmanagementsystem.modules.projectmanagement.application;
+
+import com.oryzem.programmanagementsystem.modules.projectmanagement.application.model.read.ProjectReadModels;
+import com.oryzem.programmanagementsystem.modules.projectmanagement.application.port.ProjectMemberRepository;
+import com.oryzem.programmanagementsystem.modules.projectmanagement.application.port.ProjectOrganizationRepository;
+import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectPermission;
+import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectAggregate;
+import com.oryzem.programmanagementsystem.modules.projectmanagement.application.port.ProjectRepository;
+import com.oryzem.programmanagementsystem.platform.authorization.AuthenticatedUser;
+import java.util.Comparator;
+import java.util.List;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@Transactional(readOnly = true)
+public class ListProjectsUseCase {
+
+    private final ProjectRepository projectRepository;
+    private final ProjectOrganizationRepository organizationRepository;
+    private final ProjectMemberRepository memberRepository;
+    private final ProjectAuthorizationService authorizationService;
+    private final ProjectViewMapper viewMapper;
+
+    public ListProjectsUseCase(
+            ProjectRepository projectRepository,
+            ProjectOrganizationRepository organizationRepository,
+            ProjectMemberRepository memberRepository,
+            ProjectAuthorizationService authorizationService,
+            ProjectViewMapper viewMapper) {
+        this.projectRepository = projectRepository;
+        this.organizationRepository = organizationRepository;
+        this.memberRepository = memberRepository;
+        this.authorizationService = authorizationService;
+        this.viewMapper = viewMapper;
+    }
+
+    public List<ProjectReadModels.ProjectListReadModel> execute(AuthenticatedUser actor) {
+        authorizationService.assertEnabled();
+        return projectRepository.findAllByTenantIdOrderByCreatedAtDescIdDesc(actor.tenantId()).stream()
+                .filter(project -> authorizationService.canAccessProject(
+                        project,
+                        organizationRepository.findAllByProjectIdAndActiveTrueOrderByJoinedAtAsc(project.id()),
+                        memberRepository.findAllByProjectIdAndActiveTrueOrderByAssignedAtAsc(project.id()),
+                        actor,
+                        ProjectPermission.VIEW_PROJECT))
+                .sorted(Comparator.comparing(ProjectAggregate::createdAt).reversed())
+                .map(viewMapper::toProjectListReadModel)
+                .toList();
+    }
+}
+
+

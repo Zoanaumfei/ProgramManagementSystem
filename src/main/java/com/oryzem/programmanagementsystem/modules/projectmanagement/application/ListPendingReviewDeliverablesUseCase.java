@@ -1,0 +1,47 @@
+package com.oryzem.programmanagementsystem.modules.projectmanagement.application;
+
+import com.oryzem.programmanagementsystem.modules.projectmanagement.application.model.read.ProjectReadModels;
+import com.oryzem.programmanagementsystem.modules.projectmanagement.application.port.ProjectDeliverableRepository;
+import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectDeliverableAggregate;
+import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectDeliverableStatus;
+import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectPermission;
+import com.oryzem.programmanagementsystem.platform.authorization.AuthenticatedUser;
+import java.util.List;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@Transactional(readOnly = true)
+public class ListPendingReviewDeliverablesUseCase {
+
+    private final ProjectAuthorizationService authorizationService;
+    private final ProjectDeliverableRepository deliverableRepository;
+    private final ProjectViewMapper viewMapper;
+
+    public ListPendingReviewDeliverablesUseCase(
+            ProjectAuthorizationService authorizationService,
+            ProjectDeliverableRepository deliverableRepository,
+            ProjectViewMapper viewMapper) {
+        this.authorizationService = authorizationService;
+        this.deliverableRepository = deliverableRepository;
+        this.viewMapper = viewMapper;
+    }
+
+    public List<ProjectReadModels.PendingSubmissionReviewReadModel> execute(String projectId, String structureNodeId, AuthenticatedUser actor) {
+        ProjectAuthorizationService.ProjectAccess access = authorizationService.authorizeProject(projectId, actor, ProjectPermission.VIEW_PROJECT);
+        if (structureNodeId != null && !structureNodeId.isBlank()) {
+            authorizationService.authorizeStructureNode(projectId, structureNodeId, actor, ProjectPermission.VIEW_PROJECT);
+        }
+        var deliverables =
+                structureNodeId != null && !structureNodeId.isBlank()
+                        ? deliverableRepository.findAllByProjectIdAndStructureNodeIdOrderByPlannedDueDateAscIdAsc(projectId, structureNodeId)
+                        : deliverableRepository.findAllByProjectIdOrderByPlannedDueDateAscIdAsc(projectId);
+        return deliverables.stream()
+                .filter(deliverable -> deliverable.status() == ProjectDeliverableStatus.SUBMITTED || deliverable.status() == ProjectDeliverableStatus.UNDER_REVIEW)
+                .filter(deliverable -> authorizationService.canAccessDeliverable(access.project(), access.organizations(), access.members(), deliverable, actor, ProjectPermission.REVIEW_SUBMISSION))
+                .map(viewMapper::toPendingSubmissionReviewReadModel)
+                .toList();
+    }
+}
+
+
