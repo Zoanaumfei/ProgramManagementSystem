@@ -9,6 +9,7 @@ import com.oryzem.programmanagementsystem.modules.projectmanagement.application.
 import com.oryzem.programmanagementsystem.modules.projectmanagement.application.ListProjectMilestoneTemplatesUseCase;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.application.ListProjectPhaseTemplatesUseCase;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.application.ListProjectTemplatesUseCase;
+import com.oryzem.programmanagementsystem.modules.projectmanagement.application.PurgeProjectTemplateUseCase;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.application.UpdateDeliverableTemplateUseCase;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.application.UpdateProjectMilestoneTemplateUseCase;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.application.UpdateProjectPhaseTemplateUseCase;
@@ -37,6 +38,7 @@ public class ProjectTemplateController {
     private final GetProjectTemplateDetailUseCase getProjectTemplateDetailUseCase;
     private final CreateProjectTemplateUseCase createProjectTemplateUseCase;
     private final UpdateProjectTemplateUseCase updateProjectTemplateUseCase;
+    private final PurgeProjectTemplateUseCase purgeProjectTemplateUseCase;
     private final ListProjectPhaseTemplatesUseCase listProjectPhaseTemplatesUseCase;
     private final CreateProjectPhaseTemplateUseCase createProjectPhaseTemplateUseCase;
     private final UpdateProjectPhaseTemplateUseCase updateProjectPhaseTemplateUseCase;
@@ -53,6 +55,7 @@ public class ProjectTemplateController {
             GetProjectTemplateDetailUseCase getProjectTemplateDetailUseCase,
             CreateProjectTemplateUseCase createProjectTemplateUseCase,
             UpdateProjectTemplateUseCase updateProjectTemplateUseCase,
+            PurgeProjectTemplateUseCase purgeProjectTemplateUseCase,
             ListProjectPhaseTemplatesUseCase listProjectPhaseTemplatesUseCase,
             CreateProjectPhaseTemplateUseCase createProjectPhaseTemplateUseCase,
             UpdateProjectPhaseTemplateUseCase updateProjectPhaseTemplateUseCase,
@@ -67,6 +70,7 @@ public class ProjectTemplateController {
         this.getProjectTemplateDetailUseCase = getProjectTemplateDetailUseCase;
         this.createProjectTemplateUseCase = createProjectTemplateUseCase;
         this.updateProjectTemplateUseCase = updateProjectTemplateUseCase;
+        this.purgeProjectTemplateUseCase = purgeProjectTemplateUseCase;
         this.listProjectPhaseTemplatesUseCase = listProjectPhaseTemplatesUseCase;
         this.createProjectPhaseTemplateUseCase = createProjectPhaseTemplateUseCase;
         this.updateProjectPhaseTemplateUseCase = updateProjectPhaseTemplateUseCase;
@@ -125,6 +129,15 @@ public class ProjectTemplateController {
                                 request.isDefault(),
                                 request.structureTemplateId()),
                         actor));
+    }
+
+    @PostMapping("/{templateId}/purge")
+    public ProjectTemplateDtos.ProjectTemplateSummaryResponse purgeTemplate(
+            Authentication authentication,
+            @PathVariable String templateId) {
+        AuthenticatedUser actor = authenticatedUserMapper.from(authentication);
+        return ProjectTemplateDtos.ProjectTemplateSummaryResponse.from(
+                purgeProjectTemplateUseCase.execute(templateId, actor));
     }
 
     @GetMapping("/{templateId}/phases")

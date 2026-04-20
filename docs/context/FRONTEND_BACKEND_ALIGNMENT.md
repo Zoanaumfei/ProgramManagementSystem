@@ -29,8 +29,9 @@ This repository now exposes only the core membership-first platform surface.
 - the operational dashboard receives `kpis`, `series`, `topTenants`, `tenantDetails`, `alerts` and `recentEvents` from the aggregated backend response
 - frontend should require `organizationId` and `roles` when creating users because the backend now provisions the first membership in the same request
 - frontend project creation should treat the active access-context organization as the lead organization, because the backend resolves lead ownership from the authenticated context instead of a request field
-- frontend should not promise a dynamic template catalog yet, because the backend currently has no public template-list endpoint; create flows can rely on known seeded defaults or a direct `templateId`
+- frontend should treat `/api/project-templates` and `/api/project-structure-templates` as the administrative source of truth for template governance, while the project-create wizard may still keep its seeded shortcut defaults as an operator convenience
 - frontend should use backend `version` fields when updating projects, deliverables and submissions, and should surface a dedicated optimistic-concurrency conflict message
+- frontend now also uses backend `version` fields when updating project milestones from the project detail milestones tab
 - frontend should embed document-management in the `PROJECT`, `PROJECT_DELIVERABLE` and `PROJECT_DELIVERABLE_SUBMISSION` contexts using initiate-upload -> direct storage upload -> finalize-upload -> refresh
 - `GET /api/access/users/orphans` is a cleanup/discovery surface for inconsistent data only, not the normal onboarding path
 - frontend should treat business codes such as `ORPHAN_USER_DETECTED`, `USER_ACTIVE_MEMBERSHIP_REQUIRED` and `USER_CREATION_MEMBERSHIP_FAILED` as actionable data-repair errors rather than as recoverable inline onboarding states
@@ -139,9 +140,12 @@ The active frontend source tree is not fully present in this repository, so the 
 - frontend administrative workspaces now surface structured `401`/`403` data from the backend without overwriting the refusal reason with a generic fallback; the visible copy preserves `message`, `path` and `correlationId` in users, organizations and session diagnostics flows
 - frontend runtime config now upgrades `http` API bases to `https` when served from an `https` app origin so the published shell does not keep an insecure backend URL by accident
 - the operational dashboard frontend is now active in dev and prod and consumes the minimum overview contract for `429`, `409` quota, offboarding and export requested/completed panels
+- the operational dashboard frontend now also exposes the audited tenant service-tier change action for internal `ADMIN`/`SUPPORT` operators, using `PATCH /api/access/tenants/{tenantId}/service-tier`
 - the frontend project-management module is now active under `/workspace/projects/*` with list, creation wizard, project detail tabs, deliverable detail, submission review and embedded document panels wired to the real backend module
-- the current participants tab is aligned as a read-model view over `ProjectDetailResponse.organizations` and `ProjectDetailResponse.members`; dedicated participant-management mutations remain a follow-up UI refinement rather than an API gap
-- the current frontend create wizard uses the seeded default template ids `TMP-APQP-V1`, `TMP-VDA-MLA-V1` and `TMP-CUSTOM-V1` as pragmatic UX presets because the backend contract exposes template resolution on create but not a public discovery endpoint
+- the project detail participants tab now combines the existing read model with transactional add-organization and add-member flows on top of `/api/projects/{projectId}/organizations` and `/api/projects/{projectId}/members`
+- the organizations workspace now also exposes the audited export workflow under `/workspace/organizations/{organizationId}/exports`, backed by `GET|POST|PATCH /api/access/organizations/{organizationId}/exports`
+- the current frontend create wizard still uses the seeded default template ids `TMP-APQP-V1`, `TMP-VDA-MLA-V1` and `TMP-CUSTOM-V1` as pragmatic UX presets even though the backend now exposes administrative template discovery endpoints
+- the frontend now also exposes `/workspace/templates/*` for admin-only management of project templates, structure templates, phases, milestones, deliverables and structure levels, including structure activation/deactivation and purge-protected destructive flows
 
 ## Operational validation status
 - the published backend environment was revalidated on `2026-04-01`: `GET /api/access/users` now returns structured `401 Unauthorized` for anonymous requests, confirming that the route is served by the secured backend controller path rather than a static-resource `404`

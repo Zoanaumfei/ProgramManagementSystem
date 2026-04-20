@@ -1,17 +1,18 @@
-package com.oryzem.programmanagementsystem.modules.documentmanagement.application;
+package com.oryzem.programmanagementsystem.modules.documentmanagement.infrastructure.mapper;
 
+import com.oryzem.programmanagementsystem.modules.documentmanagement.application.model.read.DocumentReadModel;
 import com.oryzem.programmanagementsystem.modules.documentmanagement.infrastructure.DocumentBindingEntity;
 import com.oryzem.programmanagementsystem.modules.documentmanagement.infrastructure.DocumentEntity;
 import org.springframework.stereotype.Component;
 
 @Component
-public class DocumentViewMapper {
+public class DocumentReadModelMapper {
 
-    public DocumentView toView(DocumentEntity document, DocumentBindingEntity binding) {
+    public DocumentReadModel toReadModel(DocumentEntity document, DocumentBindingEntity binding) {
         if (document == null || binding == null) {
             return null;
         }
-        return new DocumentView(
+        return new DocumentReadModel(
                 document.getId(),
                 document.getTenantId(),
                 binding.getContextType(),

@@ -1,11 +1,11 @@
 package com.oryzem.programmanagementsystem.modules.documentmanagement.application;
 
+import com.oryzem.programmanagementsystem.modules.documentmanagement.application.model.DocumentBindingRecord;
+import com.oryzem.programmanagementsystem.modules.documentmanagement.application.model.DocumentRecord;
+import com.oryzem.programmanagementsystem.modules.documentmanagement.application.port.DocumentBindingRepository;
+import com.oryzem.programmanagementsystem.modules.documentmanagement.application.port.DocumentRepository;
 import com.oryzem.programmanagementsystem.modules.documentmanagement.domain.DocumentStatus;
 import com.oryzem.programmanagementsystem.modules.documentmanagement.domain.DocumentStorage;
-import com.oryzem.programmanagementsystem.modules.documentmanagement.infrastructure.DocumentBindingEntity;
-import com.oryzem.programmanagementsystem.modules.documentmanagement.infrastructure.DocumentEntity;
-import com.oryzem.programmanagementsystem.modules.documentmanagement.infrastructure.SpringDataDocumentBindingJpaRepository;
-import com.oryzem.programmanagementsystem.modules.documentmanagement.infrastructure.SpringDataDocumentJpaRepository;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -17,14 +17,14 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ReconcilePendingDocumentsUseCase {
 
-    private final SpringDataDocumentJpaRepository documentRepository;
-    private final SpringDataDocumentBindingJpaRepository bindingRepository;
+    private final DocumentRepository documentRepository;
+    private final DocumentBindingRepository bindingRepository;
     private final DocumentStorage documentStorage;
     private final DocumentAuditService auditService;
 
     public ReconcilePendingDocumentsUseCase(
-            SpringDataDocumentJpaRepository documentRepository,
-            SpringDataDocumentBindingJpaRepository bindingRepository,
+            DocumentRepository documentRepository,
+            DocumentBindingRepository bindingRepository,
             DocumentStorage documentStorage,
             DocumentAuditService auditService) {
         this.documentRepository = documentRepository;
@@ -41,55 +41,55 @@ public class ReconcilePendingDocumentsUseCase {
         int missingActiveObjects = 0;
         int orphanObjectsDetected = 0;
 
-        Map<String, DocumentBindingEntity> bindingsByDocumentId = new HashMap<>();
-        bindingRepository.findAll().forEach(binding -> bindingsByDocumentId.put(binding.getDocumentId(), binding));
+        Map<String, DocumentBindingRecord> bindingsByDocumentId = new HashMap<>();
+        bindingRepository.findAll().forEach(binding -> bindingsByDocumentId.put(binding.documentId(), binding));
 
-        for (DocumentEntity pending : documentRepository.findAllByStatusAndUploadExpiresAtBefore(DocumentStatus.PENDING_UPLOAD, now)) {
-            if (!documentStorage.headObject(pending.getStorageKey()).exists()) {
+        for (DocumentRecord pending : documentRepository.findAllByStatusAndUploadExpiresAtBefore(DocumentStatus.PENDING_UPLOAD, now)) {
+            if (!documentStorage.headObject(pending.storageKey()).exists()) {
                 pending.markFailed(now);
                 documentRepository.save(pending);
                 expiredPendingMarkedFailed++;
-                DocumentBindingEntity binding = bindingsByDocumentId.get(pending.getId());
+                DocumentBindingRecord binding = bindingsByDocumentId.get(pending.id());
                 auditService.recordSystem(
                         "DOCUMENT_INCONSISTENCY_DETECTED",
-                        pending.getTenantId(),
-                        pending.getId(),
-                        binding != null ? binding.getContextType() : null,
-                        binding != null ? binding.getContextId() : null,
+                        pending.tenantId(),
+                        pending.id(),
+                        binding != null ? binding.contextType() : null,
+                        binding != null ? binding.contextId() : null,
                         "PENDING_EXPIRED",
-                        Map.of("storageKey", pending.getStorageKey()));
+                        Map.of("storageKey", pending.storageKey()));
             }
         }
 
-        for (DocumentEntity failed : documentRepository.findAllByStatus(DocumentStatus.FAILED)) {
-            if (documentStorage.headObject(failed.getStorageKey()).exists()) {
+        for (DocumentRecord failed : documentRepository.findAllByStatus(DocumentStatus.FAILED)) {
+            if (documentStorage.headObject(failed.storageKey()).exists()) {
                 failed.markActive(now);
                 documentRepository.save(failed);
                 failedRecovered++;
-                DocumentBindingEntity binding = bindingsByDocumentId.get(failed.getId());
+                DocumentBindingRecord binding = bindingsByDocumentId.get(failed.id());
                 auditService.recordSystem(
                         "DOCUMENT_UPLOAD_FINALIZED",
-                        failed.getTenantId(),
-                        failed.getId(),
-                        binding != null ? binding.getContextType() : null,
-                        binding != null ? binding.getContextId() : null,
+                        failed.tenantId(),
+                        failed.id(),
+                        binding != null ? binding.contextType() : null,
+                        binding != null ? binding.contextId() : null,
                         "RECOVERED",
-                        Map.of("storageKey", failed.getStorageKey()));
+                        Map.of("storageKey", failed.storageKey()));
             }
         }
 
-        for (DocumentEntity active : documentRepository.findAllByStatus(DocumentStatus.ACTIVE)) {
-            if (!documentStorage.headObject(active.getStorageKey()).exists()) {
+        for (DocumentRecord active : documentRepository.findAllByStatus(DocumentStatus.ACTIVE)) {
+            if (!documentStorage.headObject(active.storageKey()).exists()) {
                 missingActiveObjects++;
-                DocumentBindingEntity binding = bindingsByDocumentId.get(active.getId());
+                DocumentBindingRecord binding = bindingsByDocumentId.get(active.id());
                 auditService.recordSystem(
                         "DOCUMENT_INCONSISTENCY_DETECTED",
-                        active.getTenantId(),
-                        active.getId(),
-                        binding != null ? binding.getContextType() : null,
-                        binding != null ? binding.getContextId() : null,
+                        active.tenantId(),
+                        active.id(),
+                        binding != null ? binding.contextType() : null,
+                        binding != null ? binding.contextId() : null,
                         "ACTIVE_OBJECT_MISSING",
-                        Map.of("storageKey", active.getStorageKey()));
+                        Map.of("storageKey", active.storageKey()));
             }
         }
 

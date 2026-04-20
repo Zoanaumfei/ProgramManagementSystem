@@ -66,6 +66,43 @@ public class DocumentEntity {
     @Column(name = "deleted_at")
     private Instant deletedAt;
 
+    public DocumentEntity(
+            String id,
+            String tenantId,
+            String originalFilename,
+            String safeFilename,
+            String contentType,
+            String extension,
+            long sizeBytes,
+            String checksumSha256,
+            String storageProvider,
+            String storageKey,
+            DocumentStatus status,
+            String uploadedByUserId,
+            String uploadedByOrganizationId,
+            Instant uploadExpiresAt,
+            Instant createdAt,
+            Instant updatedAt,
+            Instant deletedAt) {
+        this.id = id;
+        this.tenantId = tenantId;
+        this.originalFilename = originalFilename;
+        this.safeFilename = safeFilename;
+        this.contentType = contentType;
+        this.extension = extension;
+        this.sizeBytes = sizeBytes;
+        this.checksumSha256 = checksumSha256;
+        this.storageProvider = storageProvider;
+        this.storageKey = storageKey;
+        this.status = status;
+        this.uploadedByUserId = uploadedByUserId;
+        this.uploadedByOrganizationId = uploadedByOrganizationId;
+        this.uploadExpiresAt = uploadExpiresAt;
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
+        this.deletedAt = deletedAt;
+    }
+
     protected DocumentEntity() {
     }
 
@@ -104,6 +141,41 @@ public class DocumentEntity {
         return entity;
     }
 
+    public void updateFrom(
+            String tenantId,
+            String originalFilename,
+            String safeFilename,
+            String contentType,
+            String extension,
+            long sizeBytes,
+            String checksumSha256,
+            String storageProvider,
+            String storageKey,
+            DocumentStatus status,
+            String uploadedByUserId,
+            String uploadedByOrganizationId,
+            Instant uploadExpiresAt,
+            Instant createdAt,
+            Instant updatedAt,
+            Instant deletedAt) {
+        this.tenantId = tenantId;
+        this.originalFilename = originalFilename;
+        this.safeFilename = safeFilename;
+        this.contentType = contentType;
+        this.extension = extension;
+        this.sizeBytes = sizeBytes;
+        this.checksumSha256 = checksumSha256;
+        this.storageProvider = storageProvider;
+        this.storageKey = storageKey;
+        this.status = status;
+        this.uploadedByUserId = uploadedByUserId;
+        this.uploadedByOrganizationId = uploadedByOrganizationId;
+        this.uploadExpiresAt = uploadExpiresAt;
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
+        this.deletedAt = deletedAt;
+    }
+
     public void markActive(Instant now) {
         if (status == DocumentStatus.DELETED) {
             throw new IllegalStateException("Deleted documents cannot become active again.");
@@ -129,71 +201,21 @@ public class DocumentEntity {
         this.updatedAt = now;
     }
 
-    public String getId() {
-        return id;
-    }
-
-    public String getTenantId() {
-        return tenantId;
-    }
-
-    public String getOriginalFilename() {
-        return originalFilename;
-    }
-
-    public String getSafeFilename() {
-        return safeFilename;
-    }
-
-    public String getContentType() {
-        return contentType;
-    }
-
-    public String getExtension() {
-        return extension;
-    }
-
-    public long getSizeBytes() {
-        return sizeBytes;
-    }
-
-    public String getChecksumSha256() {
-        return checksumSha256;
-    }
-
-    public String getStorageProvider() {
-        return storageProvider;
-    }
-
-    public String getStorageKey() {
-        return storageKey;
-    }
-
-    public DocumentStatus getStatus() {
-        return status;
-    }
-
-    public String getUploadedByUserId() {
-        return uploadedByUserId;
-    }
-
-    public String getUploadedByOrganizationId() {
-        return uploadedByOrganizationId;
-    }
-
-    public Instant getUploadExpiresAt() {
-        return uploadExpiresAt;
-    }
-
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
-
-    public Instant getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public Instant getDeletedAt() {
-        return deletedAt;
-    }
+    public String getId() { return id; }
+    public String getTenantId() { return tenantId; }
+    public String getOriginalFilename() { return originalFilename; }
+    public String getSafeFilename() { return safeFilename; }
+    public String getContentType() { return contentType; }
+    public String getExtension() { return extension; }
+    public long getSizeBytes() { return sizeBytes; }
+    public String getChecksumSha256() { return checksumSha256; }
+    public String getStorageProvider() { return storageProvider; }
+    public String getStorageKey() { return storageKey; }
+    public DocumentStatus getStatus() { return status; }
+    public String getUploadedByUserId() { return uploadedByUserId; }
+    public String getUploadedByOrganizationId() { return uploadedByOrganizationId; }
+    public Instant getUploadExpiresAt() { return uploadExpiresAt; }
+    public Instant getCreatedAt() { return createdAt; }
+    public Instant getUpdatedAt() { return updatedAt; }
+    public Instant getDeletedAt() { return deletedAt; }
 }

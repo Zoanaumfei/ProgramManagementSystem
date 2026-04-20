@@ -28,6 +28,7 @@ import com.oryzem.programmanagementsystem.modules.projectmanagement.infrastructu
 import com.oryzem.programmanagementsystem.modules.projectmanagement.infrastructure.SpringDataProjectOrganizationJpaRepository;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.infrastructure.SpringDataProjectPhaseJpaRepository;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.infrastructure.SpringDataProjectStructureNodeJpaRepository;
+import com.oryzem.programmanagementsystem.platform.audit.SpringDataAuditLogJpaRepository;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -100,6 +101,9 @@ class ProjectManagementControllerIntegrationTest {
     private SpringDataDocumentJpaRepository documentRepository;
 
     @Autowired
+    private SpringDataAuditLogJpaRepository auditLogRepository;
+
+    @Autowired
     private DocumentStorage documentStorage;
 
     @Autowired
@@ -128,6 +132,7 @@ class ProjectManagementControllerIntegrationTest {
         jdbcTemplate.update("DELETE FROM project_template WHERE id NOT IN ('TMP-APQP-V1', 'TMP-VDA-MLA-V1', 'TMP-CUSTOM-V1')");
         jdbcTemplate.update("DELETE FROM project_structure_template WHERE id NOT IN ('PST-APQP-V1', 'PST-VDA-MLA-V1', 'PST-CUSTOM-V1')");
         idempotencyRepository.deleteAll();
+        auditLogRepository.deleteAll();
         bootstrapDataService.reset();
     }
 
@@ -765,6 +770,17 @@ class ProjectManagementControllerIntegrationTest {
                 .getContentAsString();
         String structureTemplateId = objectMapper.readTree(structureTemplateResponse).get("id").asText();
 
+        mockMvc.perform(post("/api/project-structure-templates/" + structureTemplateId + "/levels")
+                        .with(externalAdminTenantA())
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "name", "Project",
+                                "code", "PROJECT",
+                                "allowsChildren", false,
+                                "allowsMilestones", true,
+                                "allowsDeliverables", true))))
+                .andExpect(status().isOk());
+
         String templateResponse = mockMvc.perform(post("/api/project-templates")
                         .with(externalAdminTenantA())
                         .contentType(APPLICATION_JSON)
@@ -986,6 +1002,194 @@ class ProjectManagementControllerIntegrationTest {
     }
 
     @Test
+    void shouldPurgeUnusedProjectTemplate() throws Exception {
+        String structureTemplateResponse = mockMvc.perform(post("/api/project-structure-templates")
+                        .with(externalAdminTenantA())
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "name", "Purgeable Structure",
+                                "frameworkType", "CUSTOM",
+                                "version", 7,
+                                "active", true))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String structureTemplateId = objectMapper.readTree(structureTemplateResponse).get("id").asText();
+
+        mockMvc.perform(post("/api/project-structure-templates/" + structureTemplateId + "/levels")
+                        .with(externalAdminTenantA())
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "name", "Project",
+                                "code", "PROJECT",
+                                "allowsChildren", false,
+                                "allowsMilestones", true,
+                                "allowsDeliverables", true))))
+                .andExpect(status().isOk());
+
+        String templateResponse = mockMvc.perform(post("/api/project-templates")
+                        .with(externalAdminTenantA())
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "name", "Purgeable Template",
+                                "frameworkType", "CUSTOM",
+                                "version", 7,
+                                "status", "RETIRED",
+                                "isDefault", false,
+                                "structureTemplateId", structureTemplateId))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String templateId = objectMapper.readTree(templateResponse).get("id").asText();
+
+        mockMvc.perform(post("/api/project-templates/" + templateId + "/purge")
+                        .with(externalAdminTenantA()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(templateId))
+                .andExpect(jsonPath("$.name").value("Purgeable Template"));
+
+        mockMvc.perform(get("/api/project-templates/" + templateId)
+                        .with(externalAdminTenantA()))
+                .andExpect(status().isNotFound());
+
+        assertThat(auditLogRepository.findAll()).anySatisfy(event -> {
+            assertThat(event.toDomain().eventType()).isEqualTo("PROJECT_TEMPLATE_PURGED");
+            assertThat(event.toDomain().targetResourceType()).isEqualTo("PROJECT_TEMPLATE");
+            assertThat(event.toDomain().targetResourceId()).isEqualTo(templateId);
+            assertThat(event.toDomain().metadataJson()).contains("Purgeable Template");
+        });
+    }
+
+    @Test
+    void shouldRejectProjectTemplatePurgeWhenTemplateIsDefault() throws Exception {
+        mockMvc.perform(post("/api/project-templates/TMP-CUSTOM-V1/purge")
+                        .with(externalAdminTenantA()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("PROJECT_TEMPLATE_DEFAULT_CANNOT_BE_PURGED"));
+    }
+
+    @Test
+    void shouldRejectProjectTemplatePurgeWhenTemplateIsUsedByProject() throws Exception {
+        String structureTemplateResponse = mockMvc.perform(post("/api/project-structure-templates")
+                        .with(externalAdminTenantA())
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "name", "Used Structure",
+                                "frameworkType", "CUSTOM",
+                                "version", 8,
+                                "active", true))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String structureTemplateId = objectMapper.readTree(structureTemplateResponse).get("id").asText();
+
+        mockMvc.perform(post("/api/project-structure-templates/" + structureTemplateId + "/levels")
+                        .with(externalAdminTenantA())
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "name", "Project",
+                                "code", "PROJECT",
+                                "allowsChildren", false,
+                                "allowsMilestones", true,
+                                "allowsDeliverables", true))))
+                .andExpect(status().isOk());
+
+        String templateResponse = mockMvc.perform(post("/api/project-templates")
+                        .with(externalAdminTenantA())
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "name", "Used Template",
+                                "frameworkType", "CUSTOM",
+                                "version", 8,
+                                "status", "ACTIVE",
+                                "isDefault", false,
+                                "structureTemplateId", structureTemplateId))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String templateId = objectMapper.readTree(templateResponse).get("id").asText();
+
+        createProject("PRJ-CUS-USED-001", "CUSTOM", templateId);
+
+        mockMvc.perform(post("/api/project-templates/" + templateId + "/purge")
+                        .with(externalAdminTenantA()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("PROJECT_TEMPLATE_IN_USE"));
+    }
+
+    @Test
+    void shouldPurgeUnusedProjectStructureTemplate() throws Exception {
+        String structureTemplateResponse = mockMvc.perform(post("/api/project-structure-templates")
+                        .with(externalAdminTenantA())
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "name", "Disposable Structure",
+                                "frameworkType", "CUSTOM",
+                                "version", 9,
+                                "active", false))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String structureTemplateId = objectMapper.readTree(structureTemplateResponse).get("id").asText();
+
+        mockMvc.perform(post("/api/project-structure-templates/" + structureTemplateId + "/purge")
+                        .with(externalAdminTenantA()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(structureTemplateId))
+                .andExpect(jsonPath("$.name").value("Disposable Structure"));
+
+        mockMvc.perform(get("/api/project-structure-templates/" + structureTemplateId)
+                        .with(externalAdminTenantA()))
+                .andExpect(status().isNotFound());
+
+        assertThat(auditLogRepository.findAll()).anySatisfy(event -> {
+            assertThat(event.toDomain().eventType()).isEqualTo("PROJECT_STRUCTURE_TEMPLATE_PURGED");
+            assertThat(event.toDomain().targetResourceType()).isEqualTo("PROJECT_STRUCTURE_TEMPLATE");
+            assertThat(event.toDomain().targetResourceId()).isEqualTo(structureTemplateId);
+            assertThat(event.toDomain().metadataJson()).contains("Disposable Structure");
+        });
+    }
+
+    @Test
+    void shouldRejectProjectStructureTemplatePurgeWhenReferencedByProjectTemplate() throws Exception {
+        String structureTemplateResponse = mockMvc.perform(post("/api/project-structure-templates")
+                        .with(externalAdminTenantA())
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "name", "Referenced Structure",
+                                "frameworkType", "CUSTOM",
+                                "version", 10,
+                                "active", true))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String structureTemplateId = objectMapper.readTree(structureTemplateResponse).get("id").asText();
+
+        mockMvc.perform(post("/api/project-templates")
+                        .with(externalAdminTenantA())
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "name", "Referencing Template",
+                                "frameworkType", "CUSTOM",
+                                "version", 10,
+                                "status", "RETIRED",
+                                "isDefault", false,
+                                "structureTemplateId", structureTemplateId))))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(post("/api/project-structure-templates/" + structureTemplateId + "/purge")
+                        .with(externalAdminTenantA()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("PROJECT_STRUCTURE_TEMPLATE_IN_USE"));
+    }
+
+    @Test
     void shouldBlockCrossTenantDocumentAccessForProjectHost() throws Exception {
         JsonNode project = createProject("PRJ-SEC-001");
         String projectId = project.get("id").asText();
@@ -1002,17 +1206,25 @@ class ProjectManagementControllerIntegrationTest {
     }
 
     private JsonNode createProject(String code, String frameworkType) throws Exception {
+        return createProject(code, frameworkType, null);
+    }
+
+    private JsonNode createProject(String code, String frameworkType, String templateId) throws Exception {
+        java.util.Map<String, Object> payload = new java.util.LinkedHashMap<>();
+        payload.put("code", code);
+        payload.put("name", "Project " + code);
+        payload.put("description", "integration flow");
+        payload.put("frameworkType", frameworkType);
+        if (templateId != null) {
+            payload.put("templateId", templateId);
+        }
+        payload.put("plannedStartDate", "2026-04-08");
+        payload.put("plannedEndDate", "2026-06-30");
         String response = mockMvc.perform(post("/api/projects")
                         .with(externalAdminTenantA())
                         .contentType(APPLICATION_JSON)
                         .header("Idempotency-Key", code)
-                        .content(objectMapper.writeValueAsString(Map.of(
-                                "code", code,
-                                "name", "Project " + code,
-                                "description", "integration flow",
-                                "frameworkType", frameworkType,
-                                "plannedStartDate", "2026-04-08",
-                                "plannedEndDate", "2026-06-30"))))
+                        .content(objectMapper.writeValueAsString(payload)))
                 .andExpect(status().isCreated())
                 .andReturn()
                 .getResponse()

@@ -48,4 +48,9 @@ public class JpaProjectStructureTemplateRepositoryAdapter implements ProjectStru
         }
         return mapper.toDomain(delegate.save(mapper.toNewEntity(structureTemplate)));
     }
+
+    @Override
+    public void deleteById(String id) {
+        delegate.deleteById(id);
+    }
 }

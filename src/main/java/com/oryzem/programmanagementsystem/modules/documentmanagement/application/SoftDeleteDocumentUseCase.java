@@ -1,8 +1,11 @@
 package com.oryzem.programmanagementsystem.modules.documentmanagement.application;
 
+import com.oryzem.programmanagementsystem.modules.documentmanagement.application.model.read.DocumentReadModel;
+import com.oryzem.programmanagementsystem.modules.documentmanagement.application.port.DocumentQueryRepository;
+import com.oryzem.programmanagementsystem.modules.documentmanagement.application.port.DocumentRepository;
 import com.oryzem.programmanagementsystem.modules.documentmanagement.domain.DocumentPermission;
-import com.oryzem.programmanagementsystem.modules.documentmanagement.infrastructure.SpringDataDocumentJpaRepository;
 import com.oryzem.programmanagementsystem.platform.authorization.AuthenticatedUser;
+import com.oryzem.programmanagementsystem.platform.shared.ResourceNotFoundException;
 import java.time.Instant;
 import java.util.Map;
 import org.springframework.stereotype.Service;
@@ -13,20 +16,20 @@ public class SoftDeleteDocumentUseCase {
 
     private final DocumentRecordLocator recordLocator;
     private final DocumentAuthorizationService authorizationService;
-    private final SpringDataDocumentJpaRepository documentRepository;
-    private final DocumentViewMapper mapper;
+    private final DocumentRepository documentRepository;
+    private final DocumentQueryRepository queryRepository;
     private final DocumentAuditService auditService;
 
     public SoftDeleteDocumentUseCase(
             DocumentRecordLocator recordLocator,
             DocumentAuthorizationService authorizationService,
-            SpringDataDocumentJpaRepository documentRepository,
-            DocumentViewMapper mapper,
+            DocumentRepository documentRepository,
+            DocumentQueryRepository queryRepository,
             DocumentAuditService auditService) {
         this.recordLocator = recordLocator;
         this.authorizationService = authorizationService;
         this.documentRepository = documentRepository;
-        this.mapper = mapper;
+        this.queryRepository = queryRepository;
         this.auditService = auditService;
     }
 
@@ -34,8 +37,8 @@ public class SoftDeleteDocumentUseCase {
     public DocumentView execute(String documentId, AuthenticatedUser actor) {
         DocumentRecordLocator.LocatedDocument located = recordLocator.require(documentId);
         authorizationService.authorizeContext(
-                located.binding().getContextType(),
-                located.binding().getContextId(),
+                located.binding().contextType(),
+                located.binding().contextId(),
                 actor,
                 DocumentPermission.DELETE_DOCUMENT);
         located.document().markDeleted(Instant.now());
@@ -43,12 +46,14 @@ public class SoftDeleteDocumentUseCase {
         auditService.record(
                 actor,
                 "DOCUMENT_SOFT_DELETED",
-                located.document().getTenantId(),
-                located.document().getId(),
-                located.binding().getContextType(),
-                located.binding().getContextId(),
+                located.document().tenantId(),
+                located.document().id(),
+                located.binding().contextType(),
+                located.binding().contextId(),
                 "OK",
-                Map.of("status", located.document().getStatus().name()));
-        return mapper.toView(located.document(), located.binding());
+                Map.of("status", located.document().status().name()));
+        DocumentReadModel readModel = queryRepository.findById(documentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Document", documentId));
+        return readModel.toView();
     }
 }

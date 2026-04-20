@@ -36,6 +36,23 @@ public class DocumentBindingEntity {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    public DocumentBindingEntity(
+            String id,
+            String documentId,
+            DocumentContextType contextType,
+            String contextId,
+            String ownerOrganizationId,
+            String createdByUserId,
+            Instant createdAt) {
+        this.id = id;
+        this.documentId = documentId;
+        this.contextType = contextType;
+        this.contextId = contextId;
+        this.ownerOrganizationId = ownerOrganizationId;
+        this.createdByUserId = createdByUserId;
+        this.createdAt = createdAt;
+    }
+
     protected DocumentBindingEntity() {
     }
 
@@ -58,31 +75,11 @@ public class DocumentBindingEntity {
         return entity;
     }
 
-    public String getId() {
-        return id;
-    }
-
-    public String getDocumentId() {
-        return documentId;
-    }
-
-    public DocumentContextType getContextType() {
-        return contextType;
-    }
-
-    public String getContextId() {
-        return contextId;
-    }
-
-    public String getOwnerOrganizationId() {
-        return ownerOrganizationId;
-    }
-
-    public String getCreatedByUserId() {
-        return createdByUserId;
-    }
-
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
+    public String getId() { return id; }
+    public String getDocumentId() { return documentId; }
+    public DocumentContextType getContextType() { return contextType; }
+    public String getContextId() { return contextId; }
+    public String getOwnerOrganizationId() { return ownerOrganizationId; }
+    public String getCreatedByUserId() { return createdByUserId; }
+    public Instant getCreatedAt() { return createdAt; }
 }

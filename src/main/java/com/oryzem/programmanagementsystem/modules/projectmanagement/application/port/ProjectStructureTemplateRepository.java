@@ -13,4 +13,6 @@ public interface ProjectStructureTemplateRepository {
     List<ProjectStructureTemplateAggregate> findAllByActiveTrueOrderByFrameworkTypeAscVersionDescNameAsc();
 
     ProjectStructureTemplateAggregate save(ProjectStructureTemplateAggregate structureTemplate);
+
+    void deleteById(String id);
 }

@@ -57,6 +57,30 @@
 - `POST /api/projects/{projectId}/deliverables/{deliverableId}/submissions/{submissionId}/approve`
 - `POST /api/projects/{projectId}/deliverables/{deliverableId}/submissions/{submissionId}/reject`
 - `GET /api/projects/{projectId}/dashboard`
+- `GET /api/project-templates`
+- `GET /api/project-templates/{templateId}`
+- `POST /api/project-templates`
+- `PATCH /api/project-templates/{templateId}`
+- `POST /api/project-templates/{templateId}/purge`
+- `GET /api/project-templates/{templateId}/phases`
+- `POST /api/project-templates/{templateId}/phases`
+- `PATCH /api/project-templates/{templateId}/phases/{phaseTemplateId}`
+- `GET /api/project-templates/{templateId}/milestones`
+- `POST /api/project-templates/{templateId}/milestones`
+- `PATCH /api/project-templates/{templateId}/milestones/{milestoneTemplateId}`
+- `GET /api/project-templates/{templateId}/deliverables`
+- `POST /api/project-templates/{templateId}/deliverables`
+- `PATCH /api/project-templates/{templateId}/deliverables/{deliverableTemplateId}`
+- `GET /api/project-structure-templates`
+- `GET /api/project-structure-templates/{structureTemplateId}`
+- `POST /api/project-structure-templates`
+- `PATCH /api/project-structure-templates/{structureTemplateId}`
+- `POST /api/project-structure-templates/{structureTemplateId}/purge`
+- `POST /api/project-structure-templates/{structureTemplateId}/activate`
+- `POST /api/project-structure-templates/{structureTemplateId}/deactivate`
+- `POST /api/project-structure-templates/{structureTemplateId}/levels`
+- `PATCH /api/project-structure-templates/{structureTemplateId}/levels/{levelTemplateId}`
+- `POST /api/project-structure-templates/{structureTemplateId}/levels/reorder`
 - `POST /api/document-contexts/{contextType}/{contextId}/documents/uploads`
 - `GET /api/document-contexts/{contextType}/{contextId}/documents`
 - `GET /api/documents/{documentId}`
@@ -68,6 +92,17 @@
 - `/api/auth/me` and `/api/access/*` remain the supported public core surface.
 - hardening changes preserve route shape and payload compatibility for the active core.
 - lifecycle, retention, quota and export state are internal server-side controls unless noted otherwise below.
+
+## Template administration
+`/api/project-templates` and `/api/project-structure-templates` expose admin-only template management for project setup.
+
+Important behavior:
+- `POST /api/project-templates/{templateId}/purge` permanently removes a project template plus its template-owned phases, milestones and deliverables.
+- project-template purge is rejected with business code `PROJECT_TEMPLATE_DEFAULT_CANNOT_BE_PURGED` when the template is still the default for its framework.
+- project-template purge is rejected with business code `PROJECT_TEMPLATE_IN_USE` when any project already references that template.
+- `POST /api/project-structure-templates/{structureTemplateId}/purge` permanently removes a structure template plus its structure levels.
+- structure-template purge is rejected with business code `PROJECT_STRUCTURE_TEMPLATE_IN_USE` when any project template still references that structure template.
+- successful purge operations are audited by the backend as `PROJECT_TEMPLATE_PURGED` and `PROJECT_STRUCTURE_TEMPLATE_PURGED`.
 
 ## Standard error payloads
 Structured backend errors now use the following shape whenever the security and exception layers provide a JSON response:

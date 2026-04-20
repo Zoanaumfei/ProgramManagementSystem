@@ -19,10 +19,11 @@ public class DocumentAuditService {
     private static final String SOURCE_MODULE = "DOCUMENT_MANAGEMENT";
 
     private final AuditTrailService auditTrailService;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
 
-    public DocumentAuditService(AuditTrailService auditTrailService) {
+    public DocumentAuditService(AuditTrailService auditTrailService, ObjectMapper objectMapper) {
         this.auditTrailService = auditTrailService;
+        this.objectMapper = objectMapper;
     }
 
     public void record(

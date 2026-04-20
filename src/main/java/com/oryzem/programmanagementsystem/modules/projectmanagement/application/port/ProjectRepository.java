@@ -12,6 +12,8 @@ public interface ProjectRepository {
 
     boolean existsByTenantIdAndCodeIgnoreCase(String tenantId, String code);
 
+    boolean existsByTemplateId(String templateId);
+
     List<ProjectAggregate> findAllByTenantIdOrderByCreatedAtDescIdDesc(String tenantId);
 
     ProjectAggregate save(ProjectAggregate project);

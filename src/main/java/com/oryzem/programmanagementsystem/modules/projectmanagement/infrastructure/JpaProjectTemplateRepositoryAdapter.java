@@ -65,4 +65,9 @@ public class JpaProjectTemplateRepositoryAdapter implements ProjectTemplateRepos
         }
         return saved;
     }
+
+    @Override
+    public void deleteById(String id) {
+        delegate.deleteById(id);
+    }
 }

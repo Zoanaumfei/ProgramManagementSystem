@@ -4,6 +4,7 @@ import com.oryzem.programmanagementsystem.modules.projectmanagement.application.
 import com.oryzem.programmanagementsystem.modules.projectmanagement.application.CreateProjectStructureTemplateUseCase;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.application.GetProjectStructureTemplateDetailUseCase;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.application.ListProjectStructureTemplatesUseCase;
+import com.oryzem.programmanagementsystem.modules.projectmanagement.application.PurgeProjectStructureTemplateUseCase;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.application.ReorderProjectStructureLevelsUseCase;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.application.SetProjectStructureTemplateActivationUseCase;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.application.UpdateProjectStructureLevelTemplateUseCase;
@@ -31,6 +32,7 @@ public class ProjectStructureTemplateController {
     private final CreateProjectStructureTemplateUseCase createProjectStructureTemplateUseCase;
     private final UpdateProjectStructureTemplateUseCase updateProjectStructureTemplateUseCase;
     private final SetProjectStructureTemplateActivationUseCase setProjectStructureTemplateActivationUseCase;
+    private final PurgeProjectStructureTemplateUseCase purgeProjectStructureTemplateUseCase;
     private final CreateProjectStructureLevelTemplateUseCase createProjectStructureLevelTemplateUseCase;
     private final UpdateProjectStructureLevelTemplateUseCase updateProjectStructureLevelTemplateUseCase;
     private final ReorderProjectStructureLevelsUseCase reorderProjectStructureLevelsUseCase;
@@ -42,6 +44,7 @@ public class ProjectStructureTemplateController {
             CreateProjectStructureTemplateUseCase createProjectStructureTemplateUseCase,
             UpdateProjectStructureTemplateUseCase updateProjectStructureTemplateUseCase,
             SetProjectStructureTemplateActivationUseCase setProjectStructureTemplateActivationUseCase,
+            PurgeProjectStructureTemplateUseCase purgeProjectStructureTemplateUseCase,
             CreateProjectStructureLevelTemplateUseCase createProjectStructureLevelTemplateUseCase,
             UpdateProjectStructureLevelTemplateUseCase updateProjectStructureLevelTemplateUseCase,
             ReorderProjectStructureLevelsUseCase reorderProjectStructureLevelsUseCase,
@@ -51,6 +54,7 @@ public class ProjectStructureTemplateController {
         this.createProjectStructureTemplateUseCase = createProjectStructureTemplateUseCase;
         this.updateProjectStructureTemplateUseCase = updateProjectStructureTemplateUseCase;
         this.setProjectStructureTemplateActivationUseCase = setProjectStructureTemplateActivationUseCase;
+        this.purgeProjectStructureTemplateUseCase = purgeProjectStructureTemplateUseCase;
         this.createProjectStructureLevelTemplateUseCase = createProjectStructureLevelTemplateUseCase;
         this.updateProjectStructureLevelTemplateUseCase = updateProjectStructureLevelTemplateUseCase;
         this.reorderProjectStructureLevelsUseCase = reorderProjectStructureLevelsUseCase;
@@ -100,6 +104,15 @@ public class ProjectStructureTemplateController {
                         structureTemplateId,
                         new UpdateProjectStructureTemplateUseCase.UpdateProjectStructureTemplateCommand(request.name()),
                         actor));
+    }
+
+    @PostMapping("/{structureTemplateId}/purge")
+    public ProjectStructureDtos.ProjectStructureTemplateSummaryResponse purgeTemplate(
+            Authentication authentication,
+            @PathVariable String structureTemplateId) {
+        AuthenticatedUser actor = authenticatedUserMapper.from(authentication);
+        return ProjectStructureDtos.ProjectStructureTemplateSummaryResponse.from(
+                purgeProjectStructureTemplateUseCase.execute(structureTemplateId, actor));
     }
 
     @PostMapping("/{structureTemplateId}/activate")

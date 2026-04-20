@@ -1,13 +1,13 @@
 package com.oryzem.programmanagementsystem.modules.documentmanagement.application;
 
+import com.oryzem.programmanagementsystem.modules.documentmanagement.application.model.DocumentBindingRecord;
+import com.oryzem.programmanagementsystem.modules.documentmanagement.application.model.DocumentRecord;
+import com.oryzem.programmanagementsystem.modules.documentmanagement.application.port.DocumentBindingRepository;
+import com.oryzem.programmanagementsystem.modules.documentmanagement.application.port.DocumentRepository;
 import com.oryzem.programmanagementsystem.modules.documentmanagement.config.DocumentManagementProperties;
 import com.oryzem.programmanagementsystem.modules.documentmanagement.domain.DocumentContextType;
 import com.oryzem.programmanagementsystem.modules.documentmanagement.domain.DocumentPermission;
 import com.oryzem.programmanagementsystem.modules.documentmanagement.domain.DocumentStorage;
-import com.oryzem.programmanagementsystem.modules.documentmanagement.infrastructure.DocumentBindingEntity;
-import com.oryzem.programmanagementsystem.modules.documentmanagement.infrastructure.DocumentEntity;
-import com.oryzem.programmanagementsystem.modules.documentmanagement.infrastructure.SpringDataDocumentBindingJpaRepository;
-import com.oryzem.programmanagementsystem.modules.documentmanagement.infrastructure.SpringDataDocumentJpaRepository;
 import com.oryzem.programmanagementsystem.modules.documentmanagement.support.DocumentFilePolicy;
 import com.oryzem.programmanagementsystem.modules.documentmanagement.support.DocumentIds;
 import com.oryzem.programmanagementsystem.modules.documentmanagement.support.DocumentStorageKeyFactory;
@@ -25,8 +25,8 @@ public class InitiateDocumentUploadUseCase {
     private final DocumentAuthorizationService authorizationService;
     private final DocumentFilePolicy documentFilePolicy;
     private final DocumentManagementProperties properties;
-    private final SpringDataDocumentJpaRepository documentRepository;
-    private final SpringDataDocumentBindingJpaRepository bindingRepository;
+    private final DocumentRepository documentRepository;
+    private final DocumentBindingRepository bindingRepository;
     private final DocumentStorageKeyFactory storageKeyFactory;
     private final DocumentStorage documentStorage;
     private final DocumentAuditService auditService;
@@ -35,8 +35,8 @@ public class InitiateDocumentUploadUseCase {
             DocumentAuthorizationService authorizationService,
             DocumentFilePolicy documentFilePolicy,
             DocumentManagementProperties properties,
-            SpringDataDocumentJpaRepository documentRepository,
-            SpringDataDocumentBindingJpaRepository bindingRepository,
+            DocumentRepository documentRepository,
+            DocumentBindingRepository bindingRepository,
             DocumentStorageKeyFactory storageKeyFactory,
             DocumentStorage documentStorage,
             DocumentAuditService auditService) {
@@ -70,7 +70,7 @@ public class InitiateDocumentUploadUseCase {
                 sizeBytes,
                 checksumSha256);
 
-        long trackedDocuments = bindingRepository.countTrackedByContext(contextType.name(), contextId);
+        long trackedDocuments = bindingRepository.countTrackedByContext(contextType, contextId);
         if (trackedDocuments >= properties.getMaxFilesPerContext()) {
             throw new BusinessRuleException(
                     "DOCUMENT_CONTEXT_LIMIT_REACHED",
@@ -86,7 +86,7 @@ public class InitiateDocumentUploadUseCase {
                 contextId,
                 documentId);
 
-        DocumentEntity document = DocumentEntity.initiate(
+        DocumentRecord document = DocumentRecord.initiate(
                 documentId,
                 resolvedContext.ownerTenantId(),
                 validatedFile.originalFilename(),
@@ -101,7 +101,7 @@ public class InitiateDocumentUploadUseCase {
                 actor.organizationId(),
                 now.plus(Duration.ofMinutes(properties.getPendingUploadExpirationMinutes())),
                 now);
-        DocumentBindingEntity binding = DocumentBindingEntity.create(
+        DocumentBindingRecord binding = DocumentBindingRecord.create(
                 DocumentIds.newBindingId(),
                 documentId,
                 contextType,
@@ -125,7 +125,7 @@ public class InitiateDocumentUploadUseCase {
             auditService.record(
                     actor,
                     "DOCUMENT_UPLOAD_INITIATED",
-                    document.getTenantId(),
+                    document.tenantId(),
                     documentId,
                     contextType,
                     contextId,
@@ -139,7 +139,7 @@ public class InitiateDocumentUploadUseCase {
             auditService.record(
                     actor,
                     "DOCUMENT_UPLOAD_FAILED",
-                    document.getTenantId(),
+                    document.tenantId(),
                     documentId,
                     contextType,
                     contextId,

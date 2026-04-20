@@ -34,6 +34,11 @@ public class JpaProjectRepositoryAdapter implements ProjectRepository {
     }
 
     @Override
+    public boolean existsByTemplateId(String templateId) {
+        return delegate.existsByTemplateId(templateId);
+    }
+
+    @Override
     public List<ProjectAggregate> findAllByTenantIdOrderByCreatedAtDescIdDesc(String tenantId) {
         return delegate.findAllByTenantIdOrderByCreatedAtDescIdDesc(tenantId).stream().map(mapper::toDomain).toList();
     }

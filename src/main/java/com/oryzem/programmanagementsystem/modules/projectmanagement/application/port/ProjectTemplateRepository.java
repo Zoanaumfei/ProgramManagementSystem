@@ -19,4 +19,6 @@ public interface ProjectTemplateRepository {
     ProjectTemplateAggregate save(ProjectTemplateAggregate projectTemplate);
 
     List<ProjectTemplateAggregate> saveAll(Iterable<ProjectTemplateAggregate> projectTemplates);
+
+    void deleteById(String id);
 }
