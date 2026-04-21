@@ -9,6 +9,7 @@ public record ProjectTemplateAggregate(
         int version,
         ProjectTemplateStatus status,
         String structureTemplateId,
+        String ownerOrganizationId,
         boolean isDefault,
         Instant createdAt) {
 
@@ -24,6 +25,7 @@ public record ProjectTemplateAggregate(
                 version,
                 nextStatus,
                 nextStructureTemplateId,
+                ownerOrganizationId,
                 nextIsDefault,
                 createdAt);
     }
@@ -36,6 +38,7 @@ public record ProjectTemplateAggregate(
                 version,
                 status,
                 structureTemplateId,
+                ownerOrganizationId,
                 nextIsDefault,
                 createdAt);
     }

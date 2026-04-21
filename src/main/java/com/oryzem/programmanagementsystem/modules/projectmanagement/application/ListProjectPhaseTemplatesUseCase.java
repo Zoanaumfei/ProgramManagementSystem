@@ -34,9 +34,9 @@ public class ListProjectPhaseTemplatesUseCase {
 
     public List<TemplateViews.ProjectPhaseTemplateView> execute(String templateId, AuthenticatedUser actor) {
         authorizationService.assertEnabled();
-        administrationService.authorizeManagement(actor);
         ProjectTemplateAggregate template = projectTemplateRepository.findById(templateId)
                 .orElseThrow(() -> new ResourceNotFoundException("ProjectTemplate", templateId));
+        administrationService.authorizeUse(actor, template.ownerOrganizationId());
         return phaseTemplateRepository.findAllByTemplateIdOrderBySequenceNoAsc(template.id()).stream()
                 .map(viewMapper::toPhaseTemplateView)
                 .toList();

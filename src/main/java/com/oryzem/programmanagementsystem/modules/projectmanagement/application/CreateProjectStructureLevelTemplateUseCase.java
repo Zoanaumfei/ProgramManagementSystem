@@ -38,9 +38,9 @@ public class CreateProjectStructureLevelTemplateUseCase {
     @Transactional
     public StructureViews.ProjectStructureLevelView execute(String structureTemplateId, CreateProjectStructureLevelTemplateCommand command, AuthenticatedUser actor) {
         authorizationService.assertEnabled();
-        administrationService.authorizeManagement(actor);
-        structureTemplateRepository.findById(structureTemplateId)
+        var template = structureTemplateRepository.findById(structureTemplateId)
                 .orElseThrow(() -> new ResourceNotFoundException("ProjectStructureTemplate", structureTemplateId));
+        administrationService.authorizeManagement(actor, template.ownerOrganizationId());
         List<ProjectStructureLevelTemplateAggregate> existingLevels = structureLevelTemplateRepository.findAllByStructureTemplateIdOrderBySequenceNoAsc(structureTemplateId);
         if (existingLevels.stream().anyMatch(level -> level.code().equalsIgnoreCase(command.code().trim()))) {
             throw new BusinessRuleException("PROJECT_STRUCTURE_LEVEL_CODE_ALREADY_EXISTS", "A structure level with this code already exists in the template.");

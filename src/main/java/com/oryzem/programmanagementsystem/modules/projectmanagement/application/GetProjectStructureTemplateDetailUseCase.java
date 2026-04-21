@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class GetProjectStructureTemplateDetailUseCase {
 
     private final ProjectAuthorizationService authorizationService;
+    private final ProjectStructureTemplateAdministrationService administrationService;
     private final ProjectStructureTemplateRepository structureTemplateRepository;
     private final ProjectStructureLevelTemplateRepository structureLevelTemplateRepository;
     private final ProjectTemplateRepository projectTemplateRepository;
@@ -29,6 +30,7 @@ public class GetProjectStructureTemplateDetailUseCase {
 
     public GetProjectStructureTemplateDetailUseCase(
             ProjectAuthorizationService authorizationService,
+            ProjectStructureTemplateAdministrationService administrationService,
             ProjectStructureTemplateRepository structureTemplateRepository,
             ProjectStructureLevelTemplateRepository structureLevelTemplateRepository,
             ProjectTemplateRepository projectTemplateRepository,
@@ -36,6 +38,7 @@ public class GetProjectStructureTemplateDetailUseCase {
             DeliverableTemplateRepository deliverableTemplateRepository,
             ProjectViewMapper viewMapper) {
         this.authorizationService = authorizationService;
+        this.administrationService = administrationService;
         this.structureTemplateRepository = structureTemplateRepository;
         this.structureLevelTemplateRepository = structureLevelTemplateRepository;
         this.projectTemplateRepository = projectTemplateRepository;
@@ -51,6 +54,7 @@ public class GetProjectStructureTemplateDetailUseCase {
         }
         ProjectStructureTemplateAggregate structureTemplate = structureTemplateRepository.findById(structureTemplateId)
                 .orElseThrow(() -> new ResourceNotFoundException("ProjectStructureTemplate", structureTemplateId));
+        administrationService.authorizeUse(actor, structureTemplate.ownerOrganizationId());
         List<ProjectTemplateAggregate> projectTemplates = projectTemplateRepository.findAllByStructureTemplateIdOrderByFrameworkTypeAscVersionDesc(structureTemplateId);
         List<String> projectTemplateIds = projectTemplates.stream().map(ProjectTemplateAggregate::id).toList();
         List<TemplateReadModels.ProjectMilestoneTemplateReadModel> milestoneTemplates = projectTemplateIds.isEmpty()

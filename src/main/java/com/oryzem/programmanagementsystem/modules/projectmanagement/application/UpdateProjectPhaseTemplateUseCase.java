@@ -33,9 +33,9 @@ public class UpdateProjectPhaseTemplateUseCase {
     @Transactional
     public TemplateViews.ProjectPhaseTemplateView execute(String templateId, String phaseTemplateId, UpdateProjectPhaseTemplateCommand command, AuthenticatedUser actor) {
         authorizationService.assertEnabled();
-        administrationService.authorizeManagement(actor);
-        projectTemplateRepository.findById(templateId)
+        var template = projectTemplateRepository.findById(templateId)
                 .orElseThrow(() -> new ResourceNotFoundException("ProjectTemplate", templateId));
+        administrationService.authorizeManagement(actor, template.ownerOrganizationId());
         ProjectPhaseTemplateAggregate entity = phaseTemplateRepository.findById(phaseTemplateId)
                 .filter(phase -> phase.templateId().equals(templateId))
                 .orElseThrow(() -> new ResourceNotFoundException("ProjectPhaseTemplate", phaseTemplateId));

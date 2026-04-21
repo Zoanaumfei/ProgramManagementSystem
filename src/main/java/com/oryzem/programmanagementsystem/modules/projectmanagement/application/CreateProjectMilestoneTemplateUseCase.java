@@ -52,9 +52,9 @@ public class CreateProjectMilestoneTemplateUseCase {
     @Transactional
     public TemplateViews.ProjectTemplateMilestoneTemplateView execute(String templateId, CreateProjectMilestoneTemplateCommand command, AuthenticatedUser actor) {
         authorizationService.assertEnabled();
-        administrationService.authorizeManagement(actor);
         ProjectTemplateAggregate template = projectTemplateRepository.findById(templateId)
                 .orElseThrow(() -> new ResourceNotFoundException("ProjectTemplate", templateId));
+        administrationService.authorizeManagement(actor, template.ownerOrganizationId());
         resolvePhaseTemplate(templateId, command.phaseTemplateId());
         validateStructureLevel(template, command.appliesToType(), command.structureLevelTemplateId());
         List<ProjectMilestoneTemplateAggregate> existing = milestoneTemplateRepository.findAllByTemplateIdOrderBySequenceNoAsc(templateId);

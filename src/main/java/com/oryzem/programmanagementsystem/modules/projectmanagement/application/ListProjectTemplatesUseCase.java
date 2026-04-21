@@ -29,8 +29,11 @@ public class ListProjectTemplatesUseCase {
 
     public List<TemplateReadModels.ProjectTemplateListReadModel> execute(AuthenticatedUser actor) {
         authorizationService.assertEnabled();
-        administrationService.authorizeManagement(actor);
+        if (actor == null) {
+            throw new org.springframework.security.access.AccessDeniedException("Authenticated user is required.");
+        }
         return projectTemplateRepository.findAllByOrderByFrameworkTypeAscVersionDesc().stream()
+                .filter(template -> administrationService.canUse(actor, template.ownerOrganizationId()))
                 .map(viewMapper::toProjectTemplateListReadModel)
                 .toList();
     }

@@ -8,6 +8,7 @@ public record ProjectStructureTemplateAggregate(
         ProjectFrameworkType frameworkType,
         int version,
         boolean active,
+        String ownerOrganizationId,
         Instant createdAt) {
 
     public ProjectStructureTemplateAggregate rename(String nextName) {
@@ -17,6 +18,7 @@ public record ProjectStructureTemplateAggregate(
                 frameworkType,
                 version,
                 active,
+                ownerOrganizationId,
                 createdAt);
     }
 
@@ -27,6 +29,7 @@ public record ProjectStructureTemplateAggregate(
                 frameworkType,
                 version,
                 nextActive,
+                ownerOrganizationId,
                 createdAt);
     }
 }

@@ -59,9 +59,9 @@ public class UpdateDeliverableTemplateUseCase {
     @Transactional
     public TemplateViews.ProjectTemplateDeliverableTemplateView execute(String templateId, String deliverableTemplateId, UpdateDeliverableTemplateCommand command, AuthenticatedUser actor) {
         authorizationService.assertEnabled();
-        administrationService.authorizeManagement(actor);
         ProjectTemplateAggregate template = projectTemplateRepository.findById(templateId)
                 .orElseThrow(() -> new ResourceNotFoundException("ProjectTemplate", templateId));
+        administrationService.authorizeManagement(actor, template.ownerOrganizationId());
         DeliverableTemplateAggregate entity = deliverableTemplateRepository.findById(deliverableTemplateId)
                 .filter(item -> item.templateId().equals(templateId))
                 .orElseThrow(() -> new ResourceNotFoundException("DeliverableTemplate", deliverableTemplateId));

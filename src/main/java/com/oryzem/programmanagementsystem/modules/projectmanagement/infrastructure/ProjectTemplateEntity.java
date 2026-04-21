@@ -28,6 +28,8 @@ public class ProjectTemplateEntity {
     private ProjectTemplateStatus status;
     @Column(name = "structure_template_id", length = 64, nullable = false)
     private String structureTemplateId;
+    @Column(name = "owner_organization_id", length = 64, nullable = false)
+    private String ownerOrganizationId;
     @Column(name = "is_default", nullable = false)
     private boolean isDefault;
     @Column(name = "created_at", nullable = false)
@@ -42,6 +44,7 @@ public class ProjectTemplateEntity {
             int version,
             ProjectTemplateStatus status,
             String structureTemplateId,
+            String ownerOrganizationId,
             boolean isDefault,
             Instant createdAt) {
         ProjectTemplateEntity entity = new ProjectTemplateEntity();
@@ -51,6 +54,7 @@ public class ProjectTemplateEntity {
         entity.version = version;
         entity.status = status;
         entity.structureTemplateId = structureTemplateId;
+        entity.ownerOrganizationId = ownerOrganizationId;
         entity.isDefault = isDefault;
         entity.createdAt = createdAt;
         return entity;
@@ -73,6 +77,7 @@ public class ProjectTemplateEntity {
     public int getVersion() { return version; }
     public ProjectTemplateStatus getStatus() { return status; }
     public String getStructureTemplateId() { return structureTemplateId; }
+    public String getOwnerOrganizationId() { return ownerOrganizationId; }
     public boolean isDefault() { return isDefault; }
     public Instant getCreatedAt() { return createdAt; }
 }

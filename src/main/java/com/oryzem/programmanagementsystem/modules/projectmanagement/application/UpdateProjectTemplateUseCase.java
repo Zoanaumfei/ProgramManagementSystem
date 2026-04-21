@@ -37,11 +37,12 @@ public class UpdateProjectTemplateUseCase {
     @Transactional
     public TemplateViews.ProjectTemplateDetailView execute(String templateId, UpdateProjectTemplateCommand command, AuthenticatedUser actor) {
         authorizationService.assertEnabled();
-        administrationService.authorizeManagement(actor);
         ProjectTemplateAggregate entity = projectTemplateRepository.findById(templateId)
                 .orElseThrow(() -> new ResourceNotFoundException("ProjectTemplate", templateId));
+        administrationService.authorizeManagement(actor, entity.ownerOrganizationId());
         ProjectStructureTemplateAggregate structureTemplate = structureTemplateRepository.findById(command.structureTemplateId())
                 .orElseThrow(() -> new ResourceNotFoundException("ProjectStructureTemplate", command.structureTemplateId()));
+        administrationService.authorizeUse(actor, structureTemplate.ownerOrganizationId());
         if (structureTemplate.frameworkType() != entity.frameworkType()) {
             throw new BusinessRuleException("PROJECT_TEMPLATE_STRUCTURE_FRAMEWORK_MISMATCH", "Project template framework must match the linked structure template framework.");
         }
@@ -53,6 +54,7 @@ public class UpdateProjectTemplateUseCase {
         if (command.isDefault()) {
             projectTemplateRepository.saveAll(existing.stream()
                     .map(template -> template.frameworkType() == current.frameworkType()
+                            && template.ownerOrganizationId().equals(current.ownerOrganizationId())
                             && template.isDefault()
                             && !template.id().equals(templateId)
                             ? template.withDefault(false)

@@ -60,9 +60,9 @@ public class CreateDeliverableTemplateUseCase {
     @Transactional
     public TemplateViews.ProjectTemplateDeliverableTemplateView execute(String templateId, CreateDeliverableTemplateCommand command, AuthenticatedUser actor) {
         authorizationService.assertEnabled();
-        administrationService.authorizeManagement(actor);
         ProjectTemplateAggregate template = projectTemplateRepository.findById(templateId)
                 .orElseThrow(() -> new ResourceNotFoundException("ProjectTemplate", templateId));
+        administrationService.authorizeManagement(actor, template.ownerOrganizationId());
         ProjectPhaseTemplateAggregate phase = resolvePhaseTemplate(templateId, command.phaseTemplateId());
         ProjectMilestoneTemplateAggregate milestone = resolveMilestoneTemplate(templateId, command.milestoneTemplateId());
         validatePhaseMilestoneLink(phase, milestone);

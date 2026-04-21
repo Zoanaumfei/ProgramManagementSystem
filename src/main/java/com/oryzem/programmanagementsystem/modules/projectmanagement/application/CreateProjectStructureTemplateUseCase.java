@@ -29,10 +29,11 @@ public class CreateProjectStructureTemplateUseCase {
     @Transactional
     public StructureViews.ProjectStructureTemplateDetailView execute(CreateProjectStructureTemplateCommand command, AuthenticatedUser actor) {
         authorizationService.assertEnabled();
-        administrationService.authorizeManagement(actor);
+        administrationService.authorizeTemplateCreation(actor);
         boolean duplicate = structureTemplateRepository.findAllByOrderByFrameworkTypeAscVersionDescNameAsc().stream()
                 .anyMatch(existing -> existing.frameworkType() == command.frameworkType()
                         && existing.version() == command.version()
+                        && existing.ownerOrganizationId().equals(actor.organizationId())
                         && existing.name().equalsIgnoreCase(command.name().trim()));
         if (duplicate) {
             throw new BusinessRuleException("PROJECT_STRUCTURE_TEMPLATE_ALREADY_EXISTS", "A structure template with the same framework, name and version already exists.");
@@ -43,6 +44,7 @@ public class CreateProjectStructureTemplateUseCase {
                 command.frameworkType(),
                 command.version(),
                 command.active(),
+                actor.organizationId(),
                 Instant.now()));
         return new StructureViews.ProjectStructureTemplateDetailView(
                 entity.id(),

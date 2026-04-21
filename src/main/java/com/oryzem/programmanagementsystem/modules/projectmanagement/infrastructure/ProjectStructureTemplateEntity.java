@@ -24,6 +24,8 @@ public class ProjectStructureTemplateEntity {
     private int version;
     @Column(nullable = false)
     private boolean active;
+    @Column(name = "owner_organization_id", length = 64, nullable = false)
+    private String ownerOrganizationId;
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -35,6 +37,7 @@ public class ProjectStructureTemplateEntity {
             ProjectFrameworkType frameworkType,
             int version,
             boolean active,
+            String ownerOrganizationId,
             Instant createdAt) {
         ProjectStructureTemplateEntity entity = new ProjectStructureTemplateEntity();
         entity.id = id;
@@ -42,6 +45,7 @@ public class ProjectStructureTemplateEntity {
         entity.frameworkType = frameworkType;
         entity.version = version;
         entity.active = active;
+        entity.ownerOrganizationId = ownerOrganizationId;
         entity.createdAt = createdAt;
         return entity;
     }
@@ -59,5 +63,6 @@ public class ProjectStructureTemplateEntity {
     public ProjectFrameworkType getFrameworkType() { return frameworkType; }
     public int getVersion() { return version; }
     public boolean isActive() { return active; }
+    public String getOwnerOrganizationId() { return ownerOrganizationId; }
     public Instant getCreatedAt() { return createdAt; }
 }

@@ -51,9 +51,9 @@ public class UpdateProjectMilestoneTemplateUseCase {
     @Transactional
     public TemplateViews.ProjectTemplateMilestoneTemplateView execute(String templateId, String milestoneTemplateId, UpdateProjectMilestoneTemplateCommand command, AuthenticatedUser actor) {
         authorizationService.assertEnabled();
-        administrationService.authorizeManagement(actor);
         ProjectTemplateAggregate template = projectTemplateRepository.findById(templateId)
                 .orElseThrow(() -> new ResourceNotFoundException("ProjectTemplate", templateId));
+        administrationService.authorizeManagement(actor, template.ownerOrganizationId());
         ProjectMilestoneTemplateAggregate entity = milestoneTemplateRepository.findById(milestoneTemplateId)
                 .filter(item -> item.templateId().equals(templateId))
                 .orElseThrow(() -> new ResourceNotFoundException("ProjectMilestoneTemplate", milestoneTemplateId));

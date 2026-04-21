@@ -35,9 +35,9 @@ public class CreateProjectPhaseTemplateUseCase {
     @Transactional
     public TemplateViews.ProjectPhaseTemplateView execute(String templateId, CreateProjectPhaseTemplateCommand command, AuthenticatedUser actor) {
         authorizationService.assertEnabled();
-        administrationService.authorizeManagement(actor);
         ProjectTemplateAggregate template = projectTemplateRepository.findById(templateId)
                 .orElseThrow(() -> new ResourceNotFoundException("ProjectTemplate", templateId));
+        administrationService.authorizeManagement(actor, template.ownerOrganizationId());
         int nextSequence = phaseTemplateRepository.findAllByTemplateIdOrderBySequenceNoAsc(template.id()).size() + 1;
         ProjectPhaseTemplateAggregate entity = phaseTemplateRepository.save(new ProjectPhaseTemplateAggregate(
                 ProjectIds.newProjectPhaseTemplateId(),

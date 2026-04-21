@@ -34,9 +34,9 @@ public class ListProjectMilestoneTemplatesUseCase {
 
     public List<TemplateViews.ProjectTemplateMilestoneTemplateView> execute(String templateId, AuthenticatedUser actor) {
         authorizationService.assertEnabled();
-        administrationService.authorizeManagement(actor);
         ProjectTemplateAggregate template = projectTemplateRepository.findById(templateId)
                 .orElseThrow(() -> new ResourceNotFoundException("ProjectTemplate", templateId));
+        administrationService.authorizeUse(actor, template.ownerOrganizationId());
         return milestoneTemplateRepository.findAllByTemplateIdOrderBySequenceNoAsc(template.id()).stream()
                 .map(viewMapper::toMilestoneTemplateView)
                 .toList();

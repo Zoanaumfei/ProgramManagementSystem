@@ -39,9 +39,10 @@ public class CreateProjectTemplateUseCase {
     @Transactional
     public TemplateViews.ProjectTemplateDetailView execute(CreateProjectTemplateCommand command, AuthenticatedUser actor) {
         authorizationService.assertEnabled();
-        administrationService.authorizeManagement(actor);
+        administrationService.authorizeTemplateCreation(actor);
         ProjectStructureTemplateAggregate structureTemplate = structureTemplateRepository.findById(command.structureTemplateId())
                 .orElseThrow(() -> new ResourceNotFoundException("ProjectStructureTemplate", command.structureTemplateId()));
+        administrationService.authorizeUse(actor, structureTemplate.ownerOrganizationId());
         if (structureTemplate.frameworkType() != command.frameworkType()) {
             throw new BusinessRuleException("PROJECT_TEMPLATE_STRUCTURE_FRAMEWORK_MISMATCH", "Project template framework must match the linked structure template framework.");
         }
@@ -49,12 +50,16 @@ public class CreateProjectTemplateUseCase {
             throw new BusinessRuleException("PROJECT_TEMPLATE_DEFAULT_MUST_BE_ACTIVE", "Default project templates must be active.");
         }
         List<ProjectTemplateAggregate> existing = projectTemplateRepository.findAllByOrderByFrameworkTypeAscVersionDesc();
-        if (existing.stream().anyMatch(template -> template.frameworkType() == command.frameworkType() && template.version() == command.version())) {
+        if (existing.stream().anyMatch(template -> template.frameworkType() == command.frameworkType()
+                && template.version() == command.version()
+                && template.ownerOrganizationId().equals(actor.organizationId()))) {
             throw new BusinessRuleException("PROJECT_TEMPLATE_VERSION_ALREADY_EXISTS", "A project template already exists for this framework and version.");
         }
         if (command.isDefault()) {
             projectTemplateRepository.saveAll(existing.stream()
-                    .map(template -> template.frameworkType() == command.frameworkType() && template.isDefault()
+                    .map(template -> template.frameworkType() == command.frameworkType()
+                            && template.ownerOrganizationId().equals(actor.organizationId())
+                            && template.isDefault()
                             ? template.withDefault(false)
                             : template)
                     .toList());
@@ -66,6 +71,7 @@ public class CreateProjectTemplateUseCase {
                 command.version(),
                 command.status(),
                 command.structureTemplateId(),
+                actor.organizationId(),
                 command.isDefault(),
                 Instant.now()));
         return viewMapper.toProjectTemplateDetailView(entity);

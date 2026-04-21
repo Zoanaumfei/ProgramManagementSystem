@@ -34,9 +34,9 @@ public class ListDeliverableTemplatesUseCase {
 
     public List<TemplateViews.ProjectTemplateDeliverableTemplateView> execute(String templateId, AuthenticatedUser actor) {
         authorizationService.assertEnabled();
-        administrationService.authorizeManagement(actor);
         ProjectTemplateAggregate template = projectTemplateRepository.findById(templateId)
                 .orElseThrow(() -> new ResourceNotFoundException("ProjectTemplate", templateId));
+        administrationService.authorizeUse(actor, template.ownerOrganizationId());
         return deliverableTemplateRepository.findAllByTemplateIdOrderByPlannedDueOffsetDaysAscCodeAsc(template.id()).stream()
                 .map(viewMapper::toDeliverableTemplateView)
                 .toList();

@@ -37,9 +37,9 @@ public class UpdateProjectStructureLevelTemplateUseCase {
     @Transactional
     public StructureViews.ProjectStructureLevelView execute(String structureTemplateId, String levelTemplateId, UpdateProjectStructureLevelTemplateCommand command, AuthenticatedUser actor) {
         authorizationService.assertEnabled();
-        administrationService.authorizeManagement(actor);
-        structureTemplateRepository.findById(structureTemplateId)
+        var template = structureTemplateRepository.findById(structureTemplateId)
                 .orElseThrow(() -> new ResourceNotFoundException("ProjectStructureTemplate", structureTemplateId));
+        administrationService.authorizeManagement(actor, template.ownerOrganizationId());
         ProjectStructureLevelTemplateAggregate entity = structureLevelTemplateRepository.findById(levelTemplateId)
                 .filter(level -> level.structureTemplateId().equals(structureTemplateId))
                 .orElseThrow(() -> new ResourceNotFoundException("ProjectStructureLevelTemplate", levelTemplateId));

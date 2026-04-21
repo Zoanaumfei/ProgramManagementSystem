@@ -38,6 +38,7 @@ public class CreateProjectUseCase {
     private final ProjectOrganizationRepository organizationRepository;
     private final ProjectMemberRepository memberRepository;
     private final ProjectTemplateRepository templateRepository;
+    private final ProjectStructureTemplateAdministrationService administrationService;
     private final OrganizationLookup organizationLookup;
     private final AccessContextService accessContextService;
     private final ProjectAuthorizationService authorizationService;
@@ -52,6 +53,7 @@ public class CreateProjectUseCase {
             ProjectOrganizationRepository organizationRepository,
             ProjectMemberRepository memberRepository,
             ProjectTemplateRepository templateRepository,
+            ProjectStructureTemplateAdministrationService administrationService,
             OrganizationLookup organizationLookup,
             AccessContextService accessContextService,
             ProjectAuthorizationService authorizationService,
@@ -64,6 +66,7 @@ public class CreateProjectUseCase {
         this.organizationRepository = organizationRepository;
         this.memberRepository = memberRepository;
         this.templateRepository = templateRepository;
+        this.administrationService = administrationService;
         this.organizationLookup = organizationLookup;
         this.accessContextService = accessContextService;
         this.authorizationService = authorizationService;
@@ -98,7 +101,7 @@ public class CreateProjectUseCase {
                 throw new BusinessRuleException("PROJECT_CUSTOMER_ORGANIZATION_INVALID", "Customer organization must be active and belong to the same tenant.");
             }
         }
-        ProjectTemplateAggregate template = resolveTemplate(command);
+        ProjectTemplateAggregate template = resolveTemplate(command, actor);
         Instant now = Instant.now(clock);
         ProjectAggregate aggregate = new ProjectAggregate(
                 ProjectIds.newProjectId(),
@@ -152,16 +155,22 @@ public class CreateProjectUseCase {
         return viewMapper.toDetail(project, organizations, members);
     }
 
-    private ProjectTemplateAggregate resolveTemplate(CreateProjectCommand command) {
+    private ProjectTemplateAggregate resolveTemplate(CreateProjectCommand command, AuthenticatedUser actor) {
         if (command.templateId() != null && !command.templateId().isBlank()) {
             ProjectTemplateAggregate template = templateRepository.findById(command.templateId())
                     .orElseThrow(() -> new ResourceNotFoundException("ProjectTemplate", command.templateId()));
+            administrationService.authorizeUse(actor, template.ownerOrganizationId());
             if (template.frameworkType() != command.frameworkType()) {
                 throw new BusinessRuleException("PROJECT_TEMPLATE_FRAMEWORK_MISMATCH", "Project template framework must match the project framework.");
             }
             return template;
         }
-        return templateRepository.findByFrameworkTypeAndIsDefaultTrueAndStatus(command.frameworkType(), ProjectTemplateStatus.ACTIVE)
+        return templateRepository.findAllByOrderByFrameworkTypeAscVersionDesc().stream()
+                .filter(template -> template.frameworkType() == command.frameworkType()
+                        && template.status() == ProjectTemplateStatus.ACTIVE
+                        && template.isDefault()
+                        && administrationService.canUse(actor, template.ownerOrganizationId()))
+                .findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("ProjectTemplate", command.frameworkType().name() + ":default"));
     }
 

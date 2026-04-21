@@ -37,9 +37,9 @@ public class PurgeProjectTemplateUseCase {
     @Transactional
     public TemplateViews.ProjectTemplateSummaryView execute(String templateId, AuthenticatedUser actor) {
         authorizationService.assertEnabled();
-        administrationService.authorizeManagement(actor);
         ProjectTemplateAggregate template = projectTemplateRepository.findById(templateId)
                 .orElseThrow(() -> new ResourceNotFoundException("ProjectTemplate", templateId));
+        administrationService.authorizeManagement(actor, template.ownerOrganizationId());
         if (template.isDefault()) {
             throw new BusinessRuleException(
                     "PROJECT_TEMPLATE_DEFAULT_CANNOT_BE_PURGED",

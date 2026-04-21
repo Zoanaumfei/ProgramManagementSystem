@@ -59,6 +59,7 @@ class GetProjectStructureTreeUseCaseTest {
                         1,
                         ProjectTemplateStatus.ACTIVE,
                         "PST-1",
+                        "org-lead",
                         true,
                         Instant.now())));
         when(levelRepository.findAllByStructureTemplateIdOrderBySequenceNoAsc("PST-1"))

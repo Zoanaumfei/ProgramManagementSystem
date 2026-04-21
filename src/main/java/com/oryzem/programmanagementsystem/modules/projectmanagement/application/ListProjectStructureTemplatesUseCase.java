@@ -12,14 +12,17 @@ import org.springframework.transaction.annotation.Transactional;
 public class ListProjectStructureTemplatesUseCase {
 
     private final ProjectAuthorizationService authorizationService;
+    private final ProjectStructureTemplateAdministrationService administrationService;
     private final ProjectStructureTemplateRepository structureTemplateRepository;
     private final ProjectViewMapper viewMapper;
 
     public ListProjectStructureTemplatesUseCase(
             ProjectAuthorizationService authorizationService,
+            ProjectStructureTemplateAdministrationService administrationService,
             ProjectStructureTemplateRepository structureTemplateRepository,
             ProjectViewMapper viewMapper) {
         this.authorizationService = authorizationService;
+        this.administrationService = administrationService;
         this.structureTemplateRepository = structureTemplateRepository;
         this.viewMapper = viewMapper;
     }
@@ -30,6 +33,7 @@ public class ListProjectStructureTemplatesUseCase {
             throw new org.springframework.security.access.AccessDeniedException("Authenticated user is required.");
         }
         return structureTemplateRepository.findAllByOrderByFrameworkTypeAscVersionDescNameAsc().stream()
+                .filter(template -> administrationService.canUse(actor, template.ownerOrganizationId()))
                 .map(viewMapper::toProjectStructureTemplateListReadModel)
                 .toList();
     }

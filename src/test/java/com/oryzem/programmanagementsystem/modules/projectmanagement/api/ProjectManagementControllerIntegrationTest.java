@@ -1190,6 +1190,71 @@ class ProjectManagementControllerIntegrationTest {
     }
 
     @Test
+    void shouldAllowSupplierInChainToViewAndUseTemplatesButDenyManagement() throws Exception {
+        String supplierOrganizationId = createSupplierOrganization();
+        createExternalUser("Supplier Admin Templates", "supplier.templates.admin@tenant-a.com", supplierOrganizationId, "ADMIN");
+
+        mockMvc.perform(get("/api/project-templates")
+                        .with(jwtFor("supplier.templates.admin@tenant-a.com", "ROLE_ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(3));
+
+        mockMvc.perform(patch("/api/project-templates/TMP-CUSTOM-V1")
+                        .with(jwtFor("supplier.templates.admin@tenant-a.com", "ROLE_ADMIN"))
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "name", "Supplier Attempt",
+                                "status", "ACTIVE",
+                                "isDefault", true,
+                                "structureTemplateId", "PST-CUSTOM-V1"))))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/project-templates/TMP-CUSTOM-V1/purge")
+                        .with(jwtFor("supplier.templates.admin@tenant-a.com", "ROLE_ADMIN")))
+                .andExpect(status().isForbidden());
+
+        String response = mockMvc.perform(post("/api/projects")
+                        .with(jwtFor("supplier.templates.admin@tenant-a.com", "ROLE_ADMIN"))
+                        .contentType(APPLICATION_JSON)
+                        .header("Idempotency-Key", "PRJ-SUP-TEMPLATE-USE-001")
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "code", "PRJ-SUP-TEMPLATE-USE-001",
+                                "name", "Project Supplier Template Use",
+                                "description", "supplier uses inherited template",
+                                "frameworkType", "CUSTOM",
+                                "templateId", "TMP-CUSTOM-V1",
+                                "plannedStartDate", "2026-04-08",
+                                "plannedEndDate", "2026-06-30"))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        assertThat(objectMapper.readTree(response).get("templateId").asText()).isEqualTo("TMP-CUSTOM-V1");
+    }
+
+    @Test
+    void shouldHideAndBlockTemplateUseOutsideOwnerChain() throws Exception {
+        mockMvc.perform(get("/api/project-templates")
+                        .with(externalAdminTenantB()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+
+        mockMvc.perform(post("/api/projects")
+                        .with(externalAdminTenantB())
+                        .contentType(APPLICATION_JSON)
+                        .header("Idempotency-Key", "PRJ-TENANT-B-TEMPLATE-001")
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "code", "PRJ-TENANT-B-TEMPLATE-001",
+                                "name", "Project Tenant B",
+                                "description", "cross-chain template use",
+                                "frameworkType", "CUSTOM",
+                                "templateId", "TMP-CUSTOM-V1",
+                                "plannedStartDate", "2026-04-08",
+                                "plannedEndDate", "2026-06-30"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void shouldBlockCrossTenantDocumentAccessForProjectHost() throws Exception {
         JsonNode project = createProject("PRJ-SEC-001");
         String projectId = project.get("id").asText();

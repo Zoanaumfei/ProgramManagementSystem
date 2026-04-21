@@ -15,6 +15,7 @@ public class ProjectTemplatePersistenceMapper {
                 entity.getVersion(),
                 entity.getStatus(),
                 entity.getStructureTemplateId(),
+                entity.getOwnerOrganizationId(),
                 entity.isDefault(),
                 entity.getCreatedAt());
     }
@@ -27,6 +28,7 @@ public class ProjectTemplatePersistenceMapper {
                 aggregate.version(),
                 aggregate.status(),
                 aggregate.structureTemplateId(),
+                aggregate.ownerOrganizationId(),
                 aggregate.isDefault(),
                 aggregate.createdAt());
     }

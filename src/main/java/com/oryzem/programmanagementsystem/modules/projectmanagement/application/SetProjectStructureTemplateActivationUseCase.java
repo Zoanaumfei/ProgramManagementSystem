@@ -29,9 +29,9 @@ public class SetProjectStructureTemplateActivationUseCase {
     @Transactional
     public StructureViews.ProjectStructureTemplateSummaryView execute(String structureTemplateId, boolean active, AuthenticatedUser actor) {
         authorizationService.assertEnabled();
-        administrationService.authorizeManagement(actor);
         ProjectStructureTemplateAggregate entity = structureTemplateRepository.findById(structureTemplateId)
                 .orElseThrow(() -> new ResourceNotFoundException("ProjectStructureTemplate", structureTemplateId));
+        administrationService.authorizeManagement(actor, entity.ownerOrganizationId());
         ProjectStructureTemplateAggregate updated = structureTemplateRepository.save(entity.withActive(active));
         return viewMapper.toStructureTemplateSummaryView(updated);
     }

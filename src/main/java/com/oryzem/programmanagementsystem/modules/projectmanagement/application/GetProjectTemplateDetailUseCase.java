@@ -30,9 +30,9 @@ public class GetProjectTemplateDetailUseCase {
 
     public TemplateReadModels.ProjectTemplateDetailReadModel execute(String templateId, AuthenticatedUser actor) {
         authorizationService.assertEnabled();
-        administrationService.authorizeManagement(actor);
         ProjectTemplateAggregate entity = projectTemplateRepository.findById(templateId)
                 .orElseThrow(() -> new ResourceNotFoundException("ProjectTemplate", templateId));
+        administrationService.authorizeUse(actor, entity.ownerOrganizationId());
         return viewMapper.toProjectTemplateDetailReadModel(entity);
     }
 }

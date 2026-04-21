@@ -37,9 +37,9 @@ public class PurgeProjectStructureTemplateUseCase {
     @Transactional
     public StructureViews.ProjectStructureTemplateSummaryView execute(String structureTemplateId, AuthenticatedUser actor) {
         authorizationService.assertEnabled();
-        administrationService.authorizeManagement(actor);
         ProjectStructureTemplateAggregate structureTemplate = structureTemplateRepository.findById(structureTemplateId)
                 .orElseThrow(() -> new ResourceNotFoundException("ProjectStructureTemplate", structureTemplateId));
+        administrationService.authorizeManagement(actor, structureTemplate.ownerOrganizationId());
         if (!projectTemplateRepository.findAllByStructureTemplateIdOrderByFrameworkTypeAscVersionDesc(structureTemplateId).isEmpty()) {
             throw new BusinessRuleException(
                     "PROJECT_STRUCTURE_TEMPLATE_IN_USE",

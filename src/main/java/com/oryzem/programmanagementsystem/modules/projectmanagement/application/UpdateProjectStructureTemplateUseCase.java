@@ -31,13 +31,14 @@ public class UpdateProjectStructureTemplateUseCase {
     @Transactional
     public StructureReadModels.ProjectStructureTemplateDetailReadModel execute(String structureTemplateId, UpdateProjectStructureTemplateCommand command, AuthenticatedUser actor) {
         authorizationService.assertEnabled();
-        administrationService.authorizeManagement(actor);
         ProjectStructureTemplateAggregate entity = structureTemplateRepository.findById(structureTemplateId)
                 .orElseThrow(() -> new ResourceNotFoundException("ProjectStructureTemplate", structureTemplateId));
+        administrationService.authorizeManagement(actor, entity.ownerOrganizationId());
         boolean duplicate = structureTemplateRepository.findAllByOrderByFrameworkTypeAscVersionDescNameAsc().stream()
                 .anyMatch(existing -> !existing.id().equals(structureTemplateId)
                         && existing.frameworkType() == entity.frameworkType()
                         && existing.version() == entity.version()
+                        && existing.ownerOrganizationId().equals(entity.ownerOrganizationId())
                         && existing.name().equalsIgnoreCase(command.name().trim()));
         if (duplicate) {
             throw new BusinessRuleException("PROJECT_STRUCTURE_TEMPLATE_ALREADY_EXISTS", "A structure template with the same framework, name and version already exists.");

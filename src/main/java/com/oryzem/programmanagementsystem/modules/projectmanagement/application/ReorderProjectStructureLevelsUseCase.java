@@ -38,9 +38,9 @@ public class ReorderProjectStructureLevelsUseCase {
     @Transactional
     public List<StructureViews.ProjectStructureLevelView> execute(String structureTemplateId, List<String> orderedLevelIds, AuthenticatedUser actor) {
         authorizationService.assertEnabled();
-        administrationService.authorizeManagement(actor);
-        structureTemplateRepository.findById(structureTemplateId)
+        var template = structureTemplateRepository.findById(structureTemplateId)
                 .orElseThrow(() -> new ResourceNotFoundException("ProjectStructureTemplate", structureTemplateId));
+        administrationService.authorizeManagement(actor, template.ownerOrganizationId());
         List<ProjectStructureLevelTemplateAggregate> existingLevels = structureLevelTemplateRepository.findAllByStructureTemplateIdOrderBySequenceNoAsc(structureTemplateId);
         if (orderedLevelIds == null || orderedLevelIds.isEmpty()) {
             throw new BusinessRuleException("PROJECT_STRUCTURE_LEVEL_ORDER_INVALID", "Level order cannot be empty.");
