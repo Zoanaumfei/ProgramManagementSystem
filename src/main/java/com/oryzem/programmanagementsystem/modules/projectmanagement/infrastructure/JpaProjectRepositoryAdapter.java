@@ -39,6 +39,11 @@ public class JpaProjectRepositoryAdapter implements ProjectRepository {
     }
 
     @Override
+    public List<ProjectAggregate> findAllOrderByCreatedAtDescIdDesc() {
+        return delegate.findAllByOrderByCreatedAtDescIdDesc().stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
     public List<ProjectAggregate> findAllByTenantIdOrderByCreatedAtDescIdDesc(String tenantId) {
         return delegate.findAllByTenantIdOrderByCreatedAtDescIdDesc(tenantId).stream().map(mapper::toDomain).toList();
     }
@@ -52,5 +57,10 @@ public class JpaProjectRepositoryAdapter implements ProjectRepository {
                 })
                 .orElseGet(() -> mapper.toNewEntity(project));
         return mapper.toDomain(delegate.save(entity));
+    }
+
+    @Override
+    public void deleteById(String id) {
+        delegate.deleteById(id);
     }
 }

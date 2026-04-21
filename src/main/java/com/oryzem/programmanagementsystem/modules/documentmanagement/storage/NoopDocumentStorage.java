@@ -38,6 +38,11 @@ public class NoopDocumentStorage implements DocumentStorage {
         return Set.of();
     }
 
+    @Override
+    public void deleteObject(String storageKey) {
+        // No-op when storage is disabled.
+    }
+
     private FeatureTemporarilyUnavailableException unavailable() {
         return new FeatureTemporarilyUnavailableException(
                 "Document storage is not configured. Defina app.document-management.storage.s3.bucket para habilitar o modulo documental.");

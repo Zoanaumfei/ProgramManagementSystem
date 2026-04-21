@@ -15,6 +15,7 @@ This repository now exposes only the core membership-first platform surface.
 - tenant service tier updates: `PATCH /api/access/tenants/{tenantId}/service-tier`
 - tenant market admin: `/api/access/tenants/{tenantId}/markets`
 - project management: `/api/projects`
+- project purge administration: `/api/projects/{projectId}/purge-intents` and `/api/projects/{projectId}/purge`
 - document management for project contexts: `/api/document-contexts/{contextType}/{contextId}/documents` and `/api/documents/{documentId}*`
 
 ## Backend behaviors the frontend must honor
@@ -29,10 +30,15 @@ This repository now exposes only the core membership-first platform surface.
 - the operational dashboard receives `kpis`, `series`, `topTenants`, `tenantDetails`, `alerts` and `recentEvents` from the aggregated backend response
 - frontend should require `organizationId` and `roles` when creating users because the backend now provisions the first membership in the same request
 - frontend project creation should treat the active access-context organization as the lead organization, because the backend resolves lead ownership from the authenticated context instead of a request field
-- frontend should treat `/api/project-templates` and `/api/project-structure-templates` as the administrative source of truth for template governance, while the project-create wizard may still keep its seeded shortcut defaults as an operator convenience
+- frontend should treat `/api/project-templates` and `/api/project-structure-templates` as the administrative source of truth for template governance and for the project-create wizard, with the visible/selectable catalog scoped by the active organization context and backend ownership rules
+- frontend should assume template catalog endpoints already return only use-authorized templates and should not surface non-returned templates as selectable fallbacks
+- frontend should treat template-management actions (edit/purge/activate/deactivate and template-child mutations) as owner-only operations even for tenant admins outside the owner organization
 - frontend should use backend `version` fields when updating projects, deliverables and submissions, and should surface a dedicated optimistic-concurrency conflict message
 - frontend now also uses backend `version` fields when updating project milestones from the project detail milestones tab
 - frontend should embed document-management in the `PROJECT`, `PROJECT_DELIVERABLE` and `PROJECT_DELIVERABLE_SUBMISSION` contexts using initiate-upload -> direct storage upload -> finalize-upload -> refresh
+- frontend should treat project purge as a two-step destructive flow: create purge intent first, display backend impact counts, then require the operator to re-confirm with reason + confirmation text before executing the final purge request
+- frontend should expose project purge only to internal `ADMIN` and `SUPPORT` operators
+- frontend project list views for internal `ADMIN` actors should now expect platform-wide results from `GET /api/projects`, while normal tenant actors remain tenant-scoped
 - `GET /api/access/users/orphans` is a cleanup/discovery surface for inconsistent data only, not the normal onboarding path
 - frontend should treat business codes such as `ORPHAN_USER_DETECTED`, `USER_ACTIVE_MEMBERSHIP_REQUIRED` and `USER_CREATION_MEMBERSHIP_FAILED` as actionable data-repair errors rather than as recoverable inline onboarding states
 - frontend users copy should frame `Usuarios sem membership` as `diagnostico e reparo`, and the memberships workspace should label `bootstrap-membership` as an exceptional repair action instead of a standard create step
@@ -144,8 +150,8 @@ The active frontend source tree is not fully present in this repository, so the 
 - the frontend project-management module is now active under `/workspace/projects/*` with list, creation wizard, project detail tabs, deliverable detail, submission review and embedded document panels wired to the real backend module
 - the project detail participants tab now combines the existing read model with transactional add-organization and add-member flows on top of `/api/projects/{projectId}/organizations` and `/api/projects/{projectId}/members`
 - the organizations workspace now also exposes the audited export workflow under `/workspace/organizations/{organizationId}/exports`, backed by `GET|POST|PATCH /api/access/organizations/{organizationId}/exports`
-- the current frontend create wizard still uses the seeded default template ids `TMP-APQP-V1`, `TMP-VDA-MLA-V1` and `TMP-CUSTOM-V1` as pragmatic UX presets even though the backend now exposes administrative template discovery endpoints
-- the frontend now also exposes `/workspace/templates/*` for admin-only management of project templates, structure templates, phases, milestones, deliverables and structure levels, including structure activation/deactivation and purge-protected destructive flows
+- the current frontend create wizard now loads the authorized template catalog from `/api/project-templates`, filters by framework in the active access context and leaves template selection blank when the operator wants the backend to resolve the authorized default template
+- the frontend now also exposes `/workspace/templates/*` for owner-admin management of project templates, structure templates, phases, milestones, deliverables and structure levels, including structure activation/deactivation and purge-protected destructive flows
 
 ## Operational validation status
 - the published backend environment was revalidated on `2026-04-01`: `GET /api/access/users` now returns structured `401 Unauthorized` for anonymous requests, confirming that the route is served by the secured backend controller path rather than a static-resource `404`
@@ -153,3 +159,4 @@ The active frontend source tree is not fully present in this repository, so the 
 - the operational reaction runbook has been exercised in dev and prod for the active core administration surface
 - the automatic alert thresholds are implemented, but explicit end-to-end alert-evidence capture remains a follow-up activity
 - confirm the desired UX for `PARTNER` relationships in organization and user workspaces: explicit read-only distinction versus relying only on authorization failures
+

@@ -4,6 +4,7 @@ import com.oryzem.programmanagementsystem.modules.documentmanagement.application
 import com.oryzem.programmanagementsystem.modules.documentmanagement.domain.DocumentContextType;
 import java.util.List;
 import java.util.Optional;
+import java.util.Collection;
 
 public interface DocumentBindingRepository {
 
@@ -18,4 +19,6 @@ public interface DocumentBindingRepository {
     List<DocumentBindingRecord> findAll();
 
     DocumentBindingRecord save(DocumentBindingRecord binding);
+
+    void deleteAllByDocumentIdIn(Collection<String> documentIds);
 }

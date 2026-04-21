@@ -14,7 +14,11 @@ public interface ProjectRepository {
 
     boolean existsByTemplateId(String templateId);
 
+    List<ProjectAggregate> findAllOrderByCreatedAtDescIdDesc();
+
     List<ProjectAggregate> findAllByTenantIdOrderByCreatedAtDescIdDesc(String tenantId);
 
     ProjectAggregate save(ProjectAggregate project);
+
+    void deleteById(String id);
 }

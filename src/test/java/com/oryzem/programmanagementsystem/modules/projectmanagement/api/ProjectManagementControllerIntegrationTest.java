@@ -26,6 +26,7 @@ import com.oryzem.programmanagementsystem.modules.projectmanagement.infrastructu
 import com.oryzem.programmanagementsystem.modules.projectmanagement.infrastructure.SpringDataProjectMemberJpaRepository;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.infrastructure.SpringDataProjectMilestoneJpaRepository;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.infrastructure.SpringDataProjectOrganizationJpaRepository;
+import com.oryzem.programmanagementsystem.modules.projectmanagement.infrastructure.SpringDataProjectPurgeIntentJpaRepository;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.infrastructure.SpringDataProjectPhaseJpaRepository;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.infrastructure.SpringDataProjectStructureNodeJpaRepository;
 import com.oryzem.programmanagementsystem.platform.audit.SpringDataAuditLogJpaRepository;
@@ -95,6 +96,9 @@ class ProjectManagementControllerIntegrationTest {
     private SpringDataProjectStructureNodeJpaRepository structureNodeRepository;
 
     @Autowired
+    private SpringDataProjectPurgeIntentJpaRepository purgeIntentRepository;
+
+    @Autowired
     private SpringDataDocumentBindingJpaRepository documentBindingRepository;
 
     @Autowired
@@ -132,6 +136,7 @@ class ProjectManagementControllerIntegrationTest {
         jdbcTemplate.update("DELETE FROM project_template WHERE id NOT IN ('TMP-APQP-V1', 'TMP-VDA-MLA-V1', 'TMP-CUSTOM-V1')");
         jdbcTemplate.update("DELETE FROM project_structure_template WHERE id NOT IN ('PST-APQP-V1', 'PST-VDA-MLA-V1', 'PST-CUSTOM-V1')");
         idempotencyRepository.deleteAll();
+        purgeIntentRepository.deleteAll();
         auditLogRepository.deleteAll();
         bootstrapDataService.reset();
     }
@@ -1266,6 +1271,126 @@ class ProjectManagementControllerIntegrationTest {
                 .andExpect(status().isForbidden());
     }
 
+    @Test
+    void shouldAllowInternalAdminToCreateProjectPurgeIntent() throws Exception {
+        JsonNode project = createProject("PRJ-PURGE-INTENT-001");
+        String projectId = project.get("id").asText();
+
+        mockMvc.perform(post("/api/projects/" + projectId + "/purge-intents")
+                        .with(internalAdmin())
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "reason", "Project is orphaned after tenant offboarding."))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.projectId").value(projectId))
+                .andExpect(jsonPath("$.projectCode").value("PRJ-PURGE-INTENT-001"))
+                .andExpect(jsonPath("$.requiresFinalConfirmation").value(true))
+                .andExpect(jsonPath("$.impact.deliverableCount").value(3));
+    }
+
+    @Test
+    void shouldAllowInternalSupportToPurgeProjectAndCleanAllArtifacts() throws Exception {
+        JsonNode project = createProject("PRJ-PURGE-001");
+        String projectId = project.get("id").asText();
+        JsonNode deliverable = firstDeliverable(projectId);
+        String deliverableId = deliverable.get("id").asText();
+        String projectDocumentId = initiateAndFinalizeDocument("PROJECT", projectId);
+        String deliverableDocumentId = initiateAndFinalizeDocument("PROJECT_DELIVERABLE", deliverableId);
+
+        String submissionResponse = mockMvc.perform(post("/api/projects/" + projectId + "/deliverables/" + deliverableId + "/submissions")
+                        .with(externalAdminTenantA())
+                        .contentType(APPLICATION_JSON)
+                        .header("Idempotency-Key", "purge-submit-" + projectId)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "deliverableVersion", deliverable.get("version").asLong(),
+                                "documentIds", java.util.List.of()))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String submissionId = objectMapper.readTree(submissionResponse).get("id").asText();
+        String submissionDocumentId = initiateAndFinalizeDocument("PROJECT_DELIVERABLE_SUBMISSION", submissionId);
+
+        String intentResponse = mockMvc.perform(post("/api/projects/" + projectId + "/purge-intents")
+                        .with(internalSupport())
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "reason", "Organization removed from platform; project cleanup required."))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.impact.documentCount").value(3))
+                .andExpect(jsonPath("$.impact.storageObjectCount").value(3))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String purgeToken = objectMapper.readTree(intentResponse).get("purgeToken").asText();
+
+        mockMvc.perform(post("/api/projects/" + projectId + "/purge")
+                        .with(internalSupport())
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "reason", "Organization removed from platform; project cleanup required.",
+                                "purgeToken", purgeToken,
+                                "confirm", true,
+                                "confirmationText", "PURGE PROJECT"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PURGED"))
+                .andExpect(jsonPath("$.impact.documentCount").value(3));
+
+        assertThat(projectRepository.findById(projectId)).isEmpty();
+        assertThat(deliverableRepository.findAllByProjectIdOrderByPlannedDueDateAscIdAsc(projectId)).isEmpty();
+        assertThat(submissionRepository.findById(submissionId)).isEmpty();
+        assertThat(documentBindingRepository.findByDocumentId(projectDocumentId)).isEmpty();
+        assertThat(documentBindingRepository.findByDocumentId(deliverableDocumentId)).isEmpty();
+        assertThat(documentBindingRepository.findByDocumentId(submissionDocumentId)).isEmpty();
+        assertThat(documentRepository.findById(projectDocumentId)).isEmpty();
+        assertThat(documentRepository.findById(deliverableDocumentId)).isEmpty();
+        assertThat(documentRepository.findById(submissionDocumentId)).isEmpty();
+        assertThat(stubStorage().listStorageKeys("tenant")).isEmpty();
+    }
+
+    @Test
+    void shouldRejectProjectPurgeExecutionWithoutFinalConfirmation() throws Exception {
+        JsonNode project = createProject("PRJ-PURGE-CONFIRM-001");
+        String projectId = project.get("id").asText();
+
+        String intentResponse = mockMvc.perform(post("/api/projects/" + projectId + "/purge-intents")
+                        .with(internalAdmin())
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "reason", "Validation of destructive safeguards."))))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String purgeToken = objectMapper.readTree(intentResponse).get("purgeToken").asText();
+
+        mockMvc.perform(post("/api/projects/" + projectId + "/purge")
+                        .with(internalAdmin())
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "reason", "Validation of destructive safeguards.",
+                                "purgeToken", purgeToken,
+                                "confirm", true,
+                                "confirmationText", "WRONG TEXT"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("PROJECT_PURGE_CONFIRMATION_TEXT_INVALID"));
+
+        assertThat(projectRepository.findById(projectId)).isPresent();
+    }
+
+    @Test
+    void shouldRejectProjectPurgeIntentForExternalActors() throws Exception {
+        JsonNode project = createProject("PRJ-PURGE-EXT-001");
+        String projectId = project.get("id").asText();
+
+        mockMvc.perform(post("/api/projects/" + projectId + "/purge-intents")
+                        .with(externalAdminTenantA())
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "reason", "External actors must not purge projects."))))
+                .andExpect(status().isForbidden());
+    }
+
     private JsonNode createProject(String code) throws Exception {
         return createProject(code, "APQP");
     }
@@ -1557,6 +1682,24 @@ class ProjectManagementControllerIntegrationTest {
                         .claim("email", "admin.a@tenant.com")
                         .claim("token_use", "access"))
                 .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
+    }
+
+    private org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor internalAdmin() {
+        return jwt().jwt(jwt -> jwt
+                        .claim("sub", "admin@oryzem.com-sub")
+                        .claim("cognito:username", "admin@oryzem.com")
+                        .claim("email", "admin@oryzem.com")
+                        .claim("token_use", "access"))
+                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
+    }
+
+    private org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor internalSupport() {
+        return jwt().jwt(jwt -> jwt
+                        .claim("sub", "support@oryzem.com-sub")
+                        .claim("cognito:username", "support@oryzem.com")
+                        .claim("email", "support@oryzem.com")
+                        .claim("token_use", "access"))
+                .authorities(new SimpleGrantedAuthority("ROLE_SUPPORT"));
     }
 
     private org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor externalAdminTenantB() {

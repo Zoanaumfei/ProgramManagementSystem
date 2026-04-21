@@ -4,6 +4,7 @@ import com.oryzem.programmanagementsystem.modules.documentmanagement.application
 import com.oryzem.programmanagementsystem.modules.documentmanagement.application.port.DocumentBindingRepository;
 import com.oryzem.programmanagementsystem.modules.documentmanagement.domain.DocumentContextType;
 import com.oryzem.programmanagementsystem.modules.documentmanagement.infrastructure.mapper.DocumentBindingPersistenceMapper;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Repository;
@@ -48,5 +49,13 @@ public class JpaDocumentBindingRepositoryAdapter implements DocumentBindingRepos
     @Override
     public DocumentBindingRecord save(DocumentBindingRecord binding) {
         return mapper.toRecord(delegate.save(mapper.toNewEntity(binding)));
+    }
+
+    @Override
+    public void deleteAllByDocumentIdIn(Collection<String> documentIds) {
+        if (documentIds == null || documentIds.isEmpty()) {
+            return;
+        }
+        delegate.deleteAllByDocumentIdIn(documentIds);
     }
 }

@@ -5,4 +5,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface SpringDataProjectPhaseJpaRepository extends JpaRepository<ProjectPhaseEntity, String> {
     List<ProjectPhaseEntity> findAllByProjectIdOrderBySequenceNoAsc(String projectId);
+    void deleteAllByProjectId(String projectId);
 }

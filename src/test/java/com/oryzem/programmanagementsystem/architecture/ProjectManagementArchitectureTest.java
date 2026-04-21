@@ -3,6 +3,9 @@ package com.oryzem.programmanagementsystem.architecture;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
+import com.oryzem.programmanagementsystem.modules.documentmanagement.application.DocumentAdministrationFacade;
+import com.oryzem.programmanagementsystem.modules.documentmanagement.application.DocumentContextRef;
+import com.oryzem.programmanagementsystem.modules.documentmanagement.application.DocumentPurgeSummary;
 import com.oryzem.programmanagementsystem.modules.documentmanagement.application.DocumentPublicFacade;
 import com.oryzem.programmanagementsystem.modules.documentmanagement.application.DocumentView;
 import com.oryzem.programmanagementsystem.modules.documentmanagement.domain.DocumentContextPolicy;
@@ -125,6 +128,9 @@ class ProjectManagementArchitectureTest {
                 String packageName = javaClass.getPackageName();
                 String className = javaClass.getName();
                 return packageName.contains(".modules.documentmanagement.")
+                        && !className.equals(DocumentAdministrationFacade.class.getName())
+                        && !className.equals(DocumentContextRef.class.getName())
+                        && !className.equals(DocumentPurgeSummary.class.getName())
                         && !className.equals(DocumentPublicFacade.class.getName())
                         && !className.equals(DocumentView.class.getName())
                         && !className.equals(DocumentStatus.class.getName())

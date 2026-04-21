@@ -5,4 +5,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface SpringDataDeliverableSubmissionDocumentJpaRepository extends JpaRepository<DeliverableSubmissionDocumentEntity, String> {
     List<DeliverableSubmissionDocumentEntity> findAllBySubmissionId(String submissionId);
+    void deleteAllBySubmissionIdIn(java.util.Collection<String> submissionIds);
 }

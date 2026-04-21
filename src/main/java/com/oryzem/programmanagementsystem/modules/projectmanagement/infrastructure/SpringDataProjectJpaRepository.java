@@ -8,5 +8,6 @@ public interface SpringDataProjectJpaRepository extends JpaRepository<ProjectEnt
     Optional<ProjectEntity> findByIdAndTenantId(String id, String tenantId);
     boolean existsByTenantIdAndCodeIgnoreCase(String tenantId, String code);
     boolean existsByTemplateId(String templateId);
+    List<ProjectEntity> findAllByOrderByCreatedAtDescIdDesc();
     List<ProjectEntity> findAllByTenantIdOrderByCreatedAtDescIdDesc(String tenantId);
 }

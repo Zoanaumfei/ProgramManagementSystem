@@ -26,6 +26,8 @@ public interface DocumentStorage {
 
     Set<String> listStorageKeys(String prefix);
 
+    void deleteObject(String storageKey);
+
     record UploadInstruction(
             String url,
             Map<String, String> fields,

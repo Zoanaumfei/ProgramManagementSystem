@@ -15,6 +15,9 @@ The backend status below was cross-checked against the code currently present in
 - the active backend surface is centered on `/api/auth/me`, `/api/access/users`, `/api/access/users/{userId}/memberships`, `/api/access/organizations`, `/api/access/organizations/{organizationId}/relationships`, `/api/access/tenants` and related operational endpoints
 - the backend now also exposes the new `project-management` and `document-management` surfaces through `/api/projects`, `/api/document-contexts/{contextType}/{contextId}/documents`, `/api/documents/{documentId}/finalize-upload` and `/api/documents/{documentId}/download-url`
 - project management currently supports project creation/list/detail/update, participant organization/member registration, milestone listing, deliverable listing/detail/update, deliverable submission create/review, project dashboard and pending-review listing
+- internal `ADMIN` actors now receive a platform-wide project list from `GET /api/projects`
+- the backend now exposes an explicit two-step project purge flow through `/api/projects/{projectId}/purge-intents` and `/api/projects/{projectId}/purge`
+- project purge is restricted to internal `ADMIN` and `SUPPORT` actors, requires mandatory reason + final confirmation text, and physically removes project data plus linked document/storage artifacts
 - project creation resolves the applied template from `templateId` when provided, and otherwise falls back to the active default template for the chosen `frameworkType`
 - document management now supports the `PROJECT`, `PROJECT_DELIVERABLE` and `PROJECT_DELIVERABLE_SUBMISSION` contexts with direct upload initiation, backend-side finalize, contextual listing, signed download URL generation and soft delete
 - user onboarding now provisions the first membership during `POST /api/access/users`, so the standard invite flow no longer depends on a later bootstrap-membership step
@@ -40,8 +43,8 @@ The frontend source tree is not the active implementation focus of this reposito
 - the active frontend workspace now also includes `/workspace/projects/*` for collaborative project management backed by the new project/document modules
 - the frontend project-management module now ships the MVP routes for project list, project creation wizard, project detail with tabs, deliverable detail and submission detail, all integrated with the real backend contract
 - the project detail screen now centralizes summary, milestones, deliverables, participants and project documents, while the deliverable detail screen concentrates work-package documents plus submission creation and the submission detail screen concentrates review/approve/reject actions
-- the project create flow currently binds the lead organization to the operator's active access context, matching the backend contract, and still uses the known seeded default template ids for `APQP`, `VDA_MLA` and `CUSTOM` as a shortcut preset even though the backend now also exposes administrative template catalogs
-- the frontend now also exposes `/workspace/templates/*` as an admin-only template-management surface for `project templates`, `project structure templates`, `phases`, `milestones`, `deliverables` and `structure levels`, including activate/deactivate and purge flows aligned with the backend contract
+- the project create flow now binds the lead organization to the operator's active access context and resolves the selectable template catalog from the backend per active organization context, falling back to the authorized default template when no explicit template is chosen
+- the frontend now also exposes `/workspace/templates/*` as an admin-only template-management surface for `project templates`, `project structure templates`, `phases`, `milestones`, `deliverables` and `structure levels`, with list/detail scoped by the active organization context and owner-aware backend authorization for activate/deactivate and purge flows
 - the project detail participants tab now combines the existing read model with transactional additions for participant organizations and project members using `/api/projects/{projectId}/organizations` and `/api/projects/{projectId}/members`
 - the project milestones tab now supports direct updates for planned/actual dates, owner organization and status using the backend `version` field
 - the operational inbox view proposed for project-management is still pending in the frontend; the current first release focuses on the core list/detail/deliverable/submission/document workflow
@@ -83,3 +86,4 @@ The frontend source tree is not the active implementation focus of this reposito
 - contextual access control by tenant, organization and market
 - low-friction administration suitable for smaller and medium-sized businesses
 - clear separation between identity data and runtime authorization context
+

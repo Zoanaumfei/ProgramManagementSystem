@@ -8,4 +8,5 @@ public interface SpringDataProjectMilestoneJpaRepository extends JpaRepository<P
     List<ProjectMilestoneEntity> findAllByProjectIdOrderBySequenceNoAsc(String projectId);
     List<ProjectMilestoneEntity> findAllByProjectIdAndStructureNodeIdOrderBySequenceNoAsc(String projectId, String structureNodeId);
     Optional<ProjectMilestoneEntity> findByIdAndProjectId(String id, String projectId);
+    void deleteAllByProjectId(String projectId);
 }

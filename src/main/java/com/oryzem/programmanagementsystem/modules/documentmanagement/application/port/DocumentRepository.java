@@ -20,4 +20,6 @@ public interface DocumentRepository {
     List<String> findTrackedStorageKeys();
 
     DocumentRecord save(DocumentRecord document);
+
+    void deleteAllByIdIn(Collection<String> ids);
 }

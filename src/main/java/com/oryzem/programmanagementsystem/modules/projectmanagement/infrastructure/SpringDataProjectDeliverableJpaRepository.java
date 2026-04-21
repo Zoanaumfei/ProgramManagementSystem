@@ -8,4 +8,5 @@ public interface SpringDataProjectDeliverableJpaRepository extends JpaRepository
     List<ProjectDeliverableEntity> findAllByProjectIdOrderByPlannedDueDateAscIdAsc(String projectId);
     List<ProjectDeliverableEntity> findAllByProjectIdAndStructureNodeIdOrderByPlannedDueDateAscIdAsc(String projectId, String structureNodeId);
     Optional<ProjectDeliverableEntity> findByIdAndProjectId(String id, String projectId);
+    void deleteAllByProjectId(String projectId);
 }

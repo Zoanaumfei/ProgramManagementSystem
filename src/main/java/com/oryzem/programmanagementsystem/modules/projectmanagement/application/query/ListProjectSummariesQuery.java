@@ -7,6 +7,8 @@ import com.oryzem.programmanagementsystem.modules.projectmanagement.application.
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectPermission;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectAggregate;
 import com.oryzem.programmanagementsystem.platform.authorization.AuthenticatedUser;
+import com.oryzem.programmanagementsystem.platform.authorization.Role;
+import com.oryzem.programmanagementsystem.platform.authorization.TenantType;
 import java.util.Comparator;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -37,7 +39,7 @@ public class ListProjectSummariesQuery {
 
     public List<ProjectViews.ProjectSummaryView> execute(AuthenticatedUser actor) {
         authorizationService.assertEnabled();
-        return projectRepository.findAllByTenantIdOrderByCreatedAtDescIdDesc(actor.tenantId()).stream()
+        return visibleProjects(actor).stream()
                 .filter(project -> authorizationService.canAccessProject(
                         project,
                         organizationRepository.findAllByProjectIdAndActiveTrueOrderByJoinedAtAsc(project.id()),
@@ -47,6 +49,16 @@ public class ListProjectSummariesQuery {
                 .sorted(Comparator.comparing(ProjectAggregate::createdAt).reversed())
                 .map(viewMapper::toSummary)
                 .toList();
+    }
+
+    private List<ProjectAggregate> visibleProjects(AuthenticatedUser actor) {
+        if (actor != null
+                && actor.tenantType() == TenantType.INTERNAL
+                && actor.roles() != null
+                && actor.roles().contains(Role.ADMIN)) {
+            return projectRepository.findAllOrderByCreatedAtDescIdDesc();
+        }
+        return projectRepository.findAllByTenantIdOrderByCreatedAtDescIdDesc(actor.tenantId());
     }
 }
 

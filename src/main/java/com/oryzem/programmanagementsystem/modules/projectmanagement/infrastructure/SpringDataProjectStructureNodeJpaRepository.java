@@ -8,4 +8,5 @@ public interface SpringDataProjectStructureNodeJpaRepository extends JpaReposito
     List<ProjectStructureNodeEntity> findAllByProjectIdOrderBySequenceNoAscIdAsc(String projectId);
     List<ProjectStructureNodeEntity> findAllByProjectIdAndParentNodeIdOrderBySequenceNoAscIdAsc(String projectId, String parentNodeId);
     Optional<ProjectStructureNodeEntity> findByIdAndProjectId(String id, String projectId);
+    void deleteAllByProjectId(String projectId);
 }

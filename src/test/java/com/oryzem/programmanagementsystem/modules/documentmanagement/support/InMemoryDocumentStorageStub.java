@@ -62,6 +62,11 @@ public class InMemoryDocumentStorageStub implements DocumentStorage {
                 .collect(Collectors.toSet());
     }
 
+    @Override
+    public void deleteObject(String storageKey) {
+        objects.remove(storageKey);
+    }
+
     public void putObject(String storageKey, String contentType, byte[] content, Map<String, String> metadata) {
         objects.put(storageKey, new StoredFile(contentType, content.clone(), new HashMap<>(metadata), Instant.now()));
     }

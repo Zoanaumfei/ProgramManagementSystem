@@ -15,7 +15,7 @@
   "containerDefinitions": [
     {
       "name": "program-management-system",
-      "image": "439533253319.dkr.ecr.sa-east-1.amazonaws.com/oryzem-backend-dev:document-s3-20260408-2055",
+      "image": "439533253319.dkr.ecr.sa-east-1.amazonaws.com/oryzem-backend-dev:latest",
       "essential": true,
       "portMappings": [
         {

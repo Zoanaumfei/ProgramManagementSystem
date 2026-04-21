@@ -27,6 +27,7 @@ import software.amazon.awssdk.auth.credentials.AwsSessionCredentials;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
@@ -217,6 +218,14 @@ public class S3DocumentStorage implements DocumentStorage {
                 .flatMap(page -> page.contents().stream())
                 .map(item -> item.key())
                 .collect(Collectors.toSet());
+    }
+
+    @Override
+    public void deleteObject(String storageKey) {
+        s3Client.deleteObject(DeleteObjectRequest.builder()
+                .bucket(bucket())
+                .key(storageKey)
+                .build());
     }
 
     private byte[] signingKey(String secretKey, String dateStamp) {

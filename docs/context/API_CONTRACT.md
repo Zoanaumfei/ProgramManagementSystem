@@ -41,6 +41,8 @@
 - `GET /api/projects`
 - `GET /api/projects/{projectId}`
 - `PATCH /api/projects/{projectId}`
+- `POST /api/projects/{projectId}/purge-intents`
+- `POST /api/projects/{projectId}/purge`
 - `POST /api/projects/{projectId}/organizations`
 - `GET /api/projects/{projectId}/organizations`
 - `POST /api/projects/{projectId}/members`
@@ -94,9 +96,27 @@
 - lifecycle, retention, quota and export state are internal server-side controls unless noted otherwise below.
 
 ## Template administration
-`/api/project-templates` and `/api/project-structure-templates` expose admin-only template management for project setup.
+`/api/project-templates` and `/api/project-structure-templates` expose template governance for project setup with ownership and relationship-chain authorization.
+
+## Project administration
+`/api/projects` now includes an explicit administrative purge flow for internal break-glass actors.
 
 Important behavior:
+- `GET /api/projects` remains tenant-scoped for normal actors, but internal `ADMIN` actors now receive a platform-wide project list
+- direct project detail and update routes continue to honor the internal privileged cross-tenant access path already present in the backend authorization layer
+- `POST /api/projects/{projectId}/purge-intents` creates a short-lived destructive intent and returns `purgeToken`, expiration metadata and a backend-calculated impact summary
+- `POST /api/projects/{projectId}/purge` requires the original `reason`, `purgeToken`, `confirm=true` and the exact confirmation text `PURGE PROJECT`
+- project purge is allowed only for internal `ADMIN` and `SUPPORT` actors
+- project purge physically removes the project aggregate, participant rows, phases, milestones, deliverables, submissions, structure nodes, document bindings, document rows and storage objects discovered under the `PROJECT`, `PROJECT_DELIVERABLE` and `PROJECT_DELIVERABLE_SUBMISSION` contexts
+- purge-intent expiration and token mismatch failures are returned as business-rule errors with stable `code` fields
+- successful purge intent creation and project purge execution are audited as `PROJECT_PURGE_INTENT_CREATED`, `PROJECT_PURGE_EXECUTION_STARTED` and `PROJECT_PURGE_COMPLETED`
+
+Important behavior:
+- template ownership is fixed at creation time from the actor active organization context (`ownerOrganizationId` in the backend model)
+- `GET /api/project-templates` and `GET /api/project-structure-templates` return only templates the active organization can use
+- `GET /api/project-templates/{templateId}` and `GET /api/project-structure-templates/{structureTemplateId}` are allowed only when the active organization can use the template
+- template use is allowed when the active organization is the owner or a descendant in the active `CUSTOMER_SUPPLIER` relationship chain
+- management operations (`create/update/purge/activate/deactivate` and template-child mutations such as phases/milestones/deliverables/levels) are allowed only for owner organization admins
 - `POST /api/project-templates/{templateId}/purge` permanently removes a project template plus its template-owned phases, milestones and deliverables.
 - project-template purge is rejected with business code `PROJECT_TEMPLATE_DEFAULT_CANNOT_BE_PURGED` when the template is still the default for its framework.
 - project-template purge is rejected with business code `PROJECT_TEMPLATE_IN_USE` when any project already references that template.
@@ -430,7 +450,8 @@ Create request shape:
 
 Important behavior:
 - `Idempotency-Key` is supported on create and submission/review mutation flows
-- when `templateId` is omitted, the backend resolves the current default template for the chosen `frameworkType`
+- when `templateId` is omitted, the backend resolves the current default template for the chosen `frameworkType` inside the actor authorized template catalog
+- when `templateId` is provided, the backend validates template-use authorization for the active organization context before creating the project
 - the lead organization is always derived from the authenticated active access context, not from a free-form request field
 - project update, milestone update, deliverable update and submission review flows use optimistic concurrency through `version`
 

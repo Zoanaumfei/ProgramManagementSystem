@@ -45,6 +45,23 @@
 - inactive markets cannot be assigned to memberships
 - a market cannot be inactivated while referenced by active memberships or organizations
 
+## Templates
+- project templates and project structure templates have immutable ownership defined by the creator active organization context
+- template visibility and use follow the active `CUSTOMER_SUPPLIER` chain transitively from the owner organization to descendant organizations
+- only the owner organization can manage templates and template artifacts (update, purge, activate/deactivate, phases, milestones, deliverables, structure levels)
+- non-owner organizations in the chain may view and use inherited templates but cannot edit or purge them
+- project creation with explicit `templateId` must fail closed when the active organization is not authorized to use the template
+- project creation without explicit `templateId` resolves the default template only from the active organization authorized catalog
+
+## Projects
+- project listing is tenant-scoped by default
+- internal `ADMIN` actors may list projects across all organizations/tenants on the platform
+- internal `ADMIN` and `SUPPORT` actors may execute the explicit project purge flow
+- project purge requires a non-empty operator reason plus a second explicit confirmation step
+- the final purge confirmation requires the exact confirmation text `PURGE PROJECT`
+- project purge is a destructive cleanup flow intended for administrative/offboarding scenarios and must remove both persisted project data and linked document/storage artifacts
+- project purge orchestration belongs to the `projectmanagement` module; shared/core modules should only provide technical capabilities consumed by that flow
+
 ## Operational controls
 - tenant rate limits are enforced per tenant tier
 - quota exhaustion can block creation of child organizations, tenant markets and active memberships

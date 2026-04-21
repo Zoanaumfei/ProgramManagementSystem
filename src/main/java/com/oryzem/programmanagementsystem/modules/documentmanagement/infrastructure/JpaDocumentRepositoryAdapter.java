@@ -58,4 +58,12 @@ public class JpaDocumentRepositoryAdapter implements DocumentRepository {
                 .orElseGet(() -> mapper.toNewEntity(document));
         return mapper.toRecord(delegate.save(entity));
     }
+
+    @Override
+    public void deleteAllByIdIn(Collection<String> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+        delegate.deleteAllByIdIn(ids);
+    }
 }

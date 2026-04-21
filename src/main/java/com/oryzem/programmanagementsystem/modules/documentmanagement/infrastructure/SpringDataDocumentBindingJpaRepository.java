@@ -1,9 +1,11 @@
 package com.oryzem.programmanagementsystem.modules.documentmanagement.infrastructure;
 
 import com.oryzem.programmanagementsystem.modules.documentmanagement.domain.DocumentContextType;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -27,4 +29,8 @@ public interface SpringDataDocumentBindingJpaRepository extends JpaRepository<Do
     long countTrackedByContext(
             @Param("contextType") String contextType,
             @Param("contextId") String contextId);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from DocumentBindingEntity b where b.documentId in :documentIds")
+    void deleteAllByDocumentIdIn(@Param("documentIds") Collection<String> documentIds);
 }
