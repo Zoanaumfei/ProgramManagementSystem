@@ -1,6 +1,5 @@
 package com.oryzem.programmanagementsystem.modules.projectmanagement.application.port;
 
-import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectFrameworkType;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectTemplateAggregate;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectTemplateStatus;
 import java.util.List;
@@ -10,7 +9,7 @@ public interface ProjectTemplateRepository {
 
     Optional<ProjectTemplateAggregate> findById(String id);
 
-    Optional<ProjectTemplateAggregate> findByFrameworkTypeAndIsDefaultTrueAndStatus(ProjectFrameworkType frameworkType, ProjectTemplateStatus status);
+    Optional<ProjectTemplateAggregate> findByFrameworkTypeAndIsDefaultTrueAndStatus(String frameworkType, ProjectTemplateStatus status);
 
     List<ProjectTemplateAggregate> findAllByStructureTemplateIdOrderByFrameworkTypeAscVersionDesc(String structureTemplateId);
 

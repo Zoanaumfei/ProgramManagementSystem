@@ -2,7 +2,6 @@ package com.oryzem.programmanagementsystem.modules.projectmanagement.api;
 
 import com.oryzem.programmanagementsystem.modules.projectmanagement.application.StructureViews;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.application.model.read.StructureReadModels;
-import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectFrameworkType;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectStructureNodeStatus;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectVisibilityScope;
 import jakarta.validation.constraints.NotBlank;
@@ -39,7 +38,7 @@ public final class ProjectStructureDtos {
 
     public record CreateProjectStructureTemplateRequest(
             @NotBlank String name,
-            @NotNull ProjectFrameworkType frameworkType,
+            @NotBlank String frameworkType,
             int version,
             boolean active) {
     }
@@ -96,7 +95,7 @@ public final class ProjectStructureDtos {
         }
     }
 
-    public record ProjectStructureTemplateSummaryResponse(String id, String name, ProjectFrameworkType frameworkType, int version, boolean active) {
+    public record ProjectStructureTemplateSummaryResponse(String id, String name, String frameworkType, int version, boolean active) {
         static ProjectStructureTemplateSummaryResponse from(StructureViews.ProjectStructureTemplateSummaryView view) {
             return new ProjectStructureTemplateSummaryResponse(view.id(), view.name(), view.frameworkType(), view.version(), view.active());
         }
@@ -106,7 +105,7 @@ public final class ProjectStructureDtos {
         }
     }
 
-    public record ProjectStructureTemplateDetailResponse(String id, String name, ProjectFrameworkType frameworkType, int version, boolean active, List<ProjectStructureLevelResponse> levels, List<ProjectTemplateDtos.ProjectTemplateSummaryResponse> projectTemplates, List<ProjectTemplateDtos.ProjectTemplateMilestoneTemplateResponse> milestoneTemplates, List<ProjectTemplateDtos.ProjectTemplateDeliverableTemplateResponse> deliverableTemplates) {
+    public record ProjectStructureTemplateDetailResponse(String id, String name, String frameworkType, int version, boolean active, List<ProjectStructureLevelResponse> levels, List<ProjectTemplateDtos.ProjectTemplateSummaryResponse> projectTemplates, List<ProjectTemplateDtos.ProjectTemplateMilestoneTemplateResponse> milestoneTemplates, List<ProjectTemplateDtos.ProjectTemplateDeliverableTemplateResponse> deliverableTemplates) {
         static ProjectStructureTemplateDetailResponse from(StructureViews.ProjectStructureTemplateDetailView view) {
             return new ProjectStructureTemplateDetailResponse(
                     view.id(),

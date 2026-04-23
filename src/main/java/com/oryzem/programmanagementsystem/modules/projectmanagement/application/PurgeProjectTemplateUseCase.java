@@ -59,7 +59,7 @@ public class PurgeProjectTemplateUseCase {
                 templateId,
                 "PROJECT_TEMPLATE",
                 new java.util.LinkedHashMap<>(java.util.Map.of(
-                        "frameworkType", template.frameworkType().name(),
+                        "frameworkType", template.frameworkType(),
                         "isDefault", template.isDefault(),
                         "name", template.name(),
                         "status", template.status().name(),

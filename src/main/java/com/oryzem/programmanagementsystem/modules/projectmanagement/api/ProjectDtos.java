@@ -2,11 +2,9 @@ package com.oryzem.programmanagementsystem.modules.projectmanagement.api;
 
 import com.oryzem.programmanagementsystem.modules.projectmanagement.application.ProjectViews;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.application.model.read.ProjectReadModels;
-import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectFrameworkType;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectStatus;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectVisibilityScope;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -20,7 +18,7 @@ public final class ProjectDtos {
             @NotBlank String code,
             @NotBlank String name,
             String description,
-            @NotNull ProjectFrameworkType frameworkType,
+            @NotBlank String frameworkType,
             String templateId,
             String customerOrganizationId,
             ProjectStatus status,
@@ -43,7 +41,7 @@ public final class ProjectDtos {
             String id,
             String code,
             String name,
-            ProjectFrameworkType frameworkType,
+            String frameworkType,
             ProjectStatus status,
             ProjectVisibilityScope visibilityScope,
             String leadOrganizationId,
@@ -65,7 +63,7 @@ public final class ProjectDtos {
             String code,
             String name,
             String description,
-            ProjectFrameworkType frameworkType,
+            String frameworkType,
             String templateId,
             int templateVersion,
             String leadOrganizationId,

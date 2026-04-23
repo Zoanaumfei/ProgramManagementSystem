@@ -55,7 +55,7 @@ public class PurgeProjectStructureTemplateUseCase {
                 "PROJECT_STRUCTURE_TEMPLATE",
                 new java.util.LinkedHashMap<>(java.util.Map.of(
                         "active", structureTemplate.active(),
-                        "frameworkType", structureTemplate.frameworkType().name(),
+                        "frameworkType", structureTemplate.frameworkType(),
                         "name", structureTemplate.name(),
                         "version", structureTemplate.version())));
         return response;

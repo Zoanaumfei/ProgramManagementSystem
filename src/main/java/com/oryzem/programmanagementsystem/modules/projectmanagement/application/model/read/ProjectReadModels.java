@@ -2,7 +2,6 @@ package com.oryzem.programmanagementsystem.modules.projectmanagement.application
 
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.DeliverableType;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectDeliverableStatus;
-import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectFrameworkType;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectMemberRole;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectMilestoneStatus;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectOrganizationRoleType;
@@ -22,7 +21,7 @@ public final class ProjectReadModels {
             String id,
             String code,
             String name,
-            ProjectFrameworkType frameworkType,
+            String frameworkType,
             ProjectStatus status,
             ProjectVisibilityScope visibilityScope,
             String leadOrganizationId,
@@ -37,7 +36,7 @@ public final class ProjectReadModels {
             String code,
             String name,
             String description,
-            ProjectFrameworkType frameworkType,
+            String frameworkType,
             String templateId,
             int templateVersion,
             String leadOrganizationId,

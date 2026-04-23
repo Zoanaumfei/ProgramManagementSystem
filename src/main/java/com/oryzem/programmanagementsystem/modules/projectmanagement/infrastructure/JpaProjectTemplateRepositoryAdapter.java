@@ -1,7 +1,6 @@
 package com.oryzem.programmanagementsystem.modules.projectmanagement.infrastructure;
 
 import com.oryzem.programmanagementsystem.modules.projectmanagement.application.port.ProjectTemplateRepository;
-import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectFrameworkType;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectTemplateAggregate;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectTemplateStatus;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.infrastructure.mapper.ProjectTemplatePersistenceMapper;
@@ -28,7 +27,7 @@ public class JpaProjectTemplateRepositoryAdapter implements ProjectTemplateRepos
     }
 
     @Override
-    public Optional<ProjectTemplateAggregate> findByFrameworkTypeAndIsDefaultTrueAndStatus(ProjectFrameworkType frameworkType, ProjectTemplateStatus status) {
+    public Optional<ProjectTemplateAggregate> findByFrameworkTypeAndIsDefaultTrueAndStatus(String frameworkType, ProjectTemplateStatus status) {
         return delegate.findByFrameworkTypeAndIsDefaultTrueAndStatus(frameworkType, status)
                 .map(mapper::toDomain);
     }

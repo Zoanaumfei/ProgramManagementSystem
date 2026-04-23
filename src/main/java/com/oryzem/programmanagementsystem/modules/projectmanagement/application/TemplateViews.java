@@ -1,7 +1,6 @@
 package com.oryzem.programmanagementsystem.modules.projectmanagement.application;
 
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.DeliverableType;
-import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectFrameworkType;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectOrganizationRoleType;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectPriority;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectTemplateAppliesToType;
@@ -17,7 +16,7 @@ public final class TemplateViews {
     public record ProjectTemplateSummaryView(
             String id,
             String name,
-            ProjectFrameworkType frameworkType,
+            String frameworkType,
             int version,
             ProjectTemplateStatus status,
             boolean isDefault,
@@ -27,7 +26,7 @@ public final class TemplateViews {
     public record ProjectTemplateDetailView(
             String id,
             String name,
-            ProjectFrameworkType frameworkType,
+            String frameworkType,
             int version,
             ProjectTemplateStatus status,
             boolean isDefault,

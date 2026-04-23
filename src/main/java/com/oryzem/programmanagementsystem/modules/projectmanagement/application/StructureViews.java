@@ -1,6 +1,5 @@
 package com.oryzem.programmanagementsystem.modules.projectmanagement.application;
 
-import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectFrameworkType;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectStructureNodeStatus;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectVisibilityScope;
 import java.util.List;
@@ -43,7 +42,7 @@ public final class StructureViews {
     public record ProjectStructureTemplateSummaryView(
             String id,
             String name,
-            ProjectFrameworkType frameworkType,
+            String frameworkType,
             int version,
             boolean active) {
     }
@@ -51,7 +50,7 @@ public final class StructureViews {
     public record ProjectStructureTemplateDetailView(
             String id,
             String name,
-            ProjectFrameworkType frameworkType,
+            String frameworkType,
             int version,
             boolean active,
             List<ProjectStructureLevelView> levels,

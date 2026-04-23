@@ -1,7 +1,6 @@
 package com.oryzem.programmanagementsystem.modules.projectmanagement.infrastructure;
 
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectAggregate;
-import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectFrameworkType;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectStatus;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectVisibilityScope;
 import jakarta.persistence.Column;
@@ -29,9 +28,8 @@ public class ProjectEntity {
     private String name;
     @Column(columnDefinition = "TEXT")
     private String description;
-    @Enumerated(EnumType.STRING)
     @Column(name = "framework_type", length = 32, nullable = false)
-    private ProjectFrameworkType frameworkType;
+    private String frameworkType;
     @Column(name = "template_id", length = 64, nullable = false)
     private String templateId;
     @Column(name = "template_version", nullable = false)
@@ -112,7 +110,7 @@ public class ProjectEntity {
     public String getCode() { return code; }
     public String getName() { return name; }
     public String getDescription() { return description; }
-    public ProjectFrameworkType getFrameworkType() { return frameworkType; }
+    public String getFrameworkType() { return frameworkType; }
     public String getTemplateId() { return templateId; }
     public int getTemplateVersion() { return templateVersion; }
     public String getLeadOrganizationId() { return leadOrganizationId; }

@@ -11,7 +11,6 @@ import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.Deliv
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectAggregate;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectDeliverableAggregate;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectDeliverableStatus;
-import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectFrameworkType;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectMemberRole;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectOrganizationRoleType;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectPermission;
@@ -70,7 +69,7 @@ class SubmissionAuthorizationMatrixTest {
                 "PRJ-001",
                 "Project",
                 "desc",
-                ProjectFrameworkType.APQP,
+                "APQP",
                 "TMP-1",
                 1,
                 "org-lead",

@@ -3,7 +3,6 @@ package com.oryzem.programmanagementsystem.modules.projectmanagement.api;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.application.TemplateViews;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.application.model.read.TemplateReadModels;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.DeliverableType;
-import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectFrameworkType;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectOrganizationRoleType;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectPriority;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectTemplateAppliesToType;
@@ -20,7 +19,7 @@ public final class ProjectTemplateDtos {
 
     public record CreateProjectTemplateRequest(
             @NotBlank String name,
-            @NotNull ProjectFrameworkType frameworkType,
+            @NotBlank String frameworkType,
             int version,
             @NotNull ProjectTemplateStatus status,
             boolean isDefault,
@@ -106,7 +105,7 @@ public final class ProjectTemplateDtos {
             @NotNull ProjectPriority priority) {
     }
 
-    public record ProjectTemplateSummaryResponse(String id, String name, ProjectFrameworkType frameworkType, int version, ProjectTemplateStatus status, boolean isDefault, String structureTemplateId) {
+    public record ProjectTemplateSummaryResponse(String id, String name, String frameworkType, int version, ProjectTemplateStatus status, boolean isDefault, String structureTemplateId) {
         static ProjectTemplateSummaryResponse from(TemplateViews.ProjectTemplateSummaryView view) {
             return new ProjectTemplateSummaryResponse(view.id(), view.name(), view.frameworkType(), view.version(), view.status(), view.isDefault(), view.structureTemplateId());
         }
@@ -116,7 +115,7 @@ public final class ProjectTemplateDtos {
         }
     }
 
-    public record ProjectTemplateDetailResponse(String id, String name, ProjectFrameworkType frameworkType, int version, ProjectTemplateStatus status, boolean isDefault, String structureTemplateId, Instant createdAt) {
+    public record ProjectTemplateDetailResponse(String id, String name, String frameworkType, int version, ProjectTemplateStatus status, boolean isDefault, String structureTemplateId, Instant createdAt) {
         static ProjectTemplateDetailResponse from(TemplateViews.ProjectTemplateDetailView view) {
             return new ProjectTemplateDetailResponse(view.id(), view.name(), view.frameworkType(), view.version(), view.status(), view.isDefault(), view.structureTemplateId(), view.createdAt());
         }

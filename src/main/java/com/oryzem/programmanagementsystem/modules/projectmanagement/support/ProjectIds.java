@@ -44,6 +44,10 @@ public final class ProjectIds {
         return newId("PST");
     }
 
+    public static String newProjectFrameworkId() {
+        return newId("PFR");
+    }
+
     public static String newProjectStructureLevelTemplateId() {
         return newId("PSLT");
     }

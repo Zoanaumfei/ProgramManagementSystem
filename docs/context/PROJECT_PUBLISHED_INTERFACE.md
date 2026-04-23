@@ -8,6 +8,7 @@
 - `ProjectDeliverableController`: list/detail/update deliverables, pending-review queue, responsible queue.
 - `DeliverableSubmissionController`: submit, list, detail, approve, reject.
 - `ProjectDashboardController`: project dashboard read model.
+- `ProjectFrameworkController`: project framework catalog for UX/UI presentation metadata.
 - `ProjectTemplateController`: project template and artifact template administration.
 - `ProjectStructureTemplateController`: structure template administration.
 

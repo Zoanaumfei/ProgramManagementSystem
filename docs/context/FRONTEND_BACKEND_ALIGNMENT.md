@@ -30,6 +30,11 @@ This repository now exposes only the core membership-first platform surface.
 - the operational dashboard receives `kpis`, `series`, `topTenants`, `tenantDetails`, `alerts` and `recentEvents` from the aggregated backend response
 - frontend should require `organizationId` and `roles` when creating users because the backend now provisions the first membership in the same request
 - frontend project creation should treat the active access-context organization as the lead organization, because the backend resolves lead ownership from the authenticated context instead of a request field
+- frontend should load `/api/project-frameworks` as the authoritative framework catalog for project UX/UI presentation metadata and use the returned `code` values to interpret `frameworkType` fields from project and template payloads
+- frontend should treat `frameworkType` as a stable framework code string, not as a closed enum baked into the client
+- frontend should use `displayName` for operator-facing labels and `uiLayout` to choose the project workspace presentation mode
+- framework catalog management is now available only for internal `ADMIN` operators through `GET|POST|PATCH /api/project-frameworks`
+- inactive frameworks may still appear in historical data, but the frontend should not present them as options for new project or template creation
 - frontend should treat `/api/project-templates` and `/api/project-structure-templates` as the administrative source of truth for template governance and for the project-create wizard, with the visible/selectable catalog scoped by the active organization context and backend ownership rules
 - frontend should assume template catalog endpoints already return only use-authorized templates and should not surface non-returned templates as selectable fallbacks
 - frontend should treat template-management actions (edit/purge/activate/deactivate and template-child mutations) as owner-only operations even for tenant admins outside the owner organization
@@ -149,6 +154,7 @@ The active frontend source tree is not fully present in this repository, so the 
 - the operational dashboard frontend is now active in dev and prod and consumes the minimum overview contract for `429`, `409` quota, offboarding and export requested/completed panels
 - the operational dashboard frontend now also exposes the audited tenant service-tier change action for internal `ADMIN`/`SUPPORT` operators, using `PATCH /api/access/tenants/{tenantId}/service-tier`
 - the frontend project-management module is now active under `/workspace/projects/*` with list, creation wizard, project detail tabs, deliverable detail, submission review and embedded document panels wired to the real backend module
+- the frontend project-management shell can now differentiate experiences such as timeline-oriented and board-oriented projects by combining each project's `frameworkType` with the catalog returned by `/api/project-frameworks`
 - the frontend project-management workspace now also includes `/workspace/projects/inbox`, which builds an operational review queue by aggregating `/api/projects/{projectId}/deliverables/pending-review` across the projects visible in the active context
 - the project detail participants tab now combines the existing read model with transactional add-organization and add-member flows on top of `/api/projects/{projectId}/organizations` and `/api/projects/{projectId}/members`
 - the organizations workspace now also exposes the audited export workflow under `/workspace/organizations/{organizationId}/exports`, backed by `GET|POST|PATCH /api/access/organizations/{organizationId}/exports`

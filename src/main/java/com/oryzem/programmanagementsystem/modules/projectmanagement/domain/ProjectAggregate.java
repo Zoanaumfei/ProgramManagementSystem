@@ -12,7 +12,7 @@ public record ProjectAggregate(
         String code,
         String name,
         String description,
-        ProjectFrameworkType frameworkType,
+        String frameworkType,
         String templateId,
         int templateVersion,
         String leadOrganizationId,

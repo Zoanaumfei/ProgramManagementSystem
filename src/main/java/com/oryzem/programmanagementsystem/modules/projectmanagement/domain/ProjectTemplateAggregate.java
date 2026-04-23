@@ -5,7 +5,7 @@ import java.time.Instant;
 public record ProjectTemplateAggregate(
         String id,
         String name,
-        ProjectFrameworkType frameworkType,
+        String frameworkType,
         int version,
         ProjectTemplateStatus status,
         String structureTemplateId,

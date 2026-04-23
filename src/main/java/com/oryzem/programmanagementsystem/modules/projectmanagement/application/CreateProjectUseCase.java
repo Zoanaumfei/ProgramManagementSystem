@@ -1,7 +1,6 @@
 package com.oryzem.programmanagementsystem.modules.projectmanagement.application;
 
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectAggregate;
-import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectFrameworkType;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectMemberAggregate;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectMemberRole;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectOrganizationAggregate;
@@ -38,6 +37,7 @@ public class CreateProjectUseCase {
     private final ProjectOrganizationRepository organizationRepository;
     private final ProjectMemberRepository memberRepository;
     private final ProjectTemplateRepository templateRepository;
+    private final ProjectFrameworkCatalogService projectFrameworkCatalogService;
     private final ProjectStructureTemplateAdministrationService administrationService;
     private final OrganizationLookup organizationLookup;
     private final AccessContextService accessContextService;
@@ -53,6 +53,7 @@ public class CreateProjectUseCase {
             ProjectOrganizationRepository organizationRepository,
             ProjectMemberRepository memberRepository,
             ProjectTemplateRepository templateRepository,
+            ProjectFrameworkCatalogService projectFrameworkCatalogService,
             ProjectStructureTemplateAdministrationService administrationService,
             OrganizationLookup organizationLookup,
             AccessContextService accessContextService,
@@ -66,6 +67,7 @@ public class CreateProjectUseCase {
         this.organizationRepository = organizationRepository;
         this.memberRepository = memberRepository;
         this.templateRepository = templateRepository;
+        this.projectFrameworkCatalogService = projectFrameworkCatalogService;
         this.administrationService = administrationService;
         this.organizationLookup = organizationLookup;
         this.accessContextService = accessContextService;
@@ -101,6 +103,7 @@ public class CreateProjectUseCase {
                 throw new BusinessRuleException("PROJECT_CUSTOMER_ORGANIZATION_INVALID", "Customer organization must be active and belong to the same tenant.");
             }
         }
+        projectFrameworkCatalogService.requireActiveFramework(command.frameworkType());
         ProjectTemplateAggregate template = resolveTemplate(command, actor);
         Instant now = Instant.now(clock);
         ProjectAggregate aggregate = new ProjectAggregate(
@@ -151,7 +154,7 @@ public class CreateProjectUseCase {
                 true,
                 now)));
         instantiateProjectFromTemplateUseCase.execute(project, organizations);
-        auditService.record(actor, "PROJECT_CREATED", project.tenantId(), project.id(), "PROJECT", new LinkedHashMap<>(java.util.Map.of("code", project.code(), "frameworkType", project.frameworkType().name(), "templateId", project.templateId(), "templateVersion", project.templateVersion())));
+        auditService.record(actor, "PROJECT_CREATED", project.tenantId(), project.id(), "PROJECT", new LinkedHashMap<>(java.util.Map.of("code", project.code(), "frameworkType", project.frameworkType(), "templateId", project.templateId(), "templateVersion", project.templateVersion())));
         return viewMapper.toDetail(project, organizations, members);
     }
 
@@ -160,25 +163,25 @@ public class CreateProjectUseCase {
             ProjectTemplateAggregate template = templateRepository.findById(command.templateId())
                     .orElseThrow(() -> new ResourceNotFoundException("ProjectTemplate", command.templateId()));
             administrationService.authorizeUse(actor, template.ownerOrganizationId());
-            if (template.frameworkType() != command.frameworkType()) {
+            if (!template.frameworkType().equals(command.frameworkType())) {
                 throw new BusinessRuleException("PROJECT_TEMPLATE_FRAMEWORK_MISMATCH", "Project template framework must match the project framework.");
             }
             return template;
         }
         return templateRepository.findAllByOrderByFrameworkTypeAscVersionDesc().stream()
-                .filter(template -> template.frameworkType() == command.frameworkType()
+                .filter(template -> template.frameworkType().equals(command.frameworkType())
                         && template.status() == ProjectTemplateStatus.ACTIVE
                         && template.isDefault()
                         && administrationService.canUse(actor, template.ownerOrganizationId()))
                 .findFirst()
-                .orElseThrow(() -> new ResourceNotFoundException("ProjectTemplate", command.frameworkType().name() + ":default"));
+                .orElseThrow(() -> new ResourceNotFoundException("ProjectTemplate", command.frameworkType() + ":default"));
     }
 
     public record CreateProjectCommand(
             String code,
             String name,
             String description,
-            ProjectFrameworkType frameworkType,
+            String frameworkType,
             String templateId,
             String customerOrganizationId,
             ProjectStatus status,

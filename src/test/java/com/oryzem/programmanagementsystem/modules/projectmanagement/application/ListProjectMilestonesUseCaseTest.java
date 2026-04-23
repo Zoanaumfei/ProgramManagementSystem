@@ -7,7 +7,6 @@ import static org.mockito.Mockito.when;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.application.model.read.ProjectReadModels;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.application.port.ProjectMilestoneRepository;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectAggregate;
-import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectFrameworkType;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectMemberRole;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectMilestoneAggregate;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectMilestoneStatus;
@@ -74,7 +73,7 @@ class ListProjectMilestonesUseCaseTest {
                 "PRJ-001",
                 "Project",
                 "desc",
-                ProjectFrameworkType.APQP,
+                "APQP",
                 "TMP-1",
                 1,
                 "org-lead",

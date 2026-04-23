@@ -11,7 +11,6 @@ import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.Deliv
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectAggregate;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectDeliverableAggregate;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectDeliverableStatus;
-import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectFrameworkType;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectPermission;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectPriority;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectStatus;
@@ -69,7 +68,7 @@ class ListPendingReviewDeliverablesUseCaseTest {
                 "PRJ-001",
                 "Project 001",
                 "test",
-                ProjectFrameworkType.APQP,
+                "APQP",
                 "TMP-001",
                 1,
                 "tenant-a",

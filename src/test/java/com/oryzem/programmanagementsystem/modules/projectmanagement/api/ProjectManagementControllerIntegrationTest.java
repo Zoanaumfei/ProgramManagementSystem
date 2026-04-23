@@ -135,6 +135,10 @@ class ProjectManagementControllerIntegrationTest {
                 "UPDATE project_structure_level_template SET sequence_no = 1, name = 'Project', code = 'PROJECT', allows_children = FALSE, allows_milestones = TRUE, allows_deliverables = TRUE WHERE id = 'PSLT-CUS-001'");
         jdbcTemplate.update("DELETE FROM project_template WHERE id NOT IN ('TMP-APQP-V1', 'TMP-VDA-MLA-V1', 'TMP-CUSTOM-V1')");
         jdbcTemplate.update("DELETE FROM project_structure_template WHERE id NOT IN ('PST-APQP-V1', 'PST-VDA-MLA-V1', 'PST-CUSTOM-V1')");
+        jdbcTemplate.update("DELETE FROM project_framework WHERE id NOT IN ('PFR-APQP', 'PFR-VDA-MLA', 'PFR-CUSTOM')");
+        jdbcTemplate.update("UPDATE project_framework SET display_name = 'APQP', description = 'Sequential product quality planning framework.', ui_layout = 'TIMELINE', active = TRUE WHERE id = 'PFR-APQP'");
+        jdbcTemplate.update("UPDATE project_framework SET display_name = 'VDA MLA', description = 'Sequential maturity level assurance framework.', ui_layout = 'TIMELINE', active = TRUE WHERE id = 'PFR-VDA-MLA'");
+        jdbcTemplate.update("UPDATE project_framework SET display_name = 'Custom', description = 'Flexible framework for tenant-defined project delivery flows.', ui_layout = 'HYBRID', active = TRUE WHERE id = 'PFR-CUSTOM'");
         idempotencyRepository.deleteAll();
         purgeIntentRepository.deleteAll();
         auditLogRepository.deleteAll();
@@ -1291,6 +1295,101 @@ class ProjectManagementControllerIntegrationTest {
                                 "structureTemplateId", "PST-CUSTOM-V1"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("Custom Default v1 Managed Internally"));
+    }
+
+    @Test
+    void shouldListCreateAndUpdateProjectFrameworkCatalog() throws Exception {
+        mockMvc.perform(get("/api/project-frameworks")
+                        .with(externalAdminTenantA()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(3))
+                .andExpect(jsonPath("$[0].code").value("APQP"));
+
+        String createResponse = mockMvc.perform(post("/api/project-frameworks")
+                        .with(internalAdmin())
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "code", "KANBAN",
+                                "displayName", "Kanban",
+                                "description", "Visual flow management",
+                                "uiLayout", "BOARD",
+                                "active", true))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.code").value("KANBAN"))
+                .andExpect(jsonPath("$.displayName").value("Kanban"))
+                .andExpect(jsonPath("$.uiLayout").value("BOARD"))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        String frameworkId = objectMapper.readTree(createResponse).get("id").asText();
+
+        mockMvc.perform(patch("/api/project-frameworks/" + frameworkId)
+                        .with(internalAdmin())
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "displayName", "Kanban Flow",
+                                "description", "Visual workflow with WIP control",
+                                "uiLayout", "HYBRID",
+                                "active", false))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("KANBAN"))
+                .andExpect(jsonPath("$.displayName").value("Kanban Flow"))
+                .andExpect(jsonPath("$.uiLayout").value("HYBRID"))
+                .andExpect(jsonPath("$.active").value(false));
+    }
+
+    @Test
+    void shouldRejectProjectFrameworkManagementOutsideInternalAdmin() throws Exception {
+        mockMvc.perform(post("/api/project-frameworks")
+                        .with(externalAdminTenantA())
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "code", "KANBAN",
+                                "displayName", "Kanban",
+                                "description", "Visual flow management",
+                                "uiLayout", "BOARD",
+                                "active", true))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldRejectInactiveFrameworkWhenCreatingTemplatesOrProjects() throws Exception {
+        mockMvc.perform(patch("/api/project-frameworks/PFR-CUSTOM")
+                        .with(internalAdmin())
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "displayName", "Custom",
+                                "description", "Flexible framework for tenant-defined project delivery flows.",
+                                "uiLayout", "HYBRID",
+                                "active", false))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.active").value(false));
+
+        mockMvc.perform(post("/api/project-structure-templates")
+                        .with(externalAdminTenantA())
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "name", "Blocked Custom Structure",
+                                "frameworkType", "CUSTOM",
+                                "version", 2,
+                                "active", true))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("PROJECT_FRAMEWORK_INACTIVE"));
+
+        mockMvc.perform(post("/api/projects")
+                        .with(externalAdminTenantA())
+                        .header("Idempotency-Key", "inactive-framework-project")
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "code", "PRJ-INACTIVE-FW-001",
+                                "name", "Inactive Framework Project",
+                                "frameworkType", "CUSTOM",
+                                "templateId", "TMP-CUSTOM-V1",
+                                "plannedStartDate", "2026-04-08",
+                                "plannedEndDate", "2026-06-30"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("PROJECT_FRAMEWORK_INACTIVE"));
     }
 
     @Test

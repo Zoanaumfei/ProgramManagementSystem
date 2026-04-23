@@ -9,7 +9,6 @@ import com.oryzem.programmanagementsystem.modules.projectmanagement.application.
 import com.oryzem.programmanagementsystem.modules.projectmanagement.application.port.ProjectStructureNodeRepository;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.application.port.ProjectTemplateRepository;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectAggregate;
-import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectFrameworkType;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectMemberRole;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectOrganizationRoleType;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectStatus;
@@ -55,7 +54,7 @@ class GetProjectStructureTreeUseCaseTest {
                 .thenReturn(Optional.of(new ProjectTemplateAggregate(
                         "TMP-1",
                         "Template",
-                        ProjectFrameworkType.APQP,
+                        "APQP",
                         1,
                         ProjectTemplateStatus.ACTIVE,
                         "PST-1",
@@ -97,7 +96,7 @@ class GetProjectStructureTreeUseCaseTest {
                 "PRJ-001",
                 "Project",
                 "desc",
-                ProjectFrameworkType.APQP,
+                "APQP",
                 "TMP-1",
                 1,
                 "org-lead",

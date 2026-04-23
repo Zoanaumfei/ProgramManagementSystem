@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.oryzem.programmanagementsystem.modules.projectmanagement.application.model.authorization.ProjectActorContext;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectAggregate;
-import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectFrameworkType;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectMemberRole;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectOrganizationRoleType;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectStatus;
@@ -79,7 +78,7 @@ class ProjectVisibilityPolicyTest {
                 "PRJ-001",
                 "Project",
                 "desc",
-                ProjectFrameworkType.APQP,
+                "APQP",
                 "TMP-1",
                 1,
                 "org-lead",

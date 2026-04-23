@@ -1,6 +1,5 @@
 package com.oryzem.programmanagementsystem.modules.projectmanagement.application;
 
-import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectFrameworkType;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectStructureTemplateAggregate;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.application.port.ProjectStructureTemplateRepository;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.support.ProjectIds;
@@ -15,14 +14,17 @@ public class CreateProjectStructureTemplateUseCase {
 
     private final ProjectAuthorizationService authorizationService;
     private final ProjectStructureTemplateAdministrationService administrationService;
+    private final ProjectFrameworkCatalogService projectFrameworkCatalogService;
     private final ProjectStructureTemplateRepository structureTemplateRepository;
 
     public CreateProjectStructureTemplateUseCase(
             ProjectAuthorizationService authorizationService,
             ProjectStructureTemplateAdministrationService administrationService,
+            ProjectFrameworkCatalogService projectFrameworkCatalogService,
             ProjectStructureTemplateRepository structureTemplateRepository) {
         this.authorizationService = authorizationService;
         this.administrationService = administrationService;
+        this.projectFrameworkCatalogService = projectFrameworkCatalogService;
         this.structureTemplateRepository = structureTemplateRepository;
     }
 
@@ -30,8 +32,9 @@ public class CreateProjectStructureTemplateUseCase {
     public StructureViews.ProjectStructureTemplateDetailView execute(CreateProjectStructureTemplateCommand command, AuthenticatedUser actor) {
         authorizationService.assertEnabled();
         administrationService.authorizeTemplateCreation(actor);
+        projectFrameworkCatalogService.requireActiveFramework(command.frameworkType());
         boolean duplicate = structureTemplateRepository.findAllByOrderByFrameworkTypeAscVersionDescNameAsc().stream()
-                .anyMatch(existing -> existing.frameworkType() == command.frameworkType()
+                .anyMatch(existing -> existing.frameworkType().equals(command.frameworkType())
                         && existing.version() == command.version()
                         && existing.ownerOrganizationId().equals(actor.organizationId())
                         && existing.name().equalsIgnoreCase(command.name().trim()));
@@ -60,7 +63,7 @@ public class CreateProjectStructureTemplateUseCase {
 
     public record CreateProjectStructureTemplateCommand(
             String name,
-            ProjectFrameworkType frameworkType,
+            String frameworkType,
             int version,
             boolean active) {
     }

@@ -59,6 +59,9 @@
 - `POST /api/projects/{projectId}/deliverables/{deliverableId}/submissions/{submissionId}/approve`
 - `POST /api/projects/{projectId}/deliverables/{deliverableId}/submissions/{submissionId}/reject`
 - `GET /api/projects/{projectId}/dashboard`
+- `GET /api/project-frameworks`
+- `POST /api/project-frameworks`
+- `PATCH /api/project-frameworks/{frameworkId}`
 - `GET /api/project-templates`
 - `GET /api/project-templates/{templateId}`
 - `POST /api/project-templates`
@@ -97,6 +100,18 @@
 
 ## Template administration
 `/api/project-templates` and `/api/project-structure-templates` expose template governance for project setup with ownership and relationship-chain authorization.
+
+## Project framework catalog
+`/api/project-frameworks` exposes the catalog of project framework codes used by templates and projects plus the frontend UX/UI layout hint for each framework.
+
+Important behavior:
+- framework codes are now persisted catalog entries rather than a closed backend enum
+- existing template and project payloads still use the `frameworkType` field, but it now carries the catalog `code`
+- `GET /api/project-frameworks` is the source of truth for framework display metadata such as `displayName`, `description`, `uiLayout` and `active`
+- only internal `ADMIN` actors can create or edit frameworks
+- project framework management supports `create` and `update` only; there is no delete/purge route
+- inactive frameworks remain visible in the catalog but cannot be used for new project, project-template or project-structure-template creation
+- current `uiLayout` values are `TIMELINE`, `BOARD` and `HYBRID`
 
 ## Project administration
 `/api/projects` now includes an explicit administrative purge flow for internal break-glass actors.

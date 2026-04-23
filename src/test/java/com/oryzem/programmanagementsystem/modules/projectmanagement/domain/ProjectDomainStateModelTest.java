@@ -111,7 +111,7 @@ class ProjectDomainStateModelTest {
                 "PRJ-CODE",
                 "Project",
                 "desc",
-                ProjectFrameworkType.APQP,
+                "APQP",
                 "TMP-1",
                 1,
                 "tenant-a",

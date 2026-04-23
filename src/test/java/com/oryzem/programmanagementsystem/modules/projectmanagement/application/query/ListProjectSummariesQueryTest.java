@@ -12,7 +12,6 @@ import com.oryzem.programmanagementsystem.modules.projectmanagement.application.
 import com.oryzem.programmanagementsystem.modules.projectmanagement.application.port.ProjectOrganizationRepository;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.application.port.ProjectRepository;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectAggregate;
-import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectFrameworkType;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectPermission;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectStatus;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectVisibilityScope;
@@ -153,7 +152,7 @@ class ListProjectSummariesQueryTest {
                 id + "-CODE",
                 "Project " + id,
                 "desc",
-                ProjectFrameworkType.APQP,
+                "APQP",
                 "TMP-1",
                 1,
                 leadOrganizationId,

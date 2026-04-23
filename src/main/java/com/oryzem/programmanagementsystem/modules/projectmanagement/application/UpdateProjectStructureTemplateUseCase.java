@@ -36,7 +36,7 @@ public class UpdateProjectStructureTemplateUseCase {
         administrationService.authorizeManagement(actor, entity.ownerOrganizationId());
         boolean duplicate = structureTemplateRepository.findAllByOrderByFrameworkTypeAscVersionDescNameAsc().stream()
                 .anyMatch(existing -> !existing.id().equals(structureTemplateId)
-                        && existing.frameworkType() == entity.frameworkType()
+                        && existing.frameworkType().equals(entity.frameworkType())
                         && existing.version() == entity.version()
                         && existing.ownerOrganizationId().equals(entity.ownerOrganizationId())
                         && existing.name().equalsIgnoreCase(command.name().trim()));

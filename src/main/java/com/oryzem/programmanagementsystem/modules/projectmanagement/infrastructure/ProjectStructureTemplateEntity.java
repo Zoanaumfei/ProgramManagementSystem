@@ -1,10 +1,7 @@
 package com.oryzem.programmanagementsystem.modules.projectmanagement.infrastructure;
 
-import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectFrameworkType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
@@ -17,9 +14,8 @@ public class ProjectStructureTemplateEntity {
     private String id;
     @Column(length = 160, nullable = false)
     private String name;
-    @Enumerated(EnumType.STRING)
     @Column(name = "framework_type", length = 32, nullable = false)
-    private ProjectFrameworkType frameworkType;
+    private String frameworkType;
     @Column(nullable = false)
     private int version;
     @Column(nullable = false)
@@ -34,7 +30,7 @@ public class ProjectStructureTemplateEntity {
     public static ProjectStructureTemplateEntity create(
             String id,
             String name,
-            ProjectFrameworkType frameworkType,
+            String frameworkType,
             int version,
             boolean active,
             String ownerOrganizationId,
@@ -60,7 +56,7 @@ public class ProjectStructureTemplateEntity {
 
     public String getId() { return id; }
     public String getName() { return name; }
-    public ProjectFrameworkType getFrameworkType() { return frameworkType; }
+    public String getFrameworkType() { return frameworkType; }
     public int getVersion() { return version; }
     public boolean isActive() { return active; }
     public String getOwnerOrganizationId() { return ownerOrganizationId; }

@@ -6,7 +6,6 @@ import static org.mockito.Mockito.when;
 
 import com.oryzem.programmanagementsystem.modules.projectmanagement.config.ProjectManagementProperties;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectAggregate;
-import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectFrameworkType;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectMemberRole;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectOrganizationRoleType;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectPermission;
@@ -36,7 +35,7 @@ class ProjectAuthorizationMatrixTest {
             "PRJ-001",
             "Project",
             "desc",
-            ProjectFrameworkType.APQP,
+            "APQP",
             "TMP-1",
             1,
             "org-lead",
