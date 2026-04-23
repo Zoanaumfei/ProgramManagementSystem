@@ -22,9 +22,9 @@
 ## Open medium priority gaps
 - exercise the automatic alert-threshold flows end-to-end and capture explicit evidence for the already-implemented `429` spike, quota spike and export-backlog rules
 - expose richer tenant directory data if the client needs more than the current tenant summary response
+- consider extending `ProjectSummaryResponse` with explicit tenant and organization display metadata if the project list should keep showing cross-tenant context without depending on a secondary organization-directory lookup
 - add explicit regression coverage for removed legacy route families returning missing-route behavior from a consumer perspective
 - confirm whether the frontend should show direct-partner relationships as view-only in the organization and user workspaces, or surface that distinction only through authorization failures
-- implement the project-management operational inbox view proposed for `/workspace/projects/inbox`
 
 ## Open low priority gaps
 - add a dedicated read model for user listing if the product later wants to separate identity administration from access administration in the UI

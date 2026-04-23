@@ -39,6 +39,7 @@ This repository now exposes only the core membership-first platform surface.
 - frontend should treat project purge as a two-step destructive flow: create purge intent first, display backend impact counts, then require the operator to re-confirm with reason + confirmation text before executing the final purge request
 - frontend should expose project purge only to internal `ADMIN` and `SUPPORT` operators
 - frontend project list views for internal `ADMIN` actors should now expect platform-wide results from `GET /api/projects`, while normal tenant actors remain tenant-scoped
+- the current `ProjectSummaryResponse` still exposes `leadOrganizationId` and `customerOrganizationId` but not explicit project-tenant or organization-name fields, so the frontend currently derives list-context labels such as `tenantId` and organization names from the visible organization directory when possible
 - `GET /api/access/users/orphans` is a cleanup/discovery surface for inconsistent data only, not the normal onboarding path
 - frontend should treat business codes such as `ORPHAN_USER_DETECTED`, `USER_ACTIVE_MEMBERSHIP_REQUIRED` and `USER_CREATION_MEMBERSHIP_FAILED` as actionable data-repair errors rather than as recoverable inline onboarding states
 - frontend users copy should frame `Usuarios sem membership` as `diagnostico e reparo`, and the memberships workspace should label `bootstrap-membership` as an exceptional repair action instead of a standard create step
@@ -148,6 +149,7 @@ The active frontend source tree is not fully present in this repository, so the 
 - the operational dashboard frontend is now active in dev and prod and consumes the minimum overview contract for `429`, `409` quota, offboarding and export requested/completed panels
 - the operational dashboard frontend now also exposes the audited tenant service-tier change action for internal `ADMIN`/`SUPPORT` operators, using `PATCH /api/access/tenants/{tenantId}/service-tier`
 - the frontend project-management module is now active under `/workspace/projects/*` with list, creation wizard, project detail tabs, deliverable detail, submission review and embedded document panels wired to the real backend module
+- the frontend project-management workspace now also includes `/workspace/projects/inbox`, which builds an operational review queue by aggregating `/api/projects/{projectId}/deliverables/pending-review` across the projects visible in the active context
 - the project detail participants tab now combines the existing read model with transactional add-organization and add-member flows on top of `/api/projects/{projectId}/organizations` and `/api/projects/{projectId}/members`
 - the organizations workspace now also exposes the audited export workflow under `/workspace/organizations/{organizationId}/exports`, backed by `GET|POST|PATCH /api/access/organizations/{organizationId}/exports`
 - the current frontend create wizard now loads the authorized template catalog from `/api/project-templates`, filters by framework in the active access context and leaves template selection blank when the operator wants the backend to resolve the authorized default template

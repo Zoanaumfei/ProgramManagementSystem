@@ -593,7 +593,7 @@ class ProjectManagementControllerIntegrationTest {
         enableCustomTwoLevelStructure();
 
         mockMvc.perform(patch("/api/project-structure-templates/PST-CUSTOM-V1/levels/PSLT-CUS-001")
-                        .with(externalAdminTenantA())
+                        .with(internalAdmin())
                         .contentType(APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "name", "Program",
@@ -1070,7 +1070,7 @@ class ProjectManagementControllerIntegrationTest {
     @Test
     void shouldRejectProjectTemplatePurgeWhenTemplateIsDefault() throws Exception {
         mockMvc.perform(post("/api/project-templates/TMP-CUSTOM-V1/purge")
-                        .with(externalAdminTenantA()))
+                        .with(internalAdmin()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("PROJECT_TEMPLATE_DEFAULT_CANNOT_BE_PURGED"));
     }
@@ -1238,11 +1238,11 @@ class ProjectManagementControllerIntegrationTest {
     }
 
     @Test
-    void shouldHideAndBlockTemplateUseOutsideOwnerChain() throws Exception {
+    void shouldExposePlatformDefaultTemplatesToOtherTenantsButKeepManagementForInternalAdmin() throws Exception {
         mockMvc.perform(get("/api/project-templates")
                         .with(externalAdminTenantB()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(0));
+                .andExpect(jsonPath("$.length()").value(3));
 
         mockMvc.perform(post("/api/projects")
                         .with(externalAdminTenantB())
@@ -1256,7 +1256,41 @@ class ProjectManagementControllerIntegrationTest {
                                 "templateId", "TMP-CUSTOM-V1",
                                 "plannedStartDate", "2026-04-08",
                                 "plannedEndDate", "2026-06-30"))))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(patch("/api/project-templates/TMP-CUSTOM-V1")
+                        .with(externalAdminTenantB())
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "name", "Tenant B Attempt",
+                                "status", "ACTIVE",
+                                "isDefault", true,
+                                "structureTemplateId", "PST-CUSTOM-V1"))))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldAllowInternalAdminToManagePlatformDefaultTemplates() throws Exception {
+        mockMvc.perform(get("/api/project-templates")
+                        .with(internalAdmin()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(3));
+
+        mockMvc.perform(get("/api/project-structure-templates")
+                        .with(internalAdmin()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(3));
+
+        mockMvc.perform(patch("/api/project-templates/TMP-CUSTOM-V1")
+                        .with(internalAdmin())
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "name", "Custom Default v1 Managed Internally",
+                                "status", "ACTIVE",
+                                "isDefault", true,
+                                "structureTemplateId", "PST-CUSTOM-V1"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Custom Default v1 Managed Internally"));
     }
 
     @Test

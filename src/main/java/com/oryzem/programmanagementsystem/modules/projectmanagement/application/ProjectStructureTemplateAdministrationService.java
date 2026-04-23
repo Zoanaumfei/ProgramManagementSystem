@@ -2,12 +2,15 @@ package com.oryzem.programmanagementsystem.modules.projectmanagement.application
 
 import com.oryzem.programmanagementsystem.platform.authorization.AuthenticatedUser;
 import com.oryzem.programmanagementsystem.platform.authorization.Role;
+import com.oryzem.programmanagementsystem.platform.authorization.TenantType;
 import com.oryzem.programmanagementsystem.platform.tenant.OrganizationLookup;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
 @Service
 public class ProjectStructureTemplateAdministrationService {
+
+    private static final String PLATFORM_TEMPLATE_OWNER_ORGANIZATION_ID = "internal-core";
 
     private final OrganizationLookup organizationLookup;
 
@@ -26,6 +29,12 @@ public class ProjectStructureTemplateAdministrationService {
 
     public void authorizeManagement(AuthenticatedUser actor, String ownerOrganizationId) {
         authorizeTemplateCreation(actor);
+        if (isPlatformManagedTemplate(ownerOrganizationId)) {
+            if (actor.tenantType() == TenantType.INTERNAL && actor.hasRole(Role.ADMIN)) {
+                return;
+            }
+            throw new AccessDeniedException("Only internal admins can manage platform templates.");
+        }
         if (ownerOrganizationId == null || ownerOrganizationId.isBlank()
                 || !ownerOrganizationId.equals(actor.organizationId())) {
             throw new AccessDeniedException("Only the template owner can manage this template.");
@@ -43,7 +52,14 @@ public class ProjectStructureTemplateAdministrationService {
                 || ownerOrganizationId == null || ownerOrganizationId.isBlank()) {
             return false;
         }
+        if (isPlatformManagedTemplate(ownerOrganizationId)) {
+            return true;
+        }
         return ownerOrganizationId.equals(actor.organizationId())
                 || organizationLookup.isSameOrDescendant(ownerOrganizationId, actor.organizationId());
+    }
+
+    private boolean isPlatformManagedTemplate(String ownerOrganizationId) {
+        return PLATFORM_TEMPLATE_OWNER_ORGANIZATION_ID.equals(ownerOrganizationId);
     }
 }
