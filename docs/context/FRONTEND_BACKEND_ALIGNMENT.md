@@ -15,6 +15,8 @@ This repository now exposes only the core membership-first platform surface.
 - tenant service tier updates: `PATCH /api/access/tenants/{tenantId}/service-tier`
 - tenant market admin: `/api/access/tenants/{tenantId}/markets`
 - project management: `/api/projects`
+- project structure nodes: `/api/projects/{projectId}/structure`
+- project framework catalog: `/api/project-frameworks`
 - project purge administration: `/api/projects/{projectId}/purge-intents` and `/api/projects/{projectId}/purge`
 - document management for project contexts: `/api/document-contexts/{contextType}/{contextId}/documents` and `/api/documents/{documentId}*`
 
@@ -40,6 +42,10 @@ This repository now exposes only the core membership-first platform surface.
 - frontend should treat template-management actions (edit/purge/activate/deactivate and template-child mutations) as owner-only operations even for tenant admins outside the owner organization
 - frontend should use backend `version` fields when updating projects, deliverables and submissions, and should surface a dedicated optimistic-concurrency conflict message
 - frontend now also uses backend `version` fields when updating project milestones from the project detail milestones tab
+- frontend should expose the project runtime structure tree from `GET /api/projects/{projectId}/structure` and allow project managers/coordinators to create concrete child nodes such as `Parts` with `POST /api/projects/{projectId}/structure/nodes`
+- frontend should not ask users to choose `levelTemplateId` when creating a project structure node; the backend derives the next level from the selected parent node
+- frontend should refresh structure, dashboard, milestone and deliverable panels after node creation because the backend materializes structure-level milestones and deliverables as part of the create-node transaction
+- frontend should pass `structureNodeId` to dashboard, milestone, deliverable, pending-review and responsible-list queries when the operator scopes the project detail view to a selected node
 - frontend should embed document-management in the `PROJECT`, `PROJECT_DELIVERABLE` and `PROJECT_DELIVERABLE_SUBMISSION` contexts using initiate-upload -> direct storage upload -> finalize-upload -> refresh
 - frontend should treat project purge as a two-step destructive flow: create purge intent first, display backend impact counts, then require the operator to re-confirm with reason + confirmation text before executing the final purge request
 - frontend should expose project purge only to internal `ADMIN` and `SUPPORT` operators
@@ -156,7 +162,9 @@ The active frontend source tree is not fully present in this repository, so the 
 - the frontend project-management module is now active under `/workspace/projects/*` with list, creation wizard, project detail tabs, deliverable detail, submission review and embedded document panels wired to the real backend module
 - the frontend project-management shell can now differentiate experiences such as timeline-oriented and board-oriented projects by combining each project's `frameworkType` with the catalog returned by `/api/project-frameworks`
 - the frontend project-management workspace now also includes `/workspace/projects/inbox`, which builds an operational review queue by aggregating `/api/projects/{projectId}/deliverables/pending-review` across the projects visible in the active context
+- the frontend now also exposes `/workspace/templates/frameworks` for framework-catalog visibility, with create/edit actions restricted to internal `ADMIN` and `code` treated as immutable after creation
 - the project detail participants tab now combines the existing read model with transactional add-organization and add-member flows on top of `/api/projects/{projectId}/organizations` and `/api/projects/{projectId}/members`
+- the project detail structure experience should add a tree panel for runtime nodes, including create child, update node and move node actions backed by `GET /api/projects/{projectId}/structure`, `POST /api/projects/{projectId}/structure/nodes`, `PATCH /api/projects/{projectId}/structure/nodes/{nodeId}` and `POST /api/projects/{projectId}/structure/nodes/{nodeId}/move`
 - the organizations workspace now also exposes the audited export workflow under `/workspace/organizations/{organizationId}/exports`, backed by `GET|POST|PATCH /api/access/organizations/{organizationId}/exports`
 - the current frontend create wizard now loads the authorized template catalog from `/api/project-templates`, filters by framework in the active access context and leaves template selection blank when the operator wants the backend to resolve the authorized default template
 - the frontend now also exposes `/workspace/templates/*` for owner-admin management of project templates, structure templates, phases, milestones, deliverables and structure levels, including structure activation/deactivation and purge-protected destructive flows

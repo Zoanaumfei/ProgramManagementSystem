@@ -47,6 +47,10 @@
 - `GET /api/projects/{projectId}/organizations`
 - `POST /api/projects/{projectId}/members`
 - `GET /api/projects/{projectId}/members`
+- `GET /api/projects/{projectId}/structure`
+- `POST /api/projects/{projectId}/structure/nodes`
+- `PATCH /api/projects/{projectId}/structure/nodes/{nodeId}`
+- `POST /api/projects/{projectId}/structure/nodes/{nodeId}/move`
 - `GET /api/projects/{projectId}/milestones`
 - `PATCH /api/projects/{projectId}/milestones/{milestoneId}`
 - `GET /api/projects/{projectId}/deliverables`
@@ -125,6 +129,77 @@ Important behavior:
 - project purge physically removes the project aggregate, participant rows, phases, milestones, deliverables, submissions, structure nodes, document bindings, document rows and storage objects discovered under the `PROJECT`, `PROJECT_DELIVERABLE` and `PROJECT_DELIVERABLE_SUBMISSION` contexts
 - purge-intent expiration and token mismatch failures are returned as business-rule errors with stable `code` fields
 - successful purge intent creation and project purge execution are audited as `PROJECT_PURGE_INTENT_CREATED`, `PROJECT_PURGE_EXECUTION_STARTED` and `PROJECT_PURGE_COMPLETED`
+
+## Project structure nodes
+`/api/projects/{projectId}/structure` exposes the runtime project structure tree instantiated from the selected project structure template.
+
+Important behavior:
+- every project starts with exactly one root node created from the first structure level of the linked structure template
+- structure levels define the allowed hierarchy; project structure nodes are the concrete runtime items operators create under the project, such as `Parts`
+- `POST /api/projects/{projectId}/structure/nodes` creates a child node under `parentNodeId`; the backend derives the child level from the next configured structure level and does not accept a client-selected `levelTemplateId`
+- creating a node materializes milestone and deliverable templates whose `appliesToType` is `STRUCTURE_LEVEL` and whose `structureLevelTemplateId` matches the new node level
+- root-level templates are instantiated during project creation; structure-level templates are instantiated when a matching node is created
+- node create, update and move require project edit permission, which currently maps to project manager/coordinator authorization rather than a generic external tenant-admin bypass
+- tree reads hide non-visible subtrees according to structure-node visibility; scoped dashboard, milestone and deliverable reads accept `structureNodeId` where supported and fail with `403 Forbidden` when the actor cannot view the requested node
+
+Create project structure node request:
+```json
+{
+  "parentNodeId": "PRJ-123-ROOT",
+  "name": "Brake Pedal Assembly",
+  "code": "PART-001",
+  "ownerOrganizationId": "ORG-123",
+  "responsibleUserId": "USR-123",
+  "visibilityScope": "ALL_PROJECT_PARTICIPANTS"
+}
+```
+
+Update project structure node request:
+```json
+{
+  "name": "Brake Pedal Assembly Rev B",
+  "code": "PART-001",
+  "ownerOrganizationId": "ORG-123",
+  "responsibleUserId": "USR-123",
+  "visibilityScope": "ALL_PROJECT_PARTICIPANTS",
+  "version": 0
+}
+```
+
+Move project structure node request:
+```json
+{
+  "newParentNodeId": "PRJ-123-ROOT",
+  "version": 0
+}
+```
+
+`ProjectStructureTreeResponse` includes:
+- `projectId`
+- `levels`
+- `nodes`
+
+`ProjectStructureLevelResponse` includes:
+- `id`
+- `sequence`
+- `name`
+- `code`
+- `allowsChildren`
+- `allowsMilestones`
+- `allowsDeliverables`
+
+`ProjectStructureNodeResponse` includes:
+- `id`
+- `levelTemplateId`
+- `parentNodeId`
+- `name`
+- `code`
+- `sequence`
+- `ownerOrganizationId`
+- `responsibleUserId`
+- `status`
+- `visibilityScope`
+- `version`
 
 Important behavior:
 - template ownership is fixed at creation time from the actor active organization context (`ownerOrganizationId` in the backend model)
@@ -519,6 +594,7 @@ Important behavior:
 
 `ProjectMilestoneResponse` includes:
 - `id`
+- `structureNodeId`
 - `phaseId`
 - `code`
 - `name`
@@ -532,6 +608,7 @@ Important behavior:
 
 `ProjectDeliverableResponse` includes:
 - `id`
+- `structureNodeId`
 - `phaseId`
 - `milestoneId`
 - `code`
