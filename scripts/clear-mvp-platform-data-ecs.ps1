@@ -59,9 +59,13 @@ if (-not $network -or -not $network.subnets -or -not $network.securityGroups) {
 }
 
 $assignPublicIp = if ($network.assignPublicIp) { $network.assignPublicIp } else { 'DISABLED' }
-$subnets = ($network.subnets | ForEach-Object { '"' + $_ + '"' }) -join ','
-$securityGroups = ($network.securityGroups | ForEach-Object { '"' + $_ + '"' }) -join ','
-$networkConfiguration = "{`"awsvpcConfiguration`":{`"subnets`":[$subnets],`"securityGroups`":[$securityGroups],`"assignPublicIp`":`"$assignPublicIp`"}}"
+$networkConfiguration = @{
+    awsvpcConfiguration = @{
+        subnets = @($network.subnets)
+        securityGroups = @($network.securityGroups)
+        assignPublicIp = $assignPublicIp
+    }
+} | ConvertTo-Json -Depth 5 -Compress
 
 $overrides = @{
     containerOverrides = @(
@@ -86,22 +90,34 @@ $overrides = @{
     )
 } | ConvertTo-Json -Depth 8 -Compress
 
+$tempDirectory = Join-Path ([System.IO.Path]::GetTempPath()) "oryzem-mvp-reset-$([System.Guid]::NewGuid().ToString('N'))"
+New-Item -Path $tempDirectory -ItemType Directory | Out-Null
+$networkConfigurationPath = Join-Path $tempDirectory 'network-configuration.json'
+$overridesPath = Join-Path $tempDirectory 'overrides.json'
+
+$networkConfiguration | Set-Content -Path $networkConfigurationPath -Encoding utf8NoBOM
+$overrides | Set-Content -Path $overridesPath -Encoding utf8NoBOM
+
 Write-Host "Launching one-off MVP reset task in ECS service network."
 Write-Host "Cluster: $ClusterName"
 Write-Host "Task definition: $($service.taskDefinition)"
 Write-Host "Bootstrap admin: $BootstrapEmail"
 
-$runTask = Invoke-AwsJson @(
-    'ecs', 'run-task',
-    '--profile', $AwsProfile,
-    '--region', $AwsRegion,
-    '--cluster', $ClusterName,
-    '--launch-type', 'FARGATE',
-    '--task-definition', $service.taskDefinition,
-    '--network-configuration', $networkConfiguration,
-    '--overrides', $overrides,
-    '--started-by', 'mvp-platform-reset'
-)
+try {
+    $runTask = Invoke-AwsJson @(
+        'ecs', 'run-task',
+        '--profile', $AwsProfile,
+        '--region', $AwsRegion,
+        '--cluster', $ClusterName,
+        '--launch-type', 'FARGATE',
+        '--task-definition', $service.taskDefinition,
+        '--network-configuration', "file://$networkConfigurationPath",
+        '--overrides', "file://$overridesPath",
+        '--started-by', 'mvp-platform-reset'
+    )
+} finally {
+    Remove-Item -LiteralPath $tempDirectory -Recurse -Force -ErrorAction SilentlyContinue
+}
 
 if ($runTask.failures -and $runTask.failures.Count -gt 0) {
     $failure = $runTask.failures[0]
