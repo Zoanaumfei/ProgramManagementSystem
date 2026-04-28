@@ -55,7 +55,7 @@ public class ListProjectSummariesQuery {
         if (actor != null
                 && actor.tenantType() == TenantType.INTERNAL
                 && actor.roles() != null
-                && actor.roles().contains(Role.ADMIN)) {
+                && (actor.roles().contains(Role.ADMIN) || actor.roles().contains(Role.SUPPORT))) {
             return projectRepository.findAllOrderByCreatedAtDescIdDesc();
         }
         return projectRepository.findAllByTenantIdOrderByCreatedAtDescIdDesc(actor.tenantId());

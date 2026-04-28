@@ -156,7 +156,7 @@ public class ProjectAuthorizationService {
         ProjectAccess projectAccess = authorizeProject(projectId, actor, permission);
         ProjectStructureNodeAggregate node = structureNodeRepository.findByIdAndProjectId(nodeId, projectId)
                 .orElseThrow(() -> new ResourceNotFoundException("ProjectStructureNode", nodeId));
-        if (!structureNodeAccessPolicy.isAllowed(structureNodeSnapshot(projectAccess.project(), projectAccess.organizations(), projectAccess.members(), node, actor, permission))) {
+        if (!isStructureNodeAllowed(projectAccess.project(), projectAccess.organizations(), projectAccess.members(), node, actor, permission)) {
             deny(actor, projectAccess.project().tenantId(), nodeId, "PROJECT_STRUCTURE_NODE_ACCESS_DENIED", permission.name());
         }
         return new StructureNodeAccess(projectAccess.project(), projectAccess.organizations(), projectAccess.members(), node);
@@ -166,7 +166,7 @@ public class ProjectAuthorizationService {
         ProjectAccess projectAccess = authorizeProject(projectId, actor, permission);
         ProjectMilestoneAggregate milestone = milestoneRepository.findByIdAndProjectId(milestoneId, projectId)
                 .orElseThrow(() -> new ResourceNotFoundException("ProjectMilestone", milestoneId));
-        if (!milestoneAccessPolicy.isAllowed(milestoneSnapshot(projectAccess.project(), projectAccess.organizations(), projectAccess.members(), milestone, actor, permission))) {
+        if (!isMilestoneAllowed(projectAccess.project(), projectAccess.organizations(), projectAccess.members(), milestone, actor, permission)) {
             deny(actor, projectAccess.project().tenantId(), milestoneId, "PROJECT_MILESTONE_ACCESS_DENIED", permission.name());
         }
         return new MilestoneAccess(projectAccess.project(), projectAccess.organizations(), projectAccess.members(), milestone);
@@ -181,6 +181,16 @@ public class ProjectAuthorizationService {
     }
 
     public boolean canAccessMilestone(ProjectAggregate project, List<ProjectOrganizationAggregate> organizations, List<ProjectMemberAggregate> members, ProjectMilestoneAggregate milestone, AuthenticatedUser actor, ProjectPermission permission) {
+        return isMilestoneAllowed(project, organizations, members, milestone, actor, permission);
+    }
+
+    private boolean isMilestoneAllowed(
+            ProjectAggregate project,
+            List<ProjectOrganizationAggregate> organizations,
+            List<ProjectMemberAggregate> members,
+            ProjectMilestoneAggregate milestone,
+            AuthenticatedUser actor,
+            ProjectPermission permission) {
         if (actor == null) {
             return false;
         }
@@ -194,10 +204,20 @@ public class ProjectAuthorizationService {
     }
 
     public boolean canAccessSubmission(ProjectAggregate project, List<ProjectOrganizationAggregate> organizations, List<ProjectMemberAggregate> members, ProjectDeliverableAggregate deliverable, DeliverableSubmissionAggregate submission, AuthenticatedUser actor, ProjectPermission permission) {
-        return isSubmissionAllowed(new DeliverableAccess(project, organizations, members, deliverable), submission, actor, permission);
+        return isSubmissionAllowed(project, organizations, members, deliverable, submission, actor, permission);
     }
 
     public boolean canAccessStructureNode(ProjectAggregate project, List<ProjectOrganizationAggregate> organizations, List<ProjectMemberAggregate> members, ProjectStructureNodeAggregate node, AuthenticatedUser actor, ProjectPermission permission) {
+        return isStructureNodeAllowed(project, organizations, members, node, actor, permission);
+    }
+
+    private boolean isStructureNodeAllowed(
+            ProjectAggregate project,
+            List<ProjectOrganizationAggregate> organizations,
+            List<ProjectMemberAggregate> members,
+            ProjectStructureNodeAggregate node,
+            AuthenticatedUser actor,
+            ProjectPermission permission) {
         if (actor == null) {
             return false;
         }
@@ -243,11 +263,38 @@ public class ProjectAuthorizationService {
     }
 
     private boolean isSubmissionAllowed(DeliverableAccess access, DeliverableSubmissionAggregate submission, AuthenticatedUser actor, ProjectPermission permission) {
-        return submissionAccessPolicy.isAllowed(submissionSnapshot(
+        return isSubmissionAllowed(
                 access.project(),
                 access.organizations(),
                 access.members(),
                 access.deliverable(),
+                submission,
+                actor,
+                permission);
+    }
+
+    private boolean isSubmissionAllowed(
+            ProjectAggregate project,
+            List<ProjectOrganizationAggregate> organizations,
+            List<ProjectMemberAggregate> members,
+            ProjectDeliverableAggregate deliverable,
+            DeliverableSubmissionAggregate submission,
+            AuthenticatedUser actor,
+            ProjectPermission permission) {
+        if (actor == null) {
+            return false;
+        }
+        if (isInternalPrivileged(actor)) {
+            return true;
+        }
+        if (!sameTenant(project.tenantId(), actor.tenantId())) {
+            return false;
+        }
+        return submissionAccessPolicy.isAllowed(submissionSnapshot(
+                project,
+                organizations,
+                members,
+                deliverable,
                 submission,
                 actor,
                 permission));

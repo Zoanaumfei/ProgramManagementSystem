@@ -17,6 +17,8 @@ import com.oryzem.programmanagementsystem.modules.projectmanagement.support.Proj
 import java.time.Clock;
 import com.oryzem.programmanagementsystem.platform.access.AccessContextService;
 import com.oryzem.programmanagementsystem.platform.authorization.AuthenticatedUser;
+import com.oryzem.programmanagementsystem.platform.authorization.Role;
+import com.oryzem.programmanagementsystem.platform.authorization.TenantType;
 import com.oryzem.programmanagementsystem.platform.shared.BusinessRuleException;
 import com.oryzem.programmanagementsystem.platform.shared.ResourceNotFoundException;
 import com.oryzem.programmanagementsystem.platform.tenant.OrganizationLookup;
@@ -85,7 +87,18 @@ public class CreateProjectUseCase {
         if (actor == null || actor.tenantId() == null || actor.organizationId() == null) {
             throw new BusinessRuleException("PROJECT_CONTEXT_REQUIRED", "An authenticated tenant and organization context are required.");
         }
+        assertCanCreateProject(actor);
         return idempotencyService.execute(actor.tenantId(), IDEMPOTENT_OPERATION, idempotencyKey, command, ProjectViews.ProjectDetailView.class, () -> doCreate(command, actor));
+    }
+
+    private void assertCanCreateProject(AuthenticatedUser actor) {
+        if (actor.tenantType() == TenantType.INTERNAL && (actor.hasRole(Role.ADMIN) || actor.hasRole(Role.SUPPORT))) {
+            return;
+        }
+        if (actor.tenantType() == TenantType.EXTERNAL && (actor.hasRole(Role.ADMIN) || actor.hasRole(Role.MANAGER))) {
+            return;
+        }
+        throw new org.springframework.security.access.AccessDeniedException("Only internal admin/support or external admin/manager actors can create projects.");
     }
 
     private ProjectViews.ProjectDetailView doCreate(CreateProjectCommand command, AuthenticatedUser actor) {

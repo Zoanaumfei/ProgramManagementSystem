@@ -6,7 +6,12 @@ import static org.mockito.Mockito.when;
 
 import com.oryzem.programmanagementsystem.modules.projectmanagement.application.*;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.application.port.ProjectDeliverableRepository;
+import com.oryzem.programmanagementsystem.modules.projectmanagement.application.port.ProjectMemberRepository;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.application.port.ProjectMilestoneRepository;
+import com.oryzem.programmanagementsystem.modules.projectmanagement.application.port.ProjectOrganizationRepository;
+import com.oryzem.programmanagementsystem.modules.projectmanagement.application.port.ProjectRepository;
+import com.oryzem.programmanagementsystem.modules.projectmanagement.application.port.ProjectStructureNodeRepository;
+import com.oryzem.programmanagementsystem.modules.projectmanagement.config.ProjectManagementProperties;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.DeliverableType;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectAggregate;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectDeliverableAggregate;
@@ -18,9 +23,12 @@ import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.Proje
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectPermission;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectPriority;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectStatus;
+import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectStructureNodeAggregate;
+import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectStructureNodeStatus;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectVisibilityScope;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectMemberAggregate;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectOrganizationAggregate;
+import com.oryzem.programmanagementsystem.platform.access.AccessContextService;
 import com.oryzem.programmanagementsystem.platform.authorization.AuthenticatedUser;
 import com.oryzem.programmanagementsystem.platform.authorization.Role;
 import com.oryzem.programmanagementsystem.platform.authorization.TenantType;
@@ -29,6 +37,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
@@ -79,6 +88,60 @@ class GetProjectDashboardQueryTest {
         assertThat(result.totalDeliverables()).isEqualTo(1);
         assertThat(result.pendingSubmissionCount()).isEqualTo(1);
         assertThat(result.milestonesAtRisk()).isEqualTo(1);
+    }
+
+    @Test
+    void shouldReturnScopedDashboardForInternalAdminOnRestrictiveStructureNode() {
+        ProjectRepository projectRepository = mock(ProjectRepository.class);
+        ProjectOrganizationRepository organizationRepository = mock(ProjectOrganizationRepository.class);
+        ProjectMemberRepository memberRepository = mock(ProjectMemberRepository.class);
+        ProjectStructureNodeRepository structureNodeRepository = mock(ProjectStructureNodeRepository.class);
+        ProjectDeliverableRepository deliverableRepository = mock(ProjectDeliverableRepository.class);
+        ProjectMilestoneRepository milestoneRepository = mock(ProjectMilestoneRepository.class);
+        ProjectVisibilityPolicy visibilityPolicy = new ProjectVisibilityPolicy();
+        ProjectAccessPolicy projectAccessPolicy = new ProjectAccessPolicy(visibilityPolicy);
+        AccessContextService accessContextService = mock(AccessContextService.class);
+        when(accessContextService.canonicalTenantId("TEN-internal-core")).thenReturn("TEN-internal-core");
+        ProjectAuthorizationService authorizationService = new ProjectAuthorizationService(
+                new ProjectManagementProperties(),
+                projectRepository,
+                organizationRepository,
+                memberRepository,
+                deliverableRepository,
+                milestoneRepository,
+                structureNodeRepository,
+                mock(com.oryzem.programmanagementsystem.modules.projectmanagement.application.port.DeliverableSubmissionRepository.class),
+                accessContextService,
+                mock(ProjectAuditService.class),
+                projectAccessPolicy,
+                new ProjectMilestoneAccessPolicy(projectAccessPolicy, visibilityPolicy),
+                new ProjectDeliverableAccessPolicy(visibilityPolicy),
+                new DeliverableSubmissionAccessPolicy(new ProjectDeliverableAccessPolicy(visibilityPolicy)),
+                new ProjectStructureNodeAccessPolicy(projectAccessPolicy, visibilityPolicy));
+        GetProjectDashboardQuery query = new GetProjectDashboardQuery(
+                authorizationService,
+                deliverableRepository,
+                milestoneRepository,
+                new ProjectDeliverableAccessPolicy(visibilityPolicy),
+                new ProjectMilestoneAccessPolicy(projectAccessPolicy, visibilityPolicy),
+                Clock.fixed(Instant.parse("2026-04-12T12:00:00Z"), ZoneOffset.UTC));
+
+        when(projectRepository.findById("PRJ-1")).thenReturn(Optional.of(project()));
+        when(organizationRepository.findAllByProjectIdAndActiveTrueOrderByJoinedAtAsc("PRJ-1"))
+                .thenReturn(organizations());
+        when(memberRepository.findAllByProjectIdAndActiveTrueOrderByAssignedAtAsc("PRJ-1"))
+                .thenReturn(List.of());
+        when(structureNodeRepository.findByIdAndProjectId("NODE-1", "PRJ-1"))
+                .thenReturn(Optional.of(structureNode(ProjectVisibilityScope.INTERNAL_ONLY)));
+        when(deliverableRepository.findAllByProjectIdAndStructureNodeIdOrderByPlannedDueDateAscIdAsc("PRJ-1", "NODE-1"))
+                .thenReturn(List.of());
+        when(milestoneRepository.findAllByProjectIdAndStructureNodeIdOrderBySequenceNoAsc("PRJ-1", "NODE-1"))
+                .thenReturn(List.of());
+
+        DashboardViews.ProjectDashboardView result = query.execute("PRJ-1", "NODE-1", internalAdmin());
+
+        assertThat(result.projectId()).isEqualTo("PRJ-1");
+        assertThat(result.totalDeliverables()).isZero();
     }
 
     private ProjectAggregate project() {
@@ -164,6 +227,22 @@ class GetProjectDashboardQueryTest {
                 0L);
     }
 
+    private ProjectStructureNodeAggregate structureNode(ProjectVisibilityScope visibilityScope) {
+        return new ProjectStructureNodeAggregate(
+                "NODE-1",
+                "PRJ-1",
+                "LVL-1",
+                "PRJ-1-ROOT",
+                "Restricted node",
+                "NODE-1",
+                1,
+                "org-lead",
+                "USR-RESP",
+                ProjectStructureNodeStatus.ACTIVE,
+                visibilityScope,
+                0L);
+    }
+
     private AuthenticatedUser actor(String userId, String organizationId) {
         return new AuthenticatedUser(
                 "sub-" + userId,
@@ -176,6 +255,20 @@ class GetProjectDashboardQueryTest {
                 organizationId,
                 null,
                 TenantType.EXTERNAL);
+    }
+
+    private AuthenticatedUser internalAdmin() {
+        return new AuthenticatedUser(
+                "sub-admin",
+                "admin@oryzem.com",
+                Set.of(Role.ADMIN),
+                Set.of(),
+                "USR-INTERNAL-ADMIN",
+                "MBR-INTERNAL-ADMIN",
+                "TEN-internal-core",
+                "ORG-INTERNAL",
+                null,
+                TenantType.INTERNAL);
     }
 }
 

@@ -193,6 +193,27 @@ class ProjectManagementControllerIntegrationTest {
     }
 
     @Test
+    void shouldAllowInternalSupportToCreateProject() throws Exception {
+        mockMvc.perform(post("/api/projects")
+                        .with(internalSupport())
+                        .contentType(APPLICATION_JSON)
+                        .header("Idempotency-Key", "PRJ-INT-SUP-001")
+                        .content(objectMapper.writeValueAsString(projectPayload("PRJ-INT-SUP-001", "APQP", null))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.code").value("PRJ-INT-SUP-001"));
+    }
+
+    @Test
+    void shouldBlockMemberFromCreatingProject() throws Exception {
+        mockMvc.perform(post("/api/projects")
+                        .with(jwtFor("member.a@tenant.com", "ROLE_MEMBER"))
+                        .contentType(APPLICATION_JSON)
+                        .header("Idempotency-Key", "PRJ-MEMBER-BLOCKED-001")
+                        .content(objectMapper.writeValueAsString(projectPayload("PRJ-MEMBER-BLOCKED-001", "APQP", null))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void shouldSupportDeliverableSubmissionAndRealDocumentHosts() throws Exception {
         JsonNode project = createProject("PRJ-FLOW-001");
         String projectId = project.get("id").asText();
@@ -1533,6 +1554,19 @@ class ProjectManagementControllerIntegrationTest {
     }
 
     private JsonNode createProject(String code, String frameworkType, String templateId) throws Exception {
+        String response = mockMvc.perform(post("/api/projects")
+                        .with(externalAdminTenantA())
+                        .contentType(APPLICATION_JSON)
+                        .header("Idempotency-Key", code)
+                        .content(objectMapper.writeValueAsString(projectPayload(code, frameworkType, templateId))))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        return objectMapper.readTree(response);
+    }
+
+    private java.util.Map<String, Object> projectPayload(String code, String frameworkType, String templateId) {
         java.util.Map<String, Object> payload = new java.util.LinkedHashMap<>();
         payload.put("code", code);
         payload.put("name", "Project " + code);
@@ -1543,16 +1577,7 @@ class ProjectManagementControllerIntegrationTest {
         }
         payload.put("plannedStartDate", "2026-04-08");
         payload.put("plannedEndDate", "2026-06-30");
-        String response = mockMvc.perform(post("/api/projects")
-                        .with(externalAdminTenantA())
-                        .contentType(APPLICATION_JSON)
-                        .header("Idempotency-Key", code)
-                        .content(objectMapper.writeValueAsString(payload)))
-                .andExpect(status().isCreated())
-                .andReturn()
-                .getResponse()
-                .getContentAsString();
-        return objectMapper.readTree(response);
+        return payload;
     }
 
     private JsonNode firstDeliverable(String projectId) throws Exception {
