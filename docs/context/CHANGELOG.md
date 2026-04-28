@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-04-28
+- added the MVP platform reset flow for the private-RDS dev stack, with `dev-reset.cmd` as the easy operator entry point and an ECS one-off task wrapper for running the reset inside the VPC
+- extended the maintenance reset so it clears project/document runtime data, document S3 objects and non-baseline project-management catalogs while preserving the internal admin, Core Oryzem and baseline project frameworks/templates/structure levels
+- added scoped IAM helper scripts for allowing `oryzem_admin` to run the ECS reset task without broader IAM administration permissions
+- validated the reset flow end-to-end against ECS task definition `program-management-system:71`, with the reset task exiting `0` and the public backend ping healthy afterward
+
 ## 2026-04-26
 - officialized runtime project structure node endpoints in `docs/context/API_CONTRACT.md`, including tree read, node create/update/move, request payloads and response fields
 - clarified that `StructureLevel` is template metadata while `ProjectStructureNode` is the concrete runtime item, such as a `Parts` node under the root `Project` node

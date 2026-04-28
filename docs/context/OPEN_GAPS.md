@@ -15,6 +15,7 @@
 - the published environments were validated end-to-end for `/api/auth/me`, `/api/access/users` and `/api/access/organizations`, confirming the structured `401`/`403` contract in dev and prod
 - the minimum operational dashboard is now live in the frontend on dev and prod for `429`, `409` quota, offboarding and export requested/completed signals
 - the operational reaction runbook has been exercised successfully in dev and prod against the active core flows
+- the MVP dev reset flow now runs through `dev-reset.cmd` and an ECS one-off task, clearing fake/runtime data from the private-RDS environment while preserving the internal admin, Core Oryzem and baseline project-management catalogs
 
 ## Open high priority gaps
 - none currently tracked for Frente A

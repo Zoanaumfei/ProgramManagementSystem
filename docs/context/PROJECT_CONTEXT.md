@@ -21,6 +21,7 @@ The backend status below was cross-checked against the code currently present in
 - the backend now exposes an explicit two-step project purge flow through `/api/projects/{projectId}/purge-intents` and `/api/projects/{projectId}/purge`
 - project purge is restricted to internal `ADMIN` and `SUPPORT` actors, requires mandatory reason + final confirmation text, and physically removes project data plus linked document/storage artifacts
 - project creation resolves the applied template from `templateId` when provided, and otherwise falls back to the active default template for the chosen `frameworkType`
+- the dev MVP reset flow is operational through `dev-reset.cmd`, which launches a one-off ECS task inside the private-RDS VPC and clears fake/runtime data while preserving `internal-core`, `vanderson.verza@gmail.com`, baseline project frameworks, baseline project templates and baseline structure templates/levels
 - document management now supports the `PROJECT`, `PROJECT_DELIVERABLE` and `PROJECT_DELIVERABLE_SUBMISSION` contexts with direct upload initiation, backend-side finalize, contextual listing, signed download URL generation and soft delete
 - user onboarding now provisions the first membership during `POST /api/access/users`, so the standard invite flow no longer depends on a later bootstrap-membership step
 - `GET /api/access/users/orphans` exists only as an inconsistency discovery surface for unexpected legacy/test data; orphan users are no longer treated as a valid lifecycle state
