@@ -73,7 +73,6 @@ $overrides = @{
             name = $ContainerName
             environment = @(
                 @{ name = 'SPRING_PROFILES_ACTIVE'; value = 'rds' },
-                @{ name = 'SPRING_MAIN_WEB_APPLICATION_TYPE'; value = 'none' },
                 @{ name = 'AWS_REGION'; value = $AwsRegion },
                 @{ name = 'DB_SECRET_ID'; value = $SecretId },
                 @{ name = 'DB_SSL_MODE'; value = 'require' },
