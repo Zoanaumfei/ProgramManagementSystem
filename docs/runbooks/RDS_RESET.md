@@ -11,9 +11,10 @@ Goal:
 Preferred path:
 1. Confirm the target is the development RDS instance.
 2. Make sure no one else is using the environment.
-3. Run `scripts/clear-mvp-platform-data.ps1 -ConfirmToken RESET_MVP_PLATFORM_DATA`.
-4. Wait for the application to start, execute the maintenance reset and exit.
-5. Re-run your normal app startup script afterward if you want the web app online.
+3. If the RDS instance is private, run `scripts/clear-mvp-platform-data-ecs.ps1 -ConfirmToken RESET_MVP_PLATFORM_DATA`.
+4. If the RDS instance is reachable from your workstation, run `scripts/clear-mvp-platform-data.ps1 -ConfirmToken RESET_MVP_PLATFORM_DATA`.
+5. Wait for the application to start, execute the maintenance reset and exit.
+6. Re-run your normal app startup script afterward if you want the web app online.
 
 Safety guarantees:
 - the reset path requires `APP_MAINTENANCE_RESET_ENABLED=true`
