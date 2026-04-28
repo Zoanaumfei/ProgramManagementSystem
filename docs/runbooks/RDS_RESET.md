@@ -20,6 +20,7 @@ Safety guarantees:
 - the reset path requires `APP_MAINTENANCE_RESET_ENABLED=true`
 - the reset path requires confirmation token `RESET_RDS_SAFE`
 - the friendly MVP wrapper requires confirmation token `RESET_MVP_PLATFORM_DATA`
+- the ECS wrapper requires `ecs:RunTask`, `ecs:DescribeServices`, `ecs:DescribeTasks` and scoped `iam:PassRole`; attach with `scripts/attach-ecs-reset-run-task-policy-to-user.ps1` when needed
 - the reset path does not run unless the application boots successfully against the RDS datasource
 - the reset path preserves the schema and only clears application data through the existing bootstrap reset flow
 
