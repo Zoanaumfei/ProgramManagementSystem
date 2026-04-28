@@ -95,8 +95,9 @@ New-Item -Path $tempDirectory -ItemType Directory | Out-Null
 $networkConfigurationPath = Join-Path $tempDirectory 'network-configuration.json'
 $overridesPath = Join-Path $tempDirectory 'overrides.json'
 
-$networkConfiguration | Set-Content -Path $networkConfigurationPath -Encoding utf8NoBOM
-$overrides | Set-Content -Path $overridesPath -Encoding utf8NoBOM
+$utf8WithoutBom = New-Object System.Text.UTF8Encoding($false)
+[System.IO.File]::WriteAllText($networkConfigurationPath, $networkConfiguration, $utf8WithoutBom)
+[System.IO.File]::WriteAllText($overridesPath, $overrides, $utf8WithoutBom)
 
 Write-Host "Launching one-off MVP reset task in ECS service network."
 Write-Host "Cluster: $ClusterName"
