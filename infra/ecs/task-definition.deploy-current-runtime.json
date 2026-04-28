@@ -156,8 +156,8 @@
         "requiresCompatibilities": [
             "FARGATE"
         ],
-        "cpu": "1024",
-        "memory": "2048",
+        "cpu": "512",
+        "memory": "1024",
         "registeredAt": "2026-04-08T21:10:27.771000-03:00",
         "registeredBy": "arn:aws:iam::439533253319:user/oryzem_admin"
     },
