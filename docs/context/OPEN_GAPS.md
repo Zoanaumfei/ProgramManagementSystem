@@ -20,6 +20,8 @@
 - none currently tracked for Frente A
 
 ## Open medium priority gaps
+- implement the frontend runtime project structure experience in project detail, including tree read, create/update/move structure nodes, automatic panel refresh after mutations and `structureNodeId` scoping for dashboard, milestone, deliverable and pending-review queries
+- after frontend implementation, exercise the project detail structure-node flow end-to-end against a deployed backend, including create child node, materialized deliverables by `structureNodeId`, update node and move node
 - exercise the automatic alert-threshold flows end-to-end and capture explicit evidence for the already-implemented `429` spike, quota spike and export-backlog rules
 - expose richer tenant directory data if the client needs more than the current tenant summary response
 - consider extending `ProjectSummaryResponse` with explicit tenant and organization display metadata if the project list should keep showing cross-tenant context without depending on a secondary organization-directory lookup

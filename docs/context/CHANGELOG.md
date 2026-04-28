@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-04-26
+- officialized runtime project structure node endpoints in `docs/context/API_CONTRACT.md`, including tree read, node create/update/move, request payloads and response fields
+- clarified that `StructureLevel` is template metadata while `ProjectStructureNode` is the concrete runtime item, such as a `Parts` node under the root `Project` node
+- updated `docs/context/FRONTEND_BACKEND_ALIGNMENT.md` and `docs/context/PROJECT_CONTEXT.md` with the frontend handoff expectations for structure-tree UI, node creation and `structureNodeId` scoped project reads
+- tracked the remaining frontend implementation work for runtime project structure nodes in `docs/context/OPEN_GAPS.md`
+
 ## 2026-04-05
 - updated `docs/context/OPEN_GAPS.md` to close the remaining Frente A high-priority items after dev/prod validation and runbook execution evidence
 - refreshed `docs/context/PROJECT_CONTEXT.md` to record that the operational dashboard is active in dev and prod and that structured `401`/`403` validation is closed end-to-end

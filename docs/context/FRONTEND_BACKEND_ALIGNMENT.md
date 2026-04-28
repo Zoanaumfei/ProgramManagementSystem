@@ -44,8 +44,8 @@ This repository now exposes only the core membership-first platform surface.
 - frontend now also uses backend `version` fields when updating project milestones from the project detail milestones tab
 - frontend should expose the project runtime structure tree from `GET /api/projects/{projectId}/structure` and allow project managers/coordinators to create concrete child nodes such as `Parts` with `POST /api/projects/{projectId}/structure/nodes`
 - frontend should not ask users to choose `levelTemplateId` when creating a project structure node; the backend derives the next level from the selected parent node
-- frontend should refresh structure, dashboard, milestone and deliverable panels after node creation because the backend materializes structure-level milestones and deliverables as part of the create-node transaction
-- frontend should pass `structureNodeId` to dashboard, milestone, deliverable, pending-review and responsible-list queries when the operator scopes the project detail view to a selected node
+- frontend should refresh structure, dashboard, milestone, deliverable and pending-review panels after node mutations because the backend materializes structure-level milestones and deliverables as part of the create-node transaction
+- frontend should pass `structureNodeId` to dashboard, milestone, deliverable and pending-review queries when the operator scopes the project detail view to a selected node
 - frontend should embed document-management in the `PROJECT`, `PROJECT_DELIVERABLE` and `PROJECT_DELIVERABLE_SUBMISSION` contexts using initiate-upload -> direct storage upload -> finalize-upload -> refresh
 - frontend should treat project purge as a two-step destructive flow: create purge intent first, display backend impact counts, then require the operator to re-confirm with reason + confirmation text before executing the final purge request
 - frontend should expose project purge only to internal `ADMIN` and `SUPPORT` operators
