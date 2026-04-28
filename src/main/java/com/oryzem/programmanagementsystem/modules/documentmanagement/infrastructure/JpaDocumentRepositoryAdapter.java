@@ -49,6 +49,11 @@ public class JpaDocumentRepositoryAdapter implements DocumentRepository {
     }
 
     @Override
+    public List<String> findAllStorageKeys() {
+        return delegate.findAllStorageKeys();
+    }
+
+    @Override
     public DocumentRecord save(DocumentRecord document) {
         DocumentEntity entity = delegate.findById(document.id())
                 .map(existing -> {

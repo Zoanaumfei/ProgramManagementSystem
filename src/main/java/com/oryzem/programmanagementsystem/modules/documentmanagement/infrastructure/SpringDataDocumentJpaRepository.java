@@ -25,6 +25,14 @@ public interface SpringDataDocumentJpaRepository extends JpaRepository<DocumentE
             """)
     List<String> findTrackedStorageKeys();
 
+    @Query("""
+            select d.storageKey
+            from DocumentEntity d
+            where d.storageKey is not null
+              and d.storageKey <> ''
+            """)
+    List<String> findAllStorageKeys();
+
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("delete from DocumentEntity d where d.id in :ids")
     void deleteAllByIdIn(@Param("ids") Collection<String> ids);

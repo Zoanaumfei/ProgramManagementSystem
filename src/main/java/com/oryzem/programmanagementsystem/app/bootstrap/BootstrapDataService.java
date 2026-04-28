@@ -40,6 +40,7 @@ public class BootstrapDataService {
     private final OrganizationResetPort organizationResetPort;
     private final UserIdentityGateway userIdentityGateway;
     private final BootstrapProperties bootstrapProperties;
+    private final MaintenanceDataResetService maintenanceDataResetService;
 
     public BootstrapDataService(
             UserRepository userRepository,
@@ -49,7 +50,8 @@ public class BootstrapDataService {
             OrganizationBootstrapPort organizationBootstrapPort,
             OrganizationResetPort organizationResetPort,
             UserIdentityGateway userIdentityGateway,
-            BootstrapProperties bootstrapProperties) {
+            BootstrapProperties bootstrapProperties,
+            MaintenanceDataResetService maintenanceDataResetService) {
         this.userRepository = userRepository;
         this.auditTrailService = auditTrailService;
         this.accessContextService = accessContextService;
@@ -58,6 +60,7 @@ public class BootstrapDataService {
         this.organizationResetPort = organizationResetPort;
         this.userIdentityGateway = userIdentityGateway;
         this.bootstrapProperties = bootstrapProperties;
+        this.maintenanceDataResetService = maintenanceDataResetService;
     }
 
     @PostConstruct
@@ -79,6 +82,7 @@ public class BootstrapDataService {
 
     @Transactional
     public void reset() {
+        maintenanceDataResetService.clearRuntimeData();
         auditTrailService.clear();
         accessContextResetService.clearMemberships();
         userRepository.deleteAll();
@@ -92,6 +96,7 @@ public class BootstrapDataService {
     }
 
     private void resetToInternalCoreSkeleton() {
+        maintenanceDataResetService.clearRuntimeData();
         auditTrailService.clear();
         accessContextResetService.clearMemberships();
         userRepository.deleteAll();

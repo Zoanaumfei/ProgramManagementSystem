@@ -10,4 +10,6 @@ public interface DocumentAdministrationFacade {
     DocumentPurgeSummary summarizeTrackedDocuments(List<DocumentContextRef> contexts);
 
     DocumentPurgeSummary purgeTrackedDocuments(List<DocumentContextRef> contexts);
+
+    DocumentPurgeSummary purgeAllDocumentsForMaintenanceReset();
 }
