@@ -43,6 +43,11 @@ public class JpaDeliverableSubmissionRepositoryAdapter implements DeliverableSub
     }
 
     @Override
+    public boolean existsByDeliverableId(String deliverableId) {
+        return delegate.existsByDeliverableId(deliverableId);
+    }
+
+    @Override
     public List<DeliverableSubmissionAggregate> findAllByDeliverableIdOrderBySubmissionNumberDesc(String deliverableId) {
         return delegate.findAllByDeliverableIdOrderBySubmissionNumberDesc(deliverableId).stream().map(mapper::toDomain).toList();
     }

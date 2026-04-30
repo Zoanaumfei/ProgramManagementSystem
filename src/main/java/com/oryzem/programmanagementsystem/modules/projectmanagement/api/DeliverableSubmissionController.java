@@ -5,6 +5,7 @@ import com.oryzem.programmanagementsystem.modules.projectmanagement.application.
 import com.oryzem.programmanagementsystem.modules.projectmanagement.application.ListDeliverableSubmissionsUseCase;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.application.RejectDeliverableSubmissionUseCase;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.application.SubmitDeliverableUseCase;
+import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
@@ -44,7 +45,7 @@ public class DeliverableSubmissionController {
     }
 
     @PostMapping
-    public ResponseEntity<DeliverableSubmissionDtos.DeliverableSubmissionResponse> submitDeliverable(Authentication authentication, @PathVariable String projectId, @PathVariable String deliverableId, @RequestBody DeliverableSubmissionDtos.SubmitDeliverableRequest request, @RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey) {
+    public ResponseEntity<DeliverableSubmissionDtos.DeliverableSubmissionResponse> submitDeliverable(Authentication authentication, @PathVariable String projectId, @PathVariable String deliverableId, @Valid @RequestBody DeliverableSubmissionDtos.SubmitDeliverableRequest request, @RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey) {
         DeliverableSubmissionDtos.DeliverableSubmissionResponse response = DeliverableSubmissionDtos.DeliverableSubmissionResponse.from(submitDeliverableUseCase.execute(projectId, deliverableId, new SubmitDeliverableUseCase.SubmitDeliverableCommand(request.deliverableVersion(), request.documentIds()), apiSupport.actor(authentication), idempotencyKey));
         return ResponseEntity.created(URI.create("/api/projects/" + projectId + "/deliverables/" + deliverableId + "/submissions/" + response.id())).body(response);
     }
@@ -60,12 +61,12 @@ public class DeliverableSubmissionController {
     }
 
     @PostMapping("/{submissionId}/approve")
-    public DeliverableSubmissionDtos.DeliverableSubmissionResponse approveSubmission(Authentication authentication, @PathVariable String projectId, @PathVariable String deliverableId, @PathVariable String submissionId, @RequestBody DeliverableSubmissionDtos.ReviewSubmissionRequest request, @RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey) {
+    public DeliverableSubmissionDtos.DeliverableSubmissionResponse approveSubmission(Authentication authentication, @PathVariable String projectId, @PathVariable String deliverableId, @PathVariable String submissionId, @Valid @RequestBody DeliverableSubmissionDtos.ReviewSubmissionRequest request, @RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey) {
         return DeliverableSubmissionDtos.DeliverableSubmissionResponse.from(approveDeliverableSubmissionUseCase.execute(projectId, deliverableId, submissionId, new ApproveDeliverableSubmissionUseCase.ReviewSubmissionCommand(request.reviewComment(), request.version()), apiSupport.actor(authentication), idempotencyKey));
     }
 
     @PostMapping("/{submissionId}/reject")
-    public DeliverableSubmissionDtos.DeliverableSubmissionResponse rejectSubmission(Authentication authentication, @PathVariable String projectId, @PathVariable String deliverableId, @PathVariable String submissionId, @RequestBody DeliverableSubmissionDtos.ReviewSubmissionRequest request, @RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey) {
+    public DeliverableSubmissionDtos.DeliverableSubmissionResponse rejectSubmission(Authentication authentication, @PathVariable String projectId, @PathVariable String deliverableId, @PathVariable String submissionId, @Valid @RequestBody DeliverableSubmissionDtos.ReviewSubmissionRequest request, @RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey) {
         return DeliverableSubmissionDtos.DeliverableSubmissionResponse.from(rejectDeliverableSubmissionUseCase.execute(projectId, deliverableId, submissionId, new RejectDeliverableSubmissionUseCase.ReviewSubmissionCommand(request.reviewComment(), request.version()), apiSupport.actor(authentication), idempotencyKey));
     }
 }

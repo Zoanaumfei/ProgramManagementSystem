@@ -16,6 +16,8 @@ public final class ProjectArtifactDtos {
     }
 
     public record UpdateMilestoneRequest(
+            String code,
+            String name,
             LocalDate plannedDate,
             LocalDate actualDate,
             ProjectMilestoneStatus status,
@@ -24,17 +26,49 @@ public final class ProjectArtifactDtos {
             long version) {
     }
 
+    public record CreateMilestoneRequest(
+            String structureNodeId,
+            String phaseId,
+            String code,
+            String name,
+            LocalDate plannedDate,
+            String ownerOrganizationId,
+            ProjectVisibilityScope visibilityScope) {
+    }
+
     public record UpdateDeliverableRequest(
+            String code,
+            String name,
             String description,
+            DeliverableType deliverableType,
             String responsibleOrganizationId,
             String responsibleUserId,
             String approverOrganizationId,
             String approverUserId,
+            Boolean requiredDocument,
             LocalDate plannedDueDate,
             ProjectDeliverableStatus status,
             ProjectPriority priority,
             ProjectVisibilityScope visibilityScope,
             long version) {
+    }
+
+    public record CreateDeliverableRequest(
+            String structureNodeId,
+            String phaseId,
+            String milestoneId,
+            String code,
+            String name,
+            String description,
+            DeliverableType deliverableType,
+            String responsibleOrganizationId,
+            String responsibleUserId,
+            String approverOrganizationId,
+            String approverUserId,
+            Boolean requiredDocument,
+            LocalDate plannedDueDate,
+            ProjectPriority priority,
+            ProjectVisibilityScope visibilityScope) {
     }
 
     public record ProjectMilestoneResponse(String id, String structureNodeId, String phaseId, String code, String name, int sequence, LocalDate plannedDate, LocalDate actualDate, ProjectMilestoneStatus status, String ownerOrganizationId, ProjectVisibilityScope visibilityScope, long version) {

@@ -21,6 +21,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -193,6 +194,25 @@ public class ApiExceptionHandler {
             HttpServletRequest request) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(errorBody(request, HttpStatus.NOT_FOUND, "Not Found", exception.getMessage(), null));
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<Map<String, Object>> handleMethodNotSupported(
+            HttpRequestMethodNotSupportedException exception,
+            HttpServletRequest request) {
+        Map<String, Object> extras = new LinkedHashMap<>();
+        extras.put("code", "HTTP_METHOD_NOT_SUPPORTED");
+        extras.put("method", exception.getMethod());
+        if (exception.getSupportedMethods() != null) {
+            extras.put("supportedMethods", java.util.List.of(exception.getSupportedMethods()));
+        }
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
+                .body(errorBody(
+                        request,
+                        HttpStatus.METHOD_NOT_ALLOWED,
+                        "Method Not Allowed",
+                        "HTTP method is not supported for this route.",
+                        extras));
     }
 
     @ExceptionHandler(Exception.class)

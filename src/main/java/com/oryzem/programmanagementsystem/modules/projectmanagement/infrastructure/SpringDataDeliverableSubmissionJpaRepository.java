@@ -8,6 +8,7 @@ public interface SpringDataDeliverableSubmissionJpaRepository extends JpaReposit
     List<DeliverableSubmissionEntity> findAllByDeliverableIdOrderBySubmissionNumberDesc(String deliverableId);
     Optional<DeliverableSubmissionEntity> findByIdAndDeliverableId(String id, String deliverableId);
     Optional<DeliverableSubmissionEntity> findTopByDeliverableIdOrderBySubmissionNumberDesc(String deliverableId);
+    boolean existsByDeliverableId(String deliverableId);
     boolean existsByDeliverableIdAndStatusIn(String deliverableId, java.util.Collection<com.oryzem.programmanagementsystem.modules.projectmanagement.domain.DeliverableSubmissionStatus> statuses);
     void deleteAllByDeliverableIdIn(java.util.Collection<String> deliverableIds);
 }

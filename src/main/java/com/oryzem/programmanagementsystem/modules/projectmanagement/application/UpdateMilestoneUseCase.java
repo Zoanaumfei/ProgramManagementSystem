@@ -6,8 +6,10 @@ import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.Proje
 import com.oryzem.programmanagementsystem.modules.projectmanagement.domain.ProjectVisibilityScope;
 import com.oryzem.programmanagementsystem.modules.projectmanagement.application.port.ProjectMilestoneRepository;
 import com.oryzem.programmanagementsystem.platform.authorization.AuthenticatedUser;
+import com.oryzem.programmanagementsystem.platform.shared.BusinessRuleException;
 import com.oryzem.programmanagementsystem.platform.shared.ConflictException;
 import java.time.LocalDate;
+import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,7 +33,11 @@ public class UpdateMilestoneUseCase {
         if (command.version() != milestone.version()) {
             throw new ConflictException("Project milestone version mismatch.");
         }
+        String nextCode = command.code() != null ? command.code() : milestone.code();
+        assertMilestoneCodeAvailable(projectId, milestone.structureNodeId(), milestone.id(), nextCode);
         ProjectMilestoneAggregate updated = milestone.update(
+                nextCode,
+                command.name() != null ? command.name() : milestone.name(),
                 command.plannedDate() != null ? command.plannedDate() : milestone.plannedDate(),
                 command.actualDate(),
                 command.status() != null ? command.status() : milestone.status(),
@@ -40,7 +46,20 @@ public class UpdateMilestoneUseCase {
         return viewMapper.toMilestoneView(milestoneRepository.save(updated));
     }
 
+    private void assertMilestoneCodeAvailable(String projectId, String structureNodeId, String milestoneId, String code) {
+        boolean duplicate = milestoneRepository.findAllByProjectIdAndStructureNodeIdOrderBySequenceNoAsc(projectId, structureNodeId).stream()
+                .anyMatch(existing -> !existing.id().equals(milestoneId) && existing.code().equalsIgnoreCase(code.trim()));
+        if (duplicate) {
+            throw new BusinessRuleException(
+                    "PROJECT_MILESTONE_CODE_ALREADY_EXISTS",
+                    "Project milestone code already exists for this project.",
+                    Map.of("code", code.trim()));
+        }
+    }
+
     public record UpdateMilestoneCommand(
+            String code,
+            String name,
             LocalDate plannedDate,
             LocalDate actualDate,
             ProjectMilestoneStatus status,

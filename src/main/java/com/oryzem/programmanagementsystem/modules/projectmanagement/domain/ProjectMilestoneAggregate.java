@@ -20,6 +20,8 @@ public record ProjectMilestoneAggregate(
         long version) {
 
     public ProjectMilestoneAggregate update(
+            String nextCode,
+            String nextName,
             LocalDate nextPlannedDate,
             LocalDate nextActualDate,
             ProjectMilestoneStatus nextStatus,
@@ -36,8 +38,8 @@ public record ProjectMilestoneAggregate(
                 projectId,
                 structureNodeId,
                 phaseId,
-                code,
-                name,
+                requireText(nextCode, "code"),
+                requireText(nextName, "name"),
                 sequence,
                 nextPlannedDate,
                 nextActualDate,
@@ -45,5 +47,15 @@ public record ProjectMilestoneAggregate(
                 nextOwnerOrganizationId,
                 nextVisibilityScope != null ? nextVisibilityScope : visibilityScope,
                 version);
+    }
+
+    private String requireText(String value, String field) {
+        if (value == null || value.isBlank()) {
+            throw new BusinessRuleException(
+                    "PROJECT_MILESTONE_FIELD_REQUIRED",
+                    "Project milestone field is required.",
+                    Map.of("field", field));
+        }
+        return value.trim();
     }
 }

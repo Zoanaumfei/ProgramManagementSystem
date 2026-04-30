@@ -100,11 +100,15 @@ public class ProjectDeliverableEntity {
     }
 
     public void apply(ProjectDeliverableAggregate aggregate) {
+        this.code = aggregate.code();
+        this.name = aggregate.name();
         this.description = aggregate.description();
+        this.deliverableType = aggregate.deliverableType();
         this.responsibleOrganizationId = aggregate.responsibleOrganizationId();
         this.responsibleUserId = aggregate.responsibleUserId();
         this.approverOrganizationId = aggregate.approverOrganizationId();
         this.approverUserId = aggregate.approverUserId();
+        this.requiredDocument = aggregate.requiredDocument();
         this.plannedDueDate = aggregate.plannedDueDate();
         this.submittedAt = aggregate.submittedAt();
         this.approvedAt = aggregate.approvedAt();

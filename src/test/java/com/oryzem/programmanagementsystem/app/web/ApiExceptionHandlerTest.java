@@ -3,6 +3,7 @@ package com.oryzem.programmanagementsystem.app.web;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.blankOrNullString;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -49,6 +50,18 @@ class ApiExceptionHandlerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error").value("Not Found"))
                 .andExpect(jsonPath("$.path").value("/api/test/missing"))
+                .andExpect(jsonPath("$.correlationId", not(blankOrNullString())));
+    }
+
+    @Test
+    void shouldReturnJsonForUnsupportedMethodsInsteadOfInternalServerError() throws Exception {
+        mockMvc.perform(delete("/api/test/boom")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(jsonPath("$.error").value("Method Not Allowed"))
+                .andExpect(jsonPath("$.code").value("HTTP_METHOD_NOT_SUPPORTED"))
+                .andExpect(jsonPath("$.method").value("DELETE"))
+                .andExpect(jsonPath("$.path").value("/api/test/boom"))
                 .andExpect(jsonPath("$.correlationId", not(blankOrNullString())));
     }
 

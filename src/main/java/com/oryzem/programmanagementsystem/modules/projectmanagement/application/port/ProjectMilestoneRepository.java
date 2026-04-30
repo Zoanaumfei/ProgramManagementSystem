@@ -15,4 +15,6 @@ public interface ProjectMilestoneRepository {
     List<ProjectMilestoneAggregate> findAllByProjectIdAndStructureNodeIdOrderBySequenceNoAsc(String projectId, String structureNodeId);
 
     ProjectMilestoneAggregate save(ProjectMilestoneAggregate milestone);
+
+    void deleteById(String id);
 }

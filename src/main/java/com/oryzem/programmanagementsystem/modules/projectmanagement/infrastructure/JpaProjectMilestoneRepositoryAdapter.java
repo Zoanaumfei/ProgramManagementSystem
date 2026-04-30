@@ -52,4 +52,9 @@ public class JpaProjectMilestoneRepositoryAdapter implements ProjectMilestoneRep
                 .orElseGet(() -> mapper.toNewEntity(milestone));
         return mapper.toDomain(delegate.save(entity));
     }
+
+    @Override
+    public void deleteById(String id) {
+        delegate.deleteById(id);
+    }
 }

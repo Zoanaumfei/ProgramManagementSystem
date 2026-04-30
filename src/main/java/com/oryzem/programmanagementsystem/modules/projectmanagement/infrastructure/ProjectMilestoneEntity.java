@@ -71,6 +71,8 @@ public class ProjectMilestoneEntity {
     }
 
     public void apply(ProjectMilestoneAggregate aggregate) {
+        this.code = aggregate.code();
+        this.name = aggregate.name();
         this.plannedDate = aggregate.plannedDate();
         this.actualDate = aggregate.actualDate();
         this.status = aggregate.status();

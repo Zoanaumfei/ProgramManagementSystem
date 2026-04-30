@@ -30,11 +30,15 @@ public record ProjectDeliverableAggregate(
         long version) {
 
     public ProjectDeliverableAggregate updateOperationalFields(
+            String nextCode,
+            String nextName,
             String nextDescription,
+            DeliverableType nextDeliverableType,
             String nextResponsibleOrganizationId,
             String nextResponsibleUserId,
             String nextApproverOrganizationId,
             String nextApproverUserId,
+            boolean nextRequiredDocument,
             LocalDate nextPlannedDueDate,
             ProjectDeliverableStatus nextStatus,
             ProjectPriority nextPriority,
@@ -54,15 +58,15 @@ public record ProjectDeliverableAggregate(
                 structureNodeId,
                 phaseId,
                 milestoneId,
-                code,
-                name,
+                requireText(nextCode, "code"),
+                requireText(nextName, "name"),
                 nextDescription,
-                deliverableType,
+                nextDeliverableType != null ? nextDeliverableType : deliverableType,
                 nextResponsibleOrganizationId,
                 nextResponsibleUserId,
                 nextApproverOrganizationId,
                 nextApproverUserId,
-                requiredDocument,
+                nextRequiredDocument,
                 nextPlannedDueDate,
                 submittedAt,
                 approvedAt,
@@ -70,6 +74,16 @@ public record ProjectDeliverableAggregate(
                 nextPriority != null ? nextPriority : priority,
                 nextVisibilityScope != null ? nextVisibilityScope : visibilityScope,
                 version);
+    }
+
+    private String requireText(String value, String field) {
+        if (value == null || value.isBlank()) {
+            throw new BusinessRuleException(
+                    "PROJECT_DELIVERABLE_FIELD_REQUIRED",
+                    "Project deliverable field is required.",
+                    Map.of("field", field));
+        }
+        return value.trim();
     }
 
     public void assertCanSubmit() {

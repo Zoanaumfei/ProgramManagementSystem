@@ -3,6 +3,7 @@ package com.oryzem.programmanagementsystem.modules.projectmanagement.api;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -269,6 +270,31 @@ class ProjectManagementControllerIntegrationTest {
                                 "deliverableVersion", deliverable.get("version").asLong(),
                                 "documentIds", java.util.List.of("DOC-DOES-NOT-EXIST")))))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldValidateSubmissionMutationPayloadsBeforeUseCaseExecution() throws Exception {
+        mockMvc.perform(post("/api/projects/PRJ-VALIDATION/deliverables/DEL-VALIDATION/submissions")
+                        .with(externalAdminTenantA())
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "deliverableVersion": 0
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("documentIds")));
+
+        mockMvc.perform(post("/api/projects/PRJ-VALIDATION/deliverables/DEL-VALIDATION/submissions/SUB-VALIDATION/approve")
+                        .with(externalAdminTenantA())
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "reviewComment": "Looks good"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("version")));
     }
 
     @Test
@@ -1295,6 +1321,139 @@ class ProjectManagementControllerIntegrationTest {
     }
 
     @Test
+    void shouldCustomizeProjectArtifactsWithoutChangingTemplateDefinitions() throws Exception {
+        JsonNode project = createProject("PRJ-CUSTOM-RUNTIME-001", "CUSTOM", "TMP-CUSTOM-V1");
+        String projectId = project.get("id").asText();
+        JsonNode milestone = listMilestonesAs(externalAdminTenantA(), projectId, null).get(0);
+        JsonNode deliverable = listDeliverablesAs(externalAdminTenantA(), projectId, null).get(0);
+
+        mockMvc.perform(patch("/api/projects/" + projectId + "/milestones/" + milestone.get("id").asText())
+                        .with(externalAdminTenantA())
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "code", "CUSTOM_RUNTIME_GATE",
+                                "name", "Runtime Custom Gate",
+                                "plannedDate", milestone.get("plannedDate").asText(),
+                                "status", milestone.get("status").asText(),
+                                "visibilityScope", milestone.get("visibilityScope").asText(),
+                                "version", milestone.get("version").asLong()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("CUSTOM_RUNTIME_GATE"))
+                .andExpect(jsonPath("$.name").value("Runtime Custom Gate"));
+
+        java.util.Map<String, Object> deliverablePayload = new java.util.LinkedHashMap<>();
+        deliverablePayload.put("code", "CUSTOM_RUNTIME_DELIVERABLE");
+        deliverablePayload.put("name", "Runtime Custom Deliverable");
+        deliverablePayload.put("description", "only this project changed");
+        deliverablePayload.put("deliverableType", deliverable.get("deliverableType").asText());
+        deliverablePayload.put("requiredDocument", true);
+        if (!deliverable.get("responsibleOrganizationId").isNull()) {
+            deliverablePayload.put("responsibleOrganizationId", deliverable.get("responsibleOrganizationId").asText());
+        }
+        if (!deliverable.get("approverOrganizationId").isNull()) {
+            deliverablePayload.put("approverOrganizationId", deliverable.get("approverOrganizationId").asText());
+        }
+        deliverablePayload.put("plannedDueDate", deliverable.get("plannedDueDate").asText());
+        deliverablePayload.put("status", deliverable.get("status").asText());
+        deliverablePayload.put("priority", deliverable.get("priority").asText());
+        deliverablePayload.put("visibilityScope", deliverable.get("visibilityScope").asText());
+        deliverablePayload.put("version", deliverable.get("version").asLong());
+
+        mockMvc.perform(patch("/api/projects/" + projectId + "/deliverables/" + deliverable.get("id").asText())
+                        .with(externalAdminTenantA())
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(deliverablePayload)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("CUSTOM_RUNTIME_DELIVERABLE"))
+                .andExpect(jsonPath("$.name").value("Runtime Custom Deliverable"))
+                .andExpect(jsonPath("$.requiredDocument").value(true));
+
+        mockMvc.perform(get("/api/project-templates/TMP-CUSTOM-V1/milestones")
+                        .with(externalAdminTenantA()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].code").value("CUSTOM_GATE_1"))
+                .andExpect(jsonPath("$[0].name").value("Custom Gate"));
+
+        mockMvc.perform(get("/api/project-templates/TMP-CUSTOM-V1/deliverables")
+                        .with(externalAdminTenantA()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].code").value("CUSTOM_DELIVERABLE_1"))
+                .andExpect(jsonPath("$[0].name").value("Custom Deliverable"))
+                .andExpect(jsonPath("$[0].requiredDocument").value(false));
+    }
+
+    @Test
+    void shouldCreateAndRemoveProjectRuntimeArtifactsWithoutChangingTemplates() throws Exception {
+        JsonNode project = createProject("PRJ-RUNTIME-CRUD-001", "CUSTOM", "TMP-CUSTOM-V1");
+        String projectId = project.get("id").asText();
+        String rootNodeId = projectId + "-ROOT";
+
+        String milestoneResponse = mockMvc.perform(post("/api/projects/" + projectId + "/milestones")
+                        .with(externalAdminTenantA())
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "structureNodeId", rootNodeId,
+                                "code", "ADDED_RUNTIME_GATE",
+                                "name", "Added Runtime Gate",
+                                "plannedDate", "2026-05-20",
+                                "visibilityScope", "ALL_PROJECT_PARTICIPANTS"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("ADDED_RUNTIME_GATE"))
+                .andExpect(jsonPath("$.structureNodeId").value(rootNodeId))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String milestoneId = objectMapper.readTree(milestoneResponse).get("id").asText();
+
+        String deliverableResponse = mockMvc.perform(post("/api/projects/" + projectId + "/deliverables")
+                        .with(externalAdminTenantA())
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "structureNodeId", rootNodeId,
+                                "milestoneId", milestoneId,
+                                "code", "ADDED_RUNTIME_DELIVERABLE",
+                                "name", "Added Runtime Deliverable",
+                                "description", "project-only deliverable",
+                                "deliverableType", "REPORT",
+                                "requiredDocument", false,
+                                "plannedDueDate", "2026-05-25",
+                                "priority", "LOW",
+                                "visibilityScope", "ALL_PROJECT_PARTICIPANTS"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("ADDED_RUNTIME_DELIVERABLE"))
+                .andExpect(jsonPath("$.milestoneId").value(milestoneId))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String deliverableId = objectMapper.readTree(deliverableResponse).get("id").asText();
+
+        mockMvc.perform(delete("/api/projects/" + projectId + "/milestones/" + milestoneId)
+                        .with(externalAdminTenantA()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("PROJECT_MILESTONE_IN_USE"));
+
+        mockMvc.perform(delete("/api/projects/" + projectId + "/deliverables/" + deliverableId)
+                        .with(externalAdminTenantA()))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(delete("/api/projects/" + projectId + "/milestones/" + milestoneId)
+                        .with(externalAdminTenantA()))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/projects/" + projectId + "/deliverables")
+                        .with(externalAdminTenantA()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.code == 'ADDED_RUNTIME_DELIVERABLE')]").isEmpty());
+        mockMvc.perform(get("/api/projects/" + projectId + "/milestones")
+                        .with(externalAdminTenantA()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.code == 'ADDED_RUNTIME_GATE')]").isEmpty());
+        mockMvc.perform(get("/api/project-templates/TMP-CUSTOM-V1/deliverables")
+                        .with(externalAdminTenantA()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
+    }
+
+    @Test
     void shouldAllowInternalAdminToManagePlatformDefaultTemplates() throws Exception {
         mockMvc.perform(get("/api/project-templates")
                         .with(internalAdmin()))
@@ -1503,6 +1662,41 @@ class ProjectManagementControllerIntegrationTest {
     }
 
     @Test
+    void shouldPurgeProjectWithRuntimeStructureNodes() throws Exception {
+        enableCustomThreeLevelStructure();
+        JsonNode project = createProject("PRJ-PURGE-STRUCT-001", "CUSTOM");
+        String projectId = project.get("id").asText();
+        JsonNode subsystem = createStructureNode(projectId, projectId + "-ROOT", "Subsystem A", "SUBSYS-A");
+        createStructureNode(projectId, subsystem.get("id").asText(), "Component A", "COMP-A");
+
+        String intentResponse = mockMvc.perform(post("/api/projects/" + projectId + "/purge-intents")
+                        .with(internalSupport())
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "reason", "Runtime structure purge regression."))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.impact.structureNodeCount").value(3))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String purgeToken = objectMapper.readTree(intentResponse).get("purgeToken").asText();
+
+        mockMvc.perform(post("/api/projects/" + projectId + "/purge")
+                        .with(internalSupport())
+                        .contentType(APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "reason", "Runtime structure purge regression.",
+                                "purgeToken", purgeToken,
+                                "confirm", true,
+                                "confirmationText", "PURGE PROJECT"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PURGED"));
+
+        assertThat(projectRepository.findById(projectId)).isEmpty();
+        assertThat(structureNodeRepository.findAllByProjectIdOrderBySequenceNoAscIdAsc(projectId)).isEmpty();
+    }
+
+    @Test
     void shouldRejectProjectPurgeExecutionWithoutFinalConfirmation() throws Exception {
         JsonNode project = createProject("PRJ-PURGE-CONFIRM-001");
         String projectId = project.get("id").asText();
@@ -1543,6 +1737,17 @@ class ProjectManagementControllerIntegrationTest {
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "reason", "External actors must not purge projects."))))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldReturnMethodNotAllowedWhenProjectDeleteEndpointIsUsed() throws Exception {
+        JsonNode project = createProject("PRJ-DELETE-METHOD-001");
+        String projectId = project.get("id").asText();
+
+        mockMvc.perform(delete("/api/projects/" + projectId)
+                        .with(internalSupport()))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(jsonPath("$.code").value("HTTP_METHOD_NOT_SUPPORTED"));
     }
 
     private JsonNode createProject(String code) throws Exception {

@@ -15,4 +15,6 @@ public interface ProjectDeliverableRepository {
     List<ProjectDeliverableAggregate> findAllByProjectIdAndStructureNodeIdOrderByPlannedDueDateAscIdAsc(String projectId, String structureNodeId);
 
     ProjectDeliverableAggregate save(ProjectDeliverableAggregate deliverable);
+
+    void deleteById(String id);
 }

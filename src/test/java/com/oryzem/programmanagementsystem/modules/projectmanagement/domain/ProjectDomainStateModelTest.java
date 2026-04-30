@@ -91,11 +91,15 @@ class ProjectDomainStateModelTest {
                 0L);
 
         assertThatThrownBy(() -> aggregate.updateOperationalFields(
+                        aggregate.code(),
+                        aggregate.name(),
                         "new desc",
+                        aggregate.deliverableType(),
                         "tenant-a",
                         null,
                         null,
                         null,
+                        aggregate.requiredDocument(),
                         LocalDate.now().plusDays(7),
                         ProjectDeliverableStatus.UNDER_REVIEW,
                         ProjectPriority.HIGH,

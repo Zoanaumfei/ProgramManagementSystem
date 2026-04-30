@@ -37,12 +37,18 @@ class UpdateDeliverableUseCaseTest {
 
         when(authorizationService.authorizeDeliverable("PRJ-001", "DLV-001", actor, ProjectPermission.EDIT_DELIVERABLE))
                 .thenReturn(access);
+        when(deliverableRepository.findAllByProjectIdAndStructureNodeIdOrderByPlannedDueDateAscIdAsc("PRJ-001", "NODE-001"))
+                .thenReturn(List.of(access.deliverable()));
         when(deliverableRepository.save(access.deliverable().updateOperationalFields(
+                "DLV-UPDATED",
+                "Deliverable Updated",
                 "updated description",
+                DeliverableType.REPORT,
                 "tenant-b",
                 "USR-2",
                 "customer-a",
                 "USR-APP-2",
+                false,
                 LocalDate.parse("2026-05-15"),
                 ProjectDeliverableStatus.WAIVED,
                 ProjectPriority.CRITICAL,
@@ -53,11 +59,15 @@ class UpdateDeliverableUseCaseTest {
                 "PRJ-001",
                 "DLV-001",
                 new UpdateDeliverableUseCase.UpdateDeliverableCommand(
+                        "DLV-UPDATED",
+                        "Deliverable Updated",
                         "updated description",
+                        DeliverableType.REPORT,
                         "tenant-b",
                         "USR-2",
                         "customer-a",
                         "USR-APP-2",
+                        false,
                         LocalDate.parse("2026-05-15"),
                         ProjectDeliverableStatus.WAIVED,
                         ProjectPriority.CRITICAL,
@@ -66,16 +76,24 @@ class UpdateDeliverableUseCaseTest {
                 actor);
 
         verify(deliverableRepository).save(access.deliverable().updateOperationalFields(
+                "DLV-UPDATED",
+                "Deliverable Updated",
                 "updated description",
+                DeliverableType.REPORT,
                 "tenant-b",
                 "USR-2",
                 "customer-a",
                 "USR-APP-2",
+                false,
                 LocalDate.parse("2026-05-15"),
                 ProjectDeliverableStatus.WAIVED,
                 ProjectPriority.CRITICAL,
                 ProjectVisibilityScope.LEAD_ONLY));
+        assertThat(response.code()).isEqualTo("DLV-UPDATED");
+        assertThat(response.name()).isEqualTo("Deliverable Updated");
         assertThat(response.description()).isEqualTo("updated description");
+        assertThat(response.deliverableType()).isEqualTo(DeliverableType.REPORT);
+        assertThat(response.requiredDocument()).isFalse();
         assertThat(response.responsibleOrganizationId()).isEqualTo("tenant-b");
         assertThat(response.responsibleUserId()).isEqualTo("USR-2");
         assertThat(response.approverUserId()).isEqualTo("USR-APP-2");

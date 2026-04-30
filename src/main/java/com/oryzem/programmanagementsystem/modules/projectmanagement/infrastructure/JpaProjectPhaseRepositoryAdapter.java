@@ -25,6 +25,11 @@ public class JpaProjectPhaseRepositoryAdapter implements ProjectPhaseRepository 
     }
 
     @Override
+    public java.util.Optional<ProjectPhaseAggregate> findByIdAndProjectId(String id, String projectId) {
+        return delegate.findByIdAndProjectId(id, projectId).map(mapper::toDomain);
+    }
+
+    @Override
     public ProjectPhaseAggregate save(ProjectPhaseAggregate phase) {
         return mapper.toDomain(delegate.save(mapper.toNewEntity(phase)));
     }

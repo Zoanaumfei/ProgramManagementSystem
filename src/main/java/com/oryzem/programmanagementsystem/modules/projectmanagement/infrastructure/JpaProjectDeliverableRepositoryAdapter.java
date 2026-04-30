@@ -53,4 +53,9 @@ public class JpaProjectDeliverableRepositoryAdapter implements ProjectDeliverabl
                 .orElseGet(() -> mapper.toNewEntity(deliverable));
         return mapper.toDomain(delegate.save(entity));
     }
+
+    @Override
+    public void deleteById(String id) {
+        delegate.deleteById(id);
+    }
 }

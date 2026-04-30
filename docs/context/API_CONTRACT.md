@@ -52,11 +52,15 @@
 - `PATCH /api/projects/{projectId}/structure/nodes/{nodeId}`
 - `POST /api/projects/{projectId}/structure/nodes/{nodeId}/move`
 - `GET /api/projects/{projectId}/milestones`
+- `POST /api/projects/{projectId}/milestones`
 - `PATCH /api/projects/{projectId}/milestones/{milestoneId}`
+- `DELETE /api/projects/{projectId}/milestones/{milestoneId}`
 - `GET /api/projects/{projectId}/deliverables`
 - `GET /api/projects/{projectId}/deliverables/pending-review`
 - `GET /api/projects/{projectId}/deliverables/{deliverableId}`
+- `POST /api/projects/{projectId}/deliverables`
 - `PATCH /api/projects/{projectId}/deliverables/{deliverableId}`
+- `DELETE /api/projects/{projectId}/deliverables/{deliverableId}`
 - `POST /api/projects/{projectId}/deliverables/{deliverableId}/submissions`
 - `GET /api/projects/{projectId}/deliverables/{deliverableId}/submissions`
 - `GET /api/projects/{projectId}/deliverables/{deliverableId}/submissions/{submissionId}`
@@ -258,7 +262,7 @@ Important behavior:
 - legacy claim echo fields were removed
 - access context is always resolved from local membership data
 - invalid `X-Access-Context` values now return `400 Bad Request`
-- tenant rate limiting may return `429 Too Many Requests`
+- tenant rate limiting may return `429 Too Many Requests` on authenticated tenant-scoped routes, including access, project-management and document-management surfaces
 - tenant rate limiting is backed by a shared counter store in production and falls back to local counters only when `app.multitenancy.rate-limit.store=local`
 
 ## User account admin
@@ -542,8 +546,94 @@ Important behavior:
 - `Idempotency-Key` is supported on create and submission/review mutation flows
 - when `templateId` is omitted, the backend resolves the current default template for the chosen `frameworkType` inside the actor authorized template catalog
 - when `templateId` is provided, the backend validates template-use authorization for the active organization context before creating the project
+- templates are setup accelerators only: project creation snapshots/materializes runtime structure, milestones and deliverables from the selected template; later project-level edits affect only that project and do not mutate the source project template, structure template, phases, milestone templates or deliverable templates
+- `templateId` and `templateVersion` remain immutable provenance fields on the project response; changing a project's runtime plan is done through project, structure-node, milestone and deliverable endpoints, not by re-binding the project to a different template
+- project-local milestones and deliverables can be added after creation with `POST /api/projects/{projectId}/milestones` and `POST /api/projects/{projectId}/deliverables`; these runtime additions do not create or mutate template definitions
+- project-local milestones can be removed with `DELETE /api/projects/{projectId}/milestones/{milestoneId}` only when no project deliverable references the milestone; otherwise the backend returns business code `PROJECT_MILESTONE_IN_USE`
+- project-local deliverables can be removed with `DELETE /api/projects/{projectId}/deliverables/{deliverableId}` only before submissions exist and while no active document is attached; otherwise the backend returns `PROJECT_DELIVERABLE_HAS_SUBMISSIONS` or `PROJECT_DELIVERABLE_HAS_DOCUMENTS`; when history must be preserved, set the deliverable status to `WAIVED` instead of deleting it
 - the lead organization is always derived from the authenticated active access context, not from a free-form request field
 - project update, milestone update, deliverable update and submission review flows use optimistic concurrency through `version`
+
+Update project request shape:
+```json
+{
+  "name": "Project PRJ-APQP-001 updated",
+  "description": "project-specific change",
+  "visibilityScope": "ALL_PROJECT_PARTICIPANTS",
+  "plannedStartDate": "2026-04-10",
+  "plannedEndDate": "2026-07-15",
+  "status": "PLANNED",
+  "version": 0
+}
+```
+
+Update milestone request shape:
+```json
+{
+  "code": "CUSTOM_RUNTIME_GATE",
+  "name": "Runtime Custom Gate",
+  "plannedDate": "2026-05-08",
+  "actualDate": null,
+  "status": "NOT_STARTED",
+  "ownerOrganizationId": "ORG-123",
+  "visibilityScope": "ALL_PROJECT_PARTICIPANTS",
+  "version": 0
+}
+```
+
+Create milestone request shape:
+```json
+{
+  "structureNodeId": "PRJ-123-ROOT",
+  "phaseId": "PRJPH-123",
+  "code": "CUSTOM_RUNTIME_GATE",
+  "name": "Runtime Custom Gate",
+  "plannedDate": "2026-05-08",
+  "ownerOrganizationId": "ORG-123",
+  "visibilityScope": "ALL_PROJECT_PARTICIPANTS"
+}
+```
+
+Update deliverable request shape:
+```json
+{
+  "code": "CUSTOM_RUNTIME_DELIVERABLE",
+  "name": "Runtime Custom Deliverable",
+  "description": "project-specific deliverable",
+  "deliverableType": "DOCUMENT_PACKAGE",
+  "responsibleOrganizationId": "ORG-123",
+  "responsibleUserId": "USR-123",
+  "approverOrganizationId": "ORG-456",
+  "approverUserId": "USR-456",
+  "requiredDocument": true,
+  "plannedDueDate": "2026-05-13",
+  "status": "NOT_STARTED",
+  "priority": "MEDIUM",
+  "visibilityScope": "ALL_PROJECT_PARTICIPANTS",
+  "version": 0
+}
+```
+
+Create deliverable request shape:
+```json
+{
+  "structureNodeId": "PRJ-123-ROOT",
+  "phaseId": "PRJPH-123",
+  "milestoneId": "PRJMS-123",
+  "code": "CUSTOM_RUNTIME_DELIVERABLE",
+  "name": "Runtime Custom Deliverable",
+  "description": "project-specific deliverable",
+  "deliverableType": "DOCUMENT_PACKAGE",
+  "responsibleOrganizationId": "ORG-123",
+  "responsibleUserId": "USR-123",
+  "approverOrganizationId": "ORG-456",
+  "approverUserId": "USR-456",
+  "requiredDocument": true,
+  "plannedDueDate": "2026-05-13",
+  "priority": "MEDIUM",
+  "visibilityScope": "ALL_PROJECT_PARTICIPANTS"
+}
+```
 
 `ProjectSummaryResponse` includes:
 - `id`
@@ -635,6 +725,8 @@ Deliverable submission create request:
   "documentIds": ["DOC-123"]
 }
 ```
+- `deliverableVersion` is required and must be zero or positive.
+- `documentIds` is required; send an empty array when no documents are attached.
 
 Deliverable review request:
 ```json
@@ -643,6 +735,7 @@ Deliverable review request:
   "version": 0
 }
 ```
+- `version` is required and must be zero or positive.
 
 `DeliverableSubmissionResponse` includes:
 - `id`

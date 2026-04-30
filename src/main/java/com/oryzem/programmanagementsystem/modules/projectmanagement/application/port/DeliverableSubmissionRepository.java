@@ -16,6 +16,8 @@ public interface DeliverableSubmissionRepository {
 
     boolean existsByDeliverableIdAndStatusIn(String deliverableId, Collection<DeliverableSubmissionStatus> statuses);
 
+    boolean existsByDeliverableId(String deliverableId);
+
     List<DeliverableSubmissionAggregate> findAllByDeliverableIdOrderBySubmissionNumberDesc(String deliverableId);
 
     DeliverableSubmissionAggregate save(DeliverableSubmissionAggregate submission);
